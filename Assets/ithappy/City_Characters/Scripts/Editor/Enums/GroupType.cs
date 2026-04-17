@@ -1,0 +1,33 @@
+namespace CharacterCustomizationTool.Editor.Enums
+{
+    public enum GroupType
+    {
+        Backpack,
+        Beard,
+        Body,
+        Bracelet,
+        Chain,
+        Dress,
+        Face,
+        Glasses,
+        Gloves,
+        Hairstyle,
+        Hat,
+        HatBeard,
+        HatHairstyle,
+        HatMustache,
+        HeelShoes,
+        Jacket,
+        Mustache,
+        Necklace,
+        Outwear,
+        Overall,
+        Pants,
+        Shirt,
+        Shoes,
+        Shorts,
+        Skirt,
+        Swimsuit,
+        Watch,
+    }
+}

@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04fb6c096ba84e798f3b56972c86a247, type: 3}
+  m_Name: Child
+  m_EditorClassIdentifier: 
+  BodyType: 5
+  BaseMesh: {fileID: 919132149155446097, guid: 2b2e8f07d79984a469ec72bf83ca6bc5, type: 3}
+  Genders:
+  - {fileID: 11400000, guid: 33f0bad997a9c134f994bebce17a5a3a, type: 2}
+  - {fileID: 11400000, guid: 657909c62e23ba94dbad82d61397b822, type: 2}
