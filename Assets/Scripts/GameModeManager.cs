@@ -11,7 +11,9 @@ public class GameModeManager : MonoBehaviour
     [SerializeField] private CameraFollow cameraFollow;
     [SerializeField] private GameObject focusUI;
     [SerializeField] private TimerController timerController;
-    [SerializeField] private Vector3 focusOffset = new Vector3(0f, 3f, -2f);
+    [SerializeField] private Transform focusCameraPoint;
+    [SerializeField] private Vector3 focusOffset = new Vector3(0f, 2f, 1.5f);
+    [SerializeField] private Vector3 focusLookAtOffset = new Vector3(0f, -0.5f, 0f);
 
     private Vector3 roamingOffset;
 
@@ -31,6 +33,13 @@ public class GameModeManager : MonoBehaviour
         playerMovement.SetMovementEnabled(false);
         cameraFollow.SetTarget(seatTransform);
         cameraFollow.SetOffset(focusOffset);
+        if (focusCameraPoint != null)
+            cameraFollow.SetFocusTransform(focusCameraPoint);
+        else
+        {
+            cameraFollow.SetLookAt(true);
+            cameraFollow.SetLookAtOffset(focusLookAtOffset);
+        }
         if (focusUI != null) focusUI.SetActive(true);
         if (timerController != null) timerController.StartSession();
     }
@@ -41,6 +50,8 @@ public class GameModeManager : MonoBehaviour
         playerMovement.SetMovementEnabled(true);
         cameraFollow.SetTarget(playerTransform);
         cameraFollow.SetOffset(roamingOffset);
+        cameraFollow.ClearFocusTransform();
+        cameraFollow.SetLookAt(false);
         if (focusUI != null) focusUI.SetActive(false);
         if (timerController != null) timerController.StopSession();
     }
