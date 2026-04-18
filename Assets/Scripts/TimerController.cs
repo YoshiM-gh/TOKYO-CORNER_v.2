@@ -26,6 +26,8 @@ public class TimerController : MonoBehaviour
     public void StopSession()
     {
         isRunning = false;
+        if (SaveDataManager.Instance != null)
+            SaveDataManager.Instance.AddSessionSeconds(elapsedSeconds);
     }
 
     private void UpdateDisplay()
