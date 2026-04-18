@@ -681,6 +681,7 @@ MonoBehaviour:
   playerMovement: {fileID: 1979357454}
   cameraFollow: {fileID: 1443662117}
   focusUI: {fileID: 2125175986}
+  timerController: {fileID: 2125175988}
   focusOffset: {x: 0, y: 3, z: -2}
 --- !u!4 &1600116567
 Transform:
@@ -1041,6 +1042,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2125175987}
+  - component: {fileID: 2125175988}
   m_Layer: 5
   m_Name: FocusUI
   m_TagString: Untagged
@@ -1068,6 +1070,19 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &2125175988
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2125175986}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f090f9f462a4c2f468ccd4e783098b97, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TimerController
+  timerText: {fileID: 1052779581}
 --- !u!1001 &2390145017181651511
 PrefabInstance:
   m_ObjectHideFlags: 0
