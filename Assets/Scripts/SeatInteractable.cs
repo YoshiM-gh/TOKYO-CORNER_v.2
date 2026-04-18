@@ -6,7 +6,7 @@ public class SeatInteractable : MonoBehaviour
     [SerializeField] private Transform sitPoint;
 
     private Transform player;
-    private bool isPlayerNear = false;
+    private bool isSeated = false;
 
     private void Start()
     {
@@ -19,20 +19,35 @@ public class SeatInteractable : MonoBehaviour
     {
         if (player == null) return;
 
-        float distance = Vector3.Distance(transform.position, player.position);
-        isPlayerNear = distance <= interactRange;
-
-        if (isPlayerNear && Input.GetKeyDown(KeyCode.E))
+        if (!isSeated)
         {
-            SitDown();
+            float distance = Vector3.Distance(transform.position, player.position);
+            if (distance <= interactRange && Input.GetKeyDown(KeyCode.E))
+            {
+                SitDown();
+            }
+        }
+        else
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                StandUp();
+            }
         }
     }
 
     private void SitDown()
     {
+        isSeated = true;
         Vector3 targetPos = sitPoint != null ? sitPoint.position : transform.position;
         player.position = targetPos;
-        Debug.Log("着席しました");
+        GameModeManager.Instance.EnterFocusMode(sitPoint != null ? sitPoint : transform);
+    }
+
+    private void StandUp()
+    {
+        isSeated = false;
+        GameModeManager.Instance.ExitFocusMode(player);
     }
 
     private void OnDrawGizmosSelected()
