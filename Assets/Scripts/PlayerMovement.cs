@@ -16,7 +16,7 @@ public class PlayerMovement : MonoBehaviour
     {
         if (!movementEnabled)
         {
-            rb.linearVelocity = Vector3.zero;
+            rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
             return;
         }
 

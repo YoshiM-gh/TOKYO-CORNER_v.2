@@ -29,6 +29,9 @@ public class SeatInteractable : MonoBehaviour
         }
         else
         {
+            Vector3 targetPos = sitPoint != null ? sitPoint.position : transform.position;
+            player.position = targetPos;
+
             if (Input.GetKeyDown(KeyCode.Escape))
             {
                 StandUp();
@@ -47,6 +50,9 @@ public class SeatInteractable : MonoBehaviour
     private void StandUp()
     {
         isSeated = false;
+        Vector3 standPos = player.position;
+        standPos.y = 0.525f;
+        player.position = standPos;
         GameModeManager.Instance.ExitFocusMode(player);
     }
 
