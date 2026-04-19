@@ -1,9 +1,13 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class SeatInteractable : MonoBehaviour
 {
     [SerializeField] private float interactRange = 1.5f;
     [SerializeField] private Transform sitPoint;
+    [Tooltip("未指定時は椅子の前方（-forward）に離席します。")]
+    [SerializeField] private Transform standPoint;
+    [SerializeField] private float standOffDistance = 1.1f;
 
     private Transform player;
     private bool isSeated = false;
@@ -32,7 +36,7 @@ public class SeatInteractable : MonoBehaviour
             Vector3 targetPos = sitPoint != null ? sitPoint.position : transform.position;
             player.position = targetPos;
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (WasEscapePressed())
             {
                 StandUp();
             }
@@ -50,10 +54,29 @@ public class SeatInteractable : MonoBehaviour
     private void StandUp()
     {
         isSeated = false;
-        Vector3 standPos = player.position;
-        standPos.y = 0.525f;
+        Vector3 sitWorld = sitPoint != null ? sitPoint.position : transform.position;
+        Vector3 standPos;
+        if (standPoint != null)
+            standPos = standPoint.position;
+        else
+        {
+            Vector3 flatForward = transform.forward;
+            flatForward.y = 0f;
+            if (flatForward.sqrMagnitude < 0.0001f)
+                flatForward = Vector3.forward;
+            else
+                flatForward.Normalize();
+            standPos = sitWorld - flatForward * standOffDistance;
+            standPos.y = 0.525f;
+        }
         player.position = standPos;
         GameModeManager.Instance.ExitFocusMode(player);
+    }
+
+    private static bool WasEscapePressed()
+    {
+        if (Input.GetKeyDown(KeyCode.Escape)) return true;
+        return Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
     }
 
     private void OnDrawGizmosSelected()
