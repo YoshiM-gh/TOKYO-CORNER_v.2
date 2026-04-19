@@ -44,6 +44,9 @@ public class SaveDataManager : MonoBehaviour
     private SaveData saveData = new SaveData();
     private string savePath;
     private float playtimeSaveTimer;
+    private System.DateTime lastRealtimeUtc;
+    private bool hasRealtimeSample;
+    private GameModeManager.GameMode modeAtLastSample = GameModeManager.GameMode.Roaming;
 
     private void Awake()
     {
@@ -64,7 +67,15 @@ public class SaveDataManager : MonoBehaviour
 
     private void OnApplicationPause(bool pause)
     {
+        // 一時停止前後で実時間差分を反映することで、バックグラウンド滞在も計測する
+        TickPlaytime();
         if (pause) Save();
+    }
+
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        TickPlaytime();
+        if (!hasFocus) Save();
     }
 
     private void OnApplicationQuit()
@@ -127,28 +138,50 @@ public class SaveDataManager : MonoBehaviour
     private void TickPlaytime()
     {
         NormalizeTodayStatsDate();
-        GameModeManager gm = GameModeManager.Instance;
-        if (gm == null) return;
-
-        float dt = Time.deltaTime;
-        if (gm.CurrentMode == GameModeManager.GameMode.Roaming)
+        var nowUtc = System.DateTime.UtcNow;
+        var currentMode = GetCurrentMode();
+        if (!hasRealtimeSample)
         {
-            saveData.todayRoamingSeconds += dt;
-            saveData.cumulativeRoamingSeconds += dt;
-        }
-        else
-        {
-            saveData.todayFocusSeconds += dt;
-            saveData.cumulativeFocusSeconds += dt;
+            lastRealtimeUtc = nowUtc;
+            modeAtLastSample = currentMode;
+            hasRealtimeSample = true;
+            return;
         }
 
-        saveData.lastPlayedDate = TodayString();
-        playtimeSaveTimer += dt;
-        if (playtimeSaveTimer >= 4f)
+        float elapsedSeconds = (float)(nowUtc - lastRealtimeUtc).TotalSeconds;
+        if (elapsedSeconds < 0f) elapsedSeconds = 0f;
+
+        if (elapsedSeconds > 0f)
         {
-            playtimeSaveTimer = 0f;
-            Save();
+            if (modeAtLastSample == GameModeManager.GameMode.Roaming)
+            {
+                saveData.todayRoamingSeconds += elapsedSeconds;
+                saveData.cumulativeRoamingSeconds += elapsedSeconds;
+            }
+            else
+            {
+                saveData.todayFocusSeconds += elapsedSeconds;
+                saveData.cumulativeFocusSeconds += elapsedSeconds;
+            }
+
+            saveData.lastPlayedDate = TodayString();
+            playtimeSaveTimer += elapsedSeconds;
+            if (playtimeSaveTimer >= 4f)
+            {
+                playtimeSaveTimer = 0f;
+                Save();
+            }
         }
+
+        lastRealtimeUtc = nowUtc;
+        modeAtLastSample = currentMode;
+    }
+
+    private GameModeManager.GameMode GetCurrentMode()
+    {
+        return GameModeManager.Instance != null
+            ? GameModeManager.Instance.CurrentMode
+            : modeAtLastSample;
     }
 
     public bool TryPurchaseMvpDrink()
