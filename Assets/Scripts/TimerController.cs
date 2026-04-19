@@ -26,8 +26,7 @@ public class TimerController : MonoBehaviour
     public void StopSession()
     {
         isRunning = false;
-        if (SaveDataManager.Instance != null)
-            SaveDataManager.Instance.AddSessionSeconds(elapsedSeconds);
+        // 滞在時間は SaveDataManager が GameMode に応じて毎フレーム集計
     }
 
     private void UpdateDisplay()
