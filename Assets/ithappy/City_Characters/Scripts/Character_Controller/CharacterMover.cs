@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Controller
@@ -35,6 +36,7 @@ namespace Controller
         private Transform m_Transform;
         private CharacterController m_Controller;
         private Animator m_Animator;
+        private Animator[] m_Animators;
 
         private MovementHandler m_Movement;
         private AnimationHandler m_Animation;
@@ -63,9 +65,10 @@ namespace Controller
             m_Transform = transform;
             m_Controller = GetComponent<CharacterController>();
             m_Animator = GetComponent<Animator>();
+            m_Animators = BuildAnimatorTargets();
 
             m_Movement = new MovementHandler(m_Controller, m_Transform, m_WalkSpeed, m_RunSpeed, m_RotateSpeed, m_JumpHeight, m_Space);
-            m_Animation = new AnimationHandler(m_Animator, m_HorizontalID,  m_VerticalID, m_StateID, m_JumpID);
+            m_Animation = new AnimationHandler(m_Animators, m_HorizontalID,  m_VerticalID, m_StateID, m_JumpID);
         }
 
         private void Update()
@@ -105,6 +108,36 @@ namespace Controller
             {
                 m_Movement.SetSurface(hit.normal);
             }
+        }
+
+        private Animator[] BuildAnimatorTargets()
+        {
+            var targets = new List<Animator> { m_Animator };
+            var controller = m_Animator.runtimeAnimatorController;
+            var avatar = m_Animator.avatar;
+
+            for (int i = 0; i < m_Transform.childCount; i++)
+            {
+                var child = m_Transform.GetChild(i);
+                if (child.GetComponentInChildren<SkinnedMeshRenderer>(true) == null)
+                {
+                    continue;
+                }
+
+                var childAnimator = child.GetComponent<Animator>();
+                if (childAnimator == null)
+                {
+                    childAnimator = child.gameObject.AddComponent<Animator>();
+                }
+
+                childAnimator.runtimeAnimatorController = controller;
+                childAnimator.avatar = avatar;
+                childAnimator.applyRootMotion = false;
+                childAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                targets.Add(childAnimator);
+            }
+
+            return targets.ToArray();
         }
 
         [Serializable]
@@ -178,12 +211,21 @@ namespace Controller
 
             public void Move(float deltaTime, in Vector2 axis, in Vector3 target, bool isRun, bool isJump, bool isMoving, out Vector2 animAxis, out bool isAir)
             {
-                var targetForward = Vector3.Normalize(target - m_Transform.position);
+                var targetForward = target - m_Transform.position;
+                targetForward.y = 0f;
+                if (targetForward.sqrMagnitude < 0.0001f)
+                {
+                    targetForward = m_Transform.forward;
+                }
+                else
+                {
+                    targetForward.Normalize();
+                }
 
                 ConvertMovement(in axis, in targetForward, out var movement);
                 CaculateGravity(isJump, deltaTime, out isAir);
                 Displace(deltaTime, in movement, isRun);
-                Turn(in targetForward, isMoving);
+                Turn(in movement, isMoving);
                 UpdateRotation(deltaTime);
 
                 GenAnimationAxis(in movement, out animAxis);
@@ -196,7 +238,15 @@ namespace Controller
 
                 if (m_Space == Space.Self)
                 {
-                    forward = new Vector3(targetForward.x, 0f, targetForward.z).normalized;
+                    forward = new Vector3(targetForward.x, 0f, targetForward.z);
+                    if (forward.sqrMagnitude < 0.0001f)
+                    {
+                        forward = m_Transform.forward;
+                    }
+                    else
+                    {
+                        forward.Normalize();
+                    }
                     right = Vector3.Cross(Vector3.up, forward).normalized;
                 }
                 else
@@ -260,21 +310,23 @@ namespace Controller
                 }
             }
 
-            private void Turn(in Vector3 targetForward, bool isMoving)
+            private void Turn(in Vector3 movement, bool isMoving)
             {
-                var angle = Vector3.SignedAngle(m_Transform.forward, Vector3.ProjectOnPlane(targetForward, Vector3.up), Vector3.up);
-
-                if (!m_IsRotating)
+                if (!isMoving)
                 {
-                    if (!isMoving && Mathf.Abs(angle) < m_Luft)
-                    {
-                        m_IsRotating = false;
-                        return;
-                    }
-
-                    m_IsRotating = true;
+                    m_IsRotating = false;
+                    return;
                 }
 
+                var flatMovement = new Vector3(movement.x, 0f, movement.z);
+                if (flatMovement.sqrMagnitude < 0.0001f)
+                {
+                    m_IsRotating = false;
+                    return;
+                }
+
+                var angle = Vector3.SignedAngle(m_Transform.forward, flatMovement.normalized, Vector3.up);
+                m_IsRotating = Mathf.Abs(angle) > Mathf.Epsilon;
                 m_TargetAngle = angle;
             }
 
@@ -302,7 +354,7 @@ namespace Controller
 
         private class AnimationHandler
         {
-            private readonly Animator m_Animator;
+            private readonly Animator[] m_Animators;
 
             private readonly string m_HorizontalID;
             private readonly string m_VerticalID;
@@ -314,9 +366,9 @@ namespace Controller
             private float m_FlowState;
             private Vector2 m_FlowAxis;
 
-            public AnimationHandler(Animator animator, string horizontalID, string verticalID, string stateID, string jumpID)
+            public AnimationHandler(Animator[] animators, string horizontalID, string verticalID, string stateID, string jumpID)
             {
-                m_Animator = animator;
+                m_Animators = animators;
 
                 m_HorizontalID = horizontalID;
                 m_VerticalID = verticalID;
@@ -326,12 +378,13 @@ namespace Controller
 
             public void Animate(in Vector2 axis, float state, bool isJump, float deltaTime)
             {
-
-                m_Animator.SetFloat(m_HorizontalID, m_FlowAxis.x);
-                m_Animator.SetFloat(m_VerticalID, m_FlowAxis.y);
-
-                m_Animator.SetFloat(m_StateID, Mathf.Clamp01(m_FlowState));
-                m_Animator.SetBool(m_JumpID, isJump);
+                for (int i = 0; i < m_Animators.Length; i++)
+                {
+                    m_Animators[i].SetFloat(m_HorizontalID, m_FlowAxis.x);
+                    m_Animators[i].SetFloat(m_VerticalID, m_FlowAxis.y);
+                    m_Animators[i].SetFloat(m_StateID, Mathf.Clamp01(m_FlowState));
+                    m_Animators[i].SetBool(m_JumpID, isJump);
+                }
 
                 m_FlowAxis = Vector2.ClampMagnitude(m_FlowAxis + k_InputFlow * deltaTime * (axis - m_FlowAxis).normalized, 1f);
                 m_FlowState = Mathf.Clamp01(m_FlowState + k_InputFlow * deltaTime * Mathf.Sign(state - m_FlowState));
@@ -339,8 +392,11 @@ namespace Controller
 
             public void AnimateIK(in Vector3 target, in LookWeight lookWeight)
             {
-                m_Animator.SetLookAtPosition(target);
-                m_Animator.SetLookAtWeight(lookWeight.weight, lookWeight.body, lookWeight.head, lookWeight.eyes);
+                for (int i = 0; i < m_Animators.Length; i++)
+                {
+                    m_Animators[i].SetLookAtPosition(target);
+                    m_Animators[i].SetLookAtWeight(lookWeight.weight, lookWeight.body, lookWeight.head, lookWeight.eyes);
+                }
             }
         }
         #endregion

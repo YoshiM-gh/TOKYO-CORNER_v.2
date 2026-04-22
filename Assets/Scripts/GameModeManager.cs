@@ -1,3 +1,4 @@
+using Controller;
 using UnityEngine;
 
 public class GameModeManager : MonoBehaviour
@@ -7,7 +8,7 @@ public class GameModeManager : MonoBehaviour
     public enum GameMode { Roaming, Focus }
     public GameMode CurrentMode { get; private set; } = GameMode.Roaming;
 
-    [SerializeField] private PlayerMovement playerMovement;
+    [SerializeField] private MovePlayerInput movePlayerInput;
     [SerializeField] private CameraFollow cameraFollow;
     [SerializeField] private GameObject focusUI;
     [SerializeField] private TimerController timerController;
@@ -30,7 +31,7 @@ public class GameModeManager : MonoBehaviour
     public void EnterFocusMode(Transform seatTransform)
     {
         CurrentMode = GameMode.Focus;
-        playerMovement.SetMovementEnabled(false);
+        if (movePlayerInput != null) movePlayerInput.enabled = false;
         cameraFollow.SetTarget(seatTransform);
         cameraFollow.SetOffset(focusOffset);
         if (focusCameraPoint != null)
@@ -48,7 +49,7 @@ public class GameModeManager : MonoBehaviour
     public void ExitFocusMode(Transform playerTransform)
     {
         CurrentMode = GameMode.Roaming;
-        playerMovement.SetMovementEnabled(true);
+        if (movePlayerInput != null) movePlayerInput.enabled = true;
         cameraFollow.SetTarget(playerTransform);
         cameraFollow.SetOffset(roamingOffset);
         cameraFollow.ClearFocusTransform();
