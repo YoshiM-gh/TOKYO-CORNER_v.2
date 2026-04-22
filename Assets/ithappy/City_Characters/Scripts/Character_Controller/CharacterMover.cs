@@ -11,15 +11,17 @@ namespace Controller
     {
         [Header("Movement")]
         [SerializeField]
-        private float m_WalkSpeed = 1.5f;
+        private float m_WalkSpeed = 2.4f;
         [SerializeField]
-        private float m_RunSpeed = 4f;
+        private float m_RunSpeed = 5.5f;
         [SerializeField, Range(0f, 360f)]
-        private float m_RotateSpeed = 90f;
+        private float m_RotateSpeed = 200f;
         [SerializeField]
         private Space m_Space = Space.Self;
         [SerializeField]
         private float m_JumpHeight = 5f;
+        [SerializeField]
+        private bool m_AutoFitController = true;
 
         [Header("Animator")]
         [SerializeField]
@@ -32,11 +34,28 @@ namespace Controller
         private string m_JumpID = "IsJump";
         [SerializeField]
         private LookWeight m_LookWeight = new(1f, 0.3f, 0.7f, 1f);
+        [Header("Animator playback")]
+        [Tooltip("歩行時の Animator.speed（1で既定。足捌きを早くするなら1.1〜1.3など）。")]
+        [SerializeField, Min(0.01f)]
+        private float m_WalkAnimPlaySpeed = 1.2f;
+        [Tooltip("走行時の Animator.speed。")]
+        [SerializeField, Min(0.01f)]
+        private float m_RunAnimPlaySpeed = 1.35f;
+        [Tooltip("止まっているときの再生速度。")]
+        [SerializeField, Min(0.01f)]
+        private float m_IdleAnimPlaySpeed = 1f;
+        [Tooltip("空中のとき。")]
+        [SerializeField, Min(0.01f)]
+        private float m_AirAnimPlaySpeed = 1f;
+        [Tooltip("歩行↔走行↔待機の切り替えを滑らかにする係数。大きいほど即応。")]
+        [SerializeField, Min(0.01f)]
+        private float m_AnimPlaySpeedLerp = 10f;
 
         private Transform m_Transform;
         private CharacterController m_Controller;
         private Animator m_Animator;
         private Animator[] m_Animators;
+        private float m_CurrentPlaySpeed = 1f;
 
         private MovementHandler m_Movement;
         private AnimationHandler m_Animation;
@@ -64,8 +83,14 @@ namespace Controller
         {
             m_Transform = transform;
             m_Controller = GetComponent<CharacterController>();
+            if (m_AutoFitController)
+            {
+                FitControllerToCharacter();
+            }
             m_Animator = GetComponent<Animator>();
             m_Animators = BuildAnimatorTargets();
+            m_CurrentPlaySpeed = m_IdleAnimPlaySpeed;
+            SetAllAnimatorPlaySpeeds(m_CurrentPlaySpeed);
 
             m_Movement = new MovementHandler(m_Controller, m_Transform, m_WalkSpeed, m_RunSpeed, m_RotateSpeed, m_JumpHeight, m_Space);
             m_Animation = new AnimationHandler(m_Animators, m_HorizontalID,  m_VerticalID, m_StateID, m_JumpID);
@@ -75,7 +100,7 @@ namespace Controller
         {
             m_Movement.Move(Time.deltaTime, in m_Axis, in m_Target, m_IsRun, m_IsJump, m_IsMoving, out var animAxis, out var isAir);
             m_Animation.Animate(in animAxis, m_IsRun? 1f : 0f, isAir, Time.deltaTime);
-
+            UpdateAnimatorPlaySpeeds(isAir, Time.deltaTime);
         }
 
         private void OnAnimatorIK()
@@ -140,6 +165,64 @@ namespace Controller
             return targets.ToArray();
         }
 
+        private void UpdateAnimatorPlaySpeeds(bool isAir, float deltaTime)
+        {
+            float target;
+            if (isAir)
+                target = m_AirAnimPlaySpeed;
+            else if (!m_IsMoving)
+                target = m_IdleAnimPlaySpeed;
+            else
+                target = m_IsRun ? m_RunAnimPlaySpeed : m_WalkAnimPlaySpeed;
+
+            m_CurrentPlaySpeed = Mathf.Lerp(m_CurrentPlaySpeed, target, 1f - Mathf.Exp(-m_AnimPlaySpeedLerp * deltaTime));
+            SetAllAnimatorPlaySpeeds(m_CurrentPlaySpeed);
+        }
+
+        private void SetAllAnimatorPlaySpeeds(float speed)
+        {
+            if (m_Animators == null)
+            {
+                return;
+            }
+            for (int i = 0; i < m_Animators.Length; i++)
+            {
+                if (m_Animators[i] != null)
+                {
+                    m_Animators[i].speed = speed;
+                }
+            }
+        }
+
+        private void FitControllerToCharacter()
+        {
+            var renderers = GetComponentsInChildren<Renderer>();
+            if (renderers == null || renderers.Length == 0)
+            {
+                return;
+            }
+
+            Bounds worldBounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                worldBounds.Encapsulate(renderers[i].bounds);
+            }
+
+            Vector3 centerLocal = m_Transform.InverseTransformPoint(worldBounds.center);
+            Vector3 sizeLocal = m_Transform.InverseTransformVector(worldBounds.size);
+            sizeLocal = new Vector3(Mathf.Abs(sizeLocal.x), Mathf.Abs(sizeLocal.y), Mathf.Abs(sizeLocal.z));
+
+            float newHeight = Mathf.Max(sizeLocal.y * 0.95f, 1.2f);
+            float newRadius = Mathf.Max(Mathf.Min(sizeLocal.x, sizeLocal.z) * 0.25f, 0.2f);
+            float maxRadius = Mathf.Max(newHeight * 0.5f - 0.02f, 0.2f);
+            newRadius = Mathf.Min(newRadius, maxRadius);
+
+            m_Controller.height = newHeight;
+            m_Controller.radius = newRadius;
+            m_Controller.center = new Vector3(0f, centerLocal.y, 0f);
+            m_Controller.stepOffset = Mathf.Clamp(newHeight * 0.12f, 0.1f, 0.45f);
+        }
+
         [Serializable]
         private struct LookWeight
         {
@@ -170,7 +253,6 @@ namespace Controller
 
             private Space m_Space;
 
-            private readonly float m_Luft = 75f;
             private readonly float m_JumpReload = 1f;
 
             private float m_TargetAngle;
