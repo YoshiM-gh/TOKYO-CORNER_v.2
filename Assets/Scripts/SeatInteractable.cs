@@ -49,6 +49,7 @@ public class SeatInteractable : MonoBehaviour
         Vector3 targetPos = sitPoint != null ? sitPoint.position : transform.position;
         player.position = targetPos;
         GameModeManager.Instance.EnterFocusMode(sitPoint != null ? sitPoint : transform);
+        Debug.Log($"[Seat] Sat down at: {gameObject.name}");
     }
 
     private void StandUp()
@@ -71,6 +72,7 @@ public class SeatInteractable : MonoBehaviour
         }
         player.position = standPos;
         GameModeManager.Instance.ExitFocusMode(player);
+        Debug.Log($"[Seat] Stood up from: {gameObject.name}");
     }
 
     private static bool WasEscapePressed()

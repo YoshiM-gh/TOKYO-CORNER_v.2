@@ -42,6 +42,7 @@ public class GameModeManager : MonoBehaviour
         }
         if (focusUI != null) focusUI.SetActive(true);
         if (timerController != null) timerController.StartSession();
+        Debug.Log("[Focus] Entered focus mode.");
     }
 
     public void ExitFocusMode(Transform playerTransform)
@@ -54,5 +55,6 @@ public class GameModeManager : MonoBehaviour
         cameraFollow.SetLookAt(false);
         if (focusUI != null) focusUI.SetActive(false);
         if (timerController != null) timerController.StopSession();
+        Debug.Log("[Focus] Exited focus mode.");
     }
 }

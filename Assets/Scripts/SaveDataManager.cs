@@ -35,6 +35,8 @@ public class SaveDataManager : MonoBehaviour
 {
     public static SaveDataManager Instance { get; private set; }
 
+    public event System.Action OnStatsChanged;
+
     public const int DailyLoginCoins = 100;
     public const int MvpDrinkPrice = 100;
     /// <summary>セーブ用ID（ASCII）。表示は <see cref="FormatMenuLine"/> で英語ラベルに。</summary>
@@ -202,9 +204,15 @@ public class SaveDataManager : MonoBehaviour
         {
             saveData.stampCount -= StampsPerCard;
             saveData.totalCards++;
+            Debug.Log($"[Stamp] Card complete! Total cards: {saveData.totalCards} | Coins left: {saveData.coins}C");
+        }
+        else
+        {
+            Debug.Log($"[Stamp] Stamp added: {saveData.stampCount}/{StampsPerCard} | Coins left: {saveData.coins}C");
         }
 
         Save();
+        OnStatsChanged?.Invoke();
         return true;
     }
 
@@ -236,6 +244,7 @@ public class SaveDataManager : MonoBehaviour
     public int GetCoins() => saveData.coins;
     public int GetStampCount() => saveData.stampCount;
     public int GetTotalCards() => saveData.totalCards;
+    public static int GetStampsPerCard() => StampsPerCard;
     public float GetTotalSessionSeconds() =>
         saveData.cumulativeRoamingSeconds + saveData.cumulativeFocusSeconds;
 
@@ -298,10 +307,16 @@ public class SaveDataManager : MonoBehaviour
 
     private void TryGrantDailyCoins()
     {
-        if (saveData.lastCoinDate == TodayString()) return;
+        if (saveData.lastCoinDate == TodayString())
+        {
+            Debug.Log($"[Login] Daily bonus already claimed today ({saveData.lastCoinDate}). Coins: {saveData.coins}C");
+            return;
+        }
         saveData.coins += DailyLoginCoins;
         saveData.lastCoinDate = TodayString();
         Save();
+        OnStatsChanged?.Invoke();
+        Debug.Log($"[Login] Daily bonus granted: +{DailyLoginCoins}C → Total: {saveData.coins}C");
     }
 
     private static string TodayString() =>

@@ -63,13 +63,25 @@ public class PurchaseInteractable : MonoBehaviour
     {
         if (SaveDataManager.Instance == null) return;
 
+        if (DrinkInventory.Instance != null && !DrinkInventory.Instance.CanPurchase())
+        {
+            Show($"Can't carry more drinks (max {DrinkInventory.MaxDrinks})");
+            Debug.Log($"[Purchase] Failed - drink inventory full ({DrinkInventory.MaxDrinks}/{DrinkInventory.MaxDrinks})");
+            return;
+        }
+
         bool ok = SaveDataManager.Instance.TryPurchaseMvpDrink();
         if (ok)
-            Show($"Drink purchased. Stamp +1. Coins left: {SaveDataManager.Instance.GetCoins()}C");
+        {
+            DrinkInventory.Instance?.AddDrink();
+            Show($"Drink purchased! Coins left: {SaveDataManager.Instance.GetCoins()}C");
+            Debug.Log($"[Purchase] MVP drink purchased. Coins: {SaveDataManager.Instance.GetCoins()}C | Stamps: {SaveDataManager.Instance.GetStampCount()}");
+        }
         else
+        {
             Show($"Not enough coins (need {SaveDataManager.MvpDrinkPrice}C, have {SaveDataManager.Instance.GetCoins()}C)");
-
-        Debug.Log(ok ? "[Purchase] MVP drink OK" : "[Purchase] Not enough coins");
+            Debug.Log($"[Purchase] Failed - not enough coins. Need: {SaveDataManager.MvpDrinkPrice}C, Have: {SaveDataManager.Instance.GetCoins()}C");
+        }
     }
 
     private void Show(string message)

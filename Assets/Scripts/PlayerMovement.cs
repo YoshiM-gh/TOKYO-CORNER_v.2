@@ -27,5 +27,9 @@ public class PlayerMovement : MonoBehaviour
         rb.MovePosition(rb.position + direction * moveSpeed * Time.fixedDeltaTime);
     }
 
-    public void SetMovementEnabled(bool enabled) => movementEnabled = enabled;
+    public void SetMovementEnabled(bool enabled)
+    {
+        movementEnabled = enabled;
+        Debug.Log($"[Move] Movement {(enabled ? "enabled" : "disabled")}.");
+    }
 }

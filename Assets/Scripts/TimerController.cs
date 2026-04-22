@@ -23,12 +23,16 @@ public class TimerController : MonoBehaviour
         sessionStartUtc = System.DateTime.UtcNow;
         isRunning = true;
         UpdateDisplay();
+        Debug.Log("[Timer] Focus session started.");
     }
 
     public void StopSession()
     {
         if (isRunning) UpdateElapsedSecondsRealtime();
         isRunning = false;
+        int minutes = Mathf.FloorToInt(elapsedSeconds / 60f);
+        int seconds = Mathf.FloorToInt(elapsedSeconds % 60f);
+        Debug.Log($"[Timer] Focus session ended. Duration: {minutes:00}:{seconds:00}");
         // 滞在時間は SaveDataManager が GameMode に応じて毎フレーム集計
     }
 
