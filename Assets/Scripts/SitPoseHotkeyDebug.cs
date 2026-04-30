@@ -13,6 +13,7 @@ public class SitPoseHotkeyDebug : MonoBehaviour
     [SerializeField] private bool forcePlayState = true;
 
     private CharacterMover characterMover;
+    private Animator[] animatorTargets;
     private bool isSitting;
 
     private void Awake()
@@ -21,6 +22,7 @@ public class SitPoseHotkeyDebug : MonoBehaviour
             targetAnimator = GetComponentInChildren<Animator>();
 
         characterMover = GetComponent<CharacterMover>();
+        animatorTargets = GetComponentsInChildren<Animator>(true);
     }
 
     private void Update()
@@ -51,19 +53,30 @@ public class SitPoseHotkeyDebug : MonoBehaviour
     {
         isSitting = sit;
 
-        if (targetAnimator != null)
+        if (animatorTargets != null && animatorTargets.Length > 0)
+        {
+            for (int i = 0; i < animatorTargets.Length; i++)
+            {
+                Animator anim = animatorTargets[i];
+                if (anim == null) continue;
+
+                anim.SetBool(sitBoolParameter, isSitting);
+                if (forcePlayState)
+                {
+                    string state = isSitting ? sitStateName : moveStateName;
+                    if (anim.HasState(0, Animator.StringToHash(state)))
+                        anim.CrossFadeInFixedTime(state, 0.05f, 0, 0f);
+                }
+            }
+        }
+        else if (targetAnimator != null)
         {
             targetAnimator.SetBool(sitBoolParameter, isSitting);
-            if (forcePlayState)
-            {
-                string state = isSitting ? sitStateName : moveStateName;
-                targetAnimator.CrossFadeInFixedTime(state, 0.05f, 0, 0f);
-            }
         }
 
         if (characterMover != null && disableMoverWhileSitting)
             characterMover.enabled = !isSitting;
 
-        Debug.Log($"[SitDebug] sit={isSitting} param={sitBoolParameter} animator={(targetAnimator != null ? targetAnimator.name : "null")}");
+        Debug.Log($"[SitDebug] sit={isSitting} param={sitBoolParameter} animatorCount={(animatorTargets != null ? animatorTargets.Length : 0)}");
     }
 }

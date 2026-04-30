@@ -25,6 +25,7 @@ public class SeatInteractable : MonoBehaviour
     private Transform player;
     private CharacterMover playerMover;
     private SitPoseHotkeyDebug sitDebugBridge;
+    private Animator[] playerAnimators;
     private bool isSeated = false;
     private bool warnedPlayerMissing = false;
 
@@ -117,36 +118,54 @@ public class SeatInteractable : MonoBehaviour
     private void SetSitAnimatorState(bool sit)
     {
         if (!useAnimatorSitParameters) return;
-        if (playerAnimator == null) return;
+        if ((playerAnimators == null || playerAnimators.Length == 0) && playerAnimator == null) return;
 
-        if (!string.IsNullOrWhiteSpace(sitBoolParameter) && HasAnimatorParameter(sitBoolParameter, AnimatorControllerParameterType.Bool))
-            playerAnimator.SetBool(sitBoolParameter, sit);
-        if (!string.IsNullOrWhiteSpace(sitBoolParameterAlt) && HasAnimatorParameter(sitBoolParameterAlt, AnimatorControllerParameterType.Bool))
-            playerAnimator.SetBool(sitBoolParameterAlt, sit);
-
-        if (sit && !string.IsNullOrWhiteSpace(sitTriggerParameter) && HasAnimatorParameter(sitTriggerParameter, AnimatorControllerParameterType.Trigger))
-            playerAnimator.SetTrigger(sitTriggerParameter);
-
-        if (forceCrossFadeState)
+        ApplyToAnimators(anim =>
         {
-            string targetState = sit ? sitStateName : moveStateName;
-            if (!string.IsNullOrWhiteSpace(targetState) && playerAnimator.HasState(0, Animator.StringToHash(targetState)))
-                playerAnimator.CrossFadeInFixedTime(targetState, 0.05f, 0, 0f);
-        }
+            if (!string.IsNullOrWhiteSpace(sitBoolParameter) && HasAnimatorParameter(anim, sitBoolParameter, AnimatorControllerParameterType.Bool))
+                anim.SetBool(sitBoolParameter, sit);
+            if (!string.IsNullOrWhiteSpace(sitBoolParameterAlt) && HasAnimatorParameter(anim, sitBoolParameterAlt, AnimatorControllerParameterType.Bool))
+                anim.SetBool(sitBoolParameterAlt, sit);
+
+            if (sit && !string.IsNullOrWhiteSpace(sitTriggerParameter) && HasAnimatorParameter(anim, sitTriggerParameter, AnimatorControllerParameterType.Trigger))
+                anim.SetTrigger(sitTriggerParameter);
+
+            if (forceCrossFadeState)
+            {
+                string targetState = sit ? sitStateName : moveStateName;
+                if (!string.IsNullOrWhiteSpace(targetState) && anim.HasState(0, Animator.StringToHash(targetState)))
+                    anim.CrossFadeInFixedTime(targetState, 0.05f, 0, 0f);
+            }
+        });
 
         if (debugLogs)
             Debug.Log($"[Seat] Animator sit={sit} bool='{sitBoolParameter}' altBool='{sitBoolParameterAlt}' trigger='{sitTriggerParameter}'");
     }
 
-    private bool HasAnimatorParameter(string parameterName, AnimatorControllerParameterType type)
+    private bool HasAnimatorParameter(Animator animator, string parameterName, AnimatorControllerParameterType type)
     {
-        var parameters = playerAnimator.parameters;
+        var parameters = animator.parameters;
         for (int i = 0; i < parameters.Length; i++)
         {
             if (parameters[i].name == parameterName && parameters[i].type == type)
                 return true;
         }
         return false;
+    }
+
+    private void ApplyToAnimators(System.Action<Animator> action)
+    {
+        if (playerAnimators != null && playerAnimators.Length > 0)
+        {
+            for (int i = 0; i < playerAnimators.Length; i++)
+            {
+                if (playerAnimators[i] != null) action(playerAnimators[i]);
+            }
+            return;
+        }
+
+        if (playerAnimator != null)
+            action(playerAnimator);
     }
 
     private static bool WasEscapePressed()
@@ -186,6 +205,7 @@ public class SeatInteractable : MonoBehaviour
             player = playerObj.transform;
             playerMover = playerObj.GetComponent<CharacterMover>();
             sitDebugBridge = playerObj.GetComponent<SitPoseHotkeyDebug>();
+            playerAnimators = playerObj.GetComponentsInChildren<Animator>(true);
             warnedPlayerMissing = false;
             if (playerAnimator == null)
                 playerAnimator = player.GetComponentInChildren<Animator>();
