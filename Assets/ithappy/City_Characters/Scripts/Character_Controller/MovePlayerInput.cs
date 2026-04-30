@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Controller
 {
@@ -57,7 +58,8 @@ namespace Controller
         {
             m_Axis = new Vector2(Input.GetAxis(m_HorizontalAxis), Input.GetAxis(m_VerticalAxis));
             m_IsRun = Input.GetKey(m_RunKey);
-            m_IsJump = Input.GetButton(m_JumpButton);
+            m_IsJump = Input.GetButton(m_JumpButton) ||
+                       (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame);
 
             if (m_Camera != null)
             {

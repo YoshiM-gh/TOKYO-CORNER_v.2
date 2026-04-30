@@ -360,8 +360,10 @@ namespace Controller
                     {
                         var gravity = Physics.gravity;
                         var length = gravity.magnitude;
-
-                        m_GravityAcelleration += -(gravity / length) * Mathf.Sqrt(m_JumpHeight * 6f * length);
+                        if (length < 0.0001f) length = 9.81f;
+                        // Set initial jump velocity directly so JumpHeight maps intuitively.
+                        float jumpVelocity = Mathf.Sqrt(2f * m_JumpHeight * length);
+                        m_GravityAcelleration = -(gravity / length) * jumpVelocity;
                         m_jumpTimer = m_JumpReload;
                         isAir = true;
 
