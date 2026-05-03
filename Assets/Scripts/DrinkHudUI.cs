@@ -9,11 +9,24 @@ using System.Text;
 public class DrinkHudUI : MonoBehaviour
 {
     [SerializeField] private TextMeshProUGUI drinkText;
+    [Header("Temporary Layout Offset")]
+    [SerializeField] private bool forceTopLeftLayout = true;
+    [SerializeField] private Vector2 anchoredPosition = new Vector2(24f, -24f);
+    [SerializeField] private Vector2 preferredSize = new Vector2(280f, 40f);
+
+    private RectTransform drinkRect;
+
+    private void Awake()
+    {
+        if (drinkText != null)
+            drinkRect = drinkText.rectTransform;
+    }
 
     private void OnEnable()
     {
         if (DrinkInventory.Instance != null)
             DrinkInventory.Instance.OnDrinksChanged += Refresh;
+        ApplyTemporaryLayout();
         Refresh();
     }
 
@@ -47,5 +60,17 @@ public class DrinkHudUI : MonoBehaviour
             sb.Append($"Drink({d.sipsRemaining}/{DrinkInventory.SipsPerDrink})");
         }
         drinkText.text = sb.ToString();
+    }
+
+    private void ApplyTemporaryLayout()
+    {
+        if (!forceTopLeftLayout || drinkRect == null) return;
+
+        drinkRect.anchorMin = new Vector2(0f, 1f);
+        drinkRect.anchorMax = new Vector2(0f, 1f);
+        drinkRect.pivot = new Vector2(0f, 1f);
+        drinkRect.anchoredPosition = anchoredPosition;
+        drinkRect.sizeDelta = preferredSize;
+        drinkText.alignment = TextAlignmentOptions.TopLeft;
     }
 }

@@ -41,6 +41,10 @@ public class TimerController : MonoBehaviour
     private int totalRounds = 1;
     private float notificationHideAt = -1f;
     private string lastNotification = string.Empty;
+    private bool awaitingNextPhase;
+    private TimerPhase queuedPhase = TimerPhase.Stopped;
+    private float queuedPhaseDurationSeconds;
+    private string queuedPhaseNotification = string.Empty;
 
     public TimerMode Mode => mode;
     public TimerPhase Phase => phase;
@@ -56,6 +60,7 @@ public class TimerController : MonoBehaviour
     public float Progress01 => phaseDurationSeconds <= 0f ? 0f : Mathf.Clamp01(ElapsedSeconds / phaseDurationSeconds);
     public string LastNotification => lastNotification;
     public IReadOnlyList<string> Laps => laps;
+    public bool IsAwaitingNextPhase => mode == TimerMode.Pomodoro && awaitingNextPhase;
     public float DefaultWorkMinutes => focusMinutes;
     public float DefaultShortBreakMinutes => breakMinutes;
     public float DefaultLongBreakMinutes => longBreakMinutes;
@@ -97,6 +102,7 @@ public class TimerController : MonoBehaviour
     public void StartPomodoro(float workMinutes, float shortBreakMinutes, float longBreakMinutesValue, int rounds)
     {
         mode = TimerMode.Pomodoro;
+        ClearQueuedPhase();
         workDurationSeconds = MinutesToSeconds(workMinutes);
         shortBreakDurationSeconds = MinutesToSeconds(shortBreakMinutes);
         longBreakDurationSeconds = MinutesToSeconds(longBreakMinutesValue);
@@ -110,6 +116,7 @@ public class TimerController : MonoBehaviour
     public void PreparePomodoro()
     {
         mode = TimerMode.Pomodoro;
+        ClearQueuedPhase();
         workDurationSeconds = MinutesToSeconds(focusMinutes);
         shortBreakDurationSeconds = MinutesToSeconds(breakMinutes);
         longBreakDurationSeconds = MinutesToSeconds(longBreakMinutes);
@@ -129,6 +136,7 @@ public class TimerController : MonoBehaviour
     public void StartStopwatch()
     {
         mode = TimerMode.Stopwatch;
+        ClearQueuedPhase();
         totalRounds = 1;
         currentRound = 1;
         stopwatchElapsedSeconds = 0f;
@@ -140,6 +148,7 @@ public class TimerController : MonoBehaviour
     public void PrepareStopwatch()
     {
         mode = TimerMode.Stopwatch;
+        ClearQueuedPhase();
         totalRounds = 1;
         currentRound = 1;
         phase = TimerPhase.Stopped;
@@ -206,6 +215,7 @@ public class TimerController : MonoBehaviour
 
     public void Stop()
     {
+        ClearQueuedPhase();
         isRunning = false;
         isPaused = false;
         isSessionActive = false;
@@ -230,17 +240,27 @@ public class TimerController : MonoBehaviour
         OnTimerChanged?.Invoke();
     }
 
+    public void AdvanceToNextPhase()
+    {
+        if (!IsAwaitingNextPhase) return;
+
+        var nextPhase = queuedPhase;
+        var nextDuration = queuedPhaseDurationSeconds;
+        var nextNotification = queuedPhaseNotification;
+        ClearQueuedPhase();
+        StartPhase(nextPhase, nextDuration);
+        if (!string.IsNullOrEmpty(nextNotification))
+            ShowNotification(nextNotification);
+    }
+
+    public string GetNextPhaseLabel()
+    {
+        return IsAwaitingNextPhase ? GetPhaseLabel(queuedPhase) : string.Empty;
+    }
+
     public string GetPhaseLabel()
     {
-        return phase switch
-        {
-            TimerPhase.Work => "WORK",
-            TimerPhase.ShortBreak => "SHORT BREAK",
-            TimerPhase.LongBreak => "LONG BREAK",
-            TimerPhase.Stopwatch => "STOPWATCH",
-            TimerPhase.Completed => "DONE",
-            _ => "READY"
-        };
+        return GetPhaseLabel(phase);
     }
 
     public static string FormatTime(float seconds)
@@ -253,6 +273,7 @@ public class TimerController : MonoBehaviour
 
     private void StartPhase(TimerPhase nextPhase, float durationSeconds)
     {
+        ClearQueuedPhase();
         phase = nextPhase;
         phaseDurationSeconds = mode == TimerMode.Stopwatch ? 0f : Mathf.Max(1f, durationSeconds);
         elapsedBeforePauseSeconds = 0f;
@@ -275,22 +296,23 @@ public class TimerController : MonoBehaviour
             }
 
             bool useLongBreak = currentRound % Mathf.Max(1, longBreakEveryRounds) == 0;
-            StartPhase(useLongBreak ? TimerPhase.LongBreak : TimerPhase.ShortBreak,
-                useLongBreak ? longBreakDurationSeconds : shortBreakDurationSeconds);
-            ShowNotification(useLongBreak ? "Long break started" : "Short break started");
+            QueueNextPhase(
+                useLongBreak ? TimerPhase.LongBreak : TimerPhase.ShortBreak,
+                useLongBreak ? longBreakDurationSeconds : shortBreakDurationSeconds,
+                useLongBreak ? "Long break started" : "Short break started");
             return;
         }
 
         if (phase == TimerPhase.ShortBreak || phase == TimerPhase.LongBreak)
         {
             currentRound++;
-            StartPhase(TimerPhase.Work, workDurationSeconds);
-            ShowNotification("Work started");
+            QueueNextPhase(TimerPhase.Work, workDurationSeconds, "Work started");
         }
     }
 
     private void CompleteTimer(string message)
     {
+        ClearQueuedPhase();
         phase = TimerPhase.Completed;
         isRunning = false;
         isPaused = false;
@@ -302,11 +324,17 @@ public class TimerController : MonoBehaviour
 
     private float GetPhaseElapsedSeconds()
     {
+        if (phase == TimerPhase.Stopped)
+            return 0f;
+
         if (isPaused || phase == TimerPhase.Completed)
             return elapsedBeforePauseSeconds;
 
+        if (awaitingNextPhase)
+            return elapsedBeforePauseSeconds;
+
         if (!isRunning)
-            return 0f;
+            return elapsedBeforePauseSeconds;
 
         float realtimeElapsed = (float)(DateTime.UtcNow - phaseStartUtc).TotalSeconds;
         float elapsed = Mathf.Max(0f, elapsedBeforePauseSeconds + realtimeElapsed);
@@ -333,9 +361,12 @@ public class TimerController : MonoBehaviour
             return;
         }
 
-        timerText.text = mode == TimerMode.Stopwatch
-            ? $"{GetPhaseLabel()} {FormatTime(ElapsedSeconds)}"
-            : $"{GetPhaseLabel()} {FormatTime(RemainingSeconds)}";
+        if (mode == TimerMode.Stopwatch)
+            timerText.text = $"{GetPhaseLabel()} {FormatTime(ElapsedSeconds)}";
+        else if (IsAwaitingNextPhase)
+            timerText.text = $"{GetPhaseLabel()} {FormatTime(0f)}";
+        else
+            timerText.text = $"{GetPhaseLabel()} {FormatTime(RemainingSeconds)}";
     }
 
     private void ShowNotification(string message)
@@ -370,6 +401,41 @@ public class TimerController : MonoBehaviour
 
         ClearNotification();
         OnTimerChanged?.Invoke();
+    }
+
+    private void QueueNextPhase(TimerPhase nextPhase, float nextDurationSeconds, string nextNotification)
+    {
+        awaitingNextPhase = true;
+        queuedPhase = nextPhase;
+        queuedPhaseDurationSeconds = Mathf.Max(1f, nextDurationSeconds);
+        queuedPhaseNotification = nextNotification;
+        elapsedBeforePauseSeconds = phaseDurationSeconds;
+        isRunning = false;
+        isPaused = false;
+        ShowNotification("Phase complete");
+        UpdateLegacyDisplay();
+        OnTimerChanged?.Invoke();
+    }
+
+    private void ClearQueuedPhase()
+    {
+        awaitingNextPhase = false;
+        queuedPhase = TimerPhase.Stopped;
+        queuedPhaseDurationSeconds = 0f;
+        queuedPhaseNotification = string.Empty;
+    }
+
+    private static string GetPhaseLabel(TimerPhase targetPhase)
+    {
+        return targetPhase switch
+        {
+            TimerPhase.Work => "WORK",
+            TimerPhase.ShortBreak => "SHORT BREAK",
+            TimerPhase.LongBreak => "LONG BREAK",
+            TimerPhase.Stopwatch => "STOPWATCH",
+            TimerPhase.Completed => "DONE",
+            _ => "READY"
+        };
     }
 
     private static float MinutesToSeconds(float minutes) => Mathf.Max(0.1f, minutes) * 60f;
