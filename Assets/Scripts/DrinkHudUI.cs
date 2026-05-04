@@ -9,6 +9,7 @@ using System.Text;
 public class DrinkHudUI : MonoBehaviour
 {
     [SerializeField] private TextMeshProUGUI drinkText;
+    [SerializeField] private bool showInFocusMode = false;
     [Header("Temporary Layout Offset")]
     [SerializeField] private bool forceTopLeftLayout = true;
     [SerializeField] private Vector2 anchoredPosition = new Vector2(24f, -24f);
@@ -39,6 +40,13 @@ public class DrinkHudUI : MonoBehaviour
     private void Refresh()
     {
         if (drinkText == null) return;
+
+        bool isFocusMode =
+            GameModeManager.Instance != null &&
+            GameModeManager.Instance.CurrentMode == GameModeManager.GameMode.Focus;
+        if (drinkText.enabled != (showInFocusMode && isFocusMode))
+            drinkText.enabled = showInFocusMode && isFocusMode;
+        if (!drinkText.enabled) return;
 
         if (DrinkInventory.Instance == null)
         {

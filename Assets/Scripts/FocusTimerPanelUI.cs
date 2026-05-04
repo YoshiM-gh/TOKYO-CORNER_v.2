@@ -1,4 +1,5 @@
 using TMPro;
+using TranslucentUIFX;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,7 +7,25 @@ public class FocusTimerPanelUI : MonoBehaviour
 {
     [SerializeField] private TimerController timerController;
     [SerializeField] private TMP_FontAsset timerFont;
-    [SerializeField] private Vector2 panelSize = new Vector2(940f, 520f);
+    [SerializeField] private bool useTranslucentPanelFx = true;
+    [Header("Translucent Panel FX (Inspector Tunable)")]
+    [SerializeField] private GlassPreset panelPreset = GlassPreset.DarkGlass;
+    [SerializeField] private PerformanceMode panelQualityMode = PerformanceMode.Medium;
+    [SerializeField] private TranslucentUpdateMode panelUpdateMode = TranslucentUpdateMode.Interval;
+    [SerializeField, Range(1, 60)] private int panelUpdateInterval = 4;
+    [SerializeField] private Color panelBaseColor = new Color(1f, 1f, 1f, 0.12f);
+    [SerializeField] private Color panelTintColor = new Color(0.02f, 0.03f, 0.06f, 0.32f);
+    [SerializeField, Range(0f, 1f)] private float panelBlurStrength = 0.14f;
+    [SerializeField, Range(0f, 1f)] private float panelFrostAmount = 0.05f;
+    [SerializeField, Range(0f, 1f)] private float panelGlassIntensity = 1f;
+    [SerializeField] private bool panelEnableEdgeLighting = true;
+    [SerializeField] private EdgeShape panelEdgeShape = EdgeShape.RoundedRect;
+    [SerializeField, Range(0f, 0.5f)] private float panelEdgeRounding = 0.4f;
+    [SerializeField] private Color panelEdgeLightColor = new Color(1f, 1f, 1f, 0.12f);
+    [SerializeField, Range(0f, 0.5f)] private float panelEdgeLightWidth = 0.018f;
+    [SerializeField, Range(0.1f, 10f)] private float panelEdgeLightPower = 2.1f;
+    [SerializeField] private Color panelFallbackColor = new Color(0f, 0f, 0f, 0.42f);
+    [SerializeField] private Vector2 panelSize = new Vector2(1410f, 780f);
     [SerializeField, Range(1, 99)] private int minWorkMinutes = 1;
     [SerializeField, Range(1, 99)] private int maxWorkMinutes = 99;
     [SerializeField, Range(1, 20)] private int minBreakMinutes = 1;
@@ -31,6 +50,7 @@ public class FocusTimerPanelUI : MonoBehaviour
     private int selectedRounds = 4;
     private float nextRefresh;
     private bool completionHandled;
+    private static Sprite roundedPanelSprite;
 
     private void Awake()
     {
@@ -46,6 +66,10 @@ public class FocusTimerPanelUI : MonoBehaviour
             selectedShortBreakMinutes = Mathf.Clamp(Mathf.RoundToInt(timerController.DefaultShortBreakMinutes), minBreakMinutes, maxBreakMinutes);
             selectedRounds = Mathf.Clamp(timerController.DefaultRounds, minRounds, maxRounds);
         }
+
+        // Keep runtime panel large enough even if old serialized values remain in scene.
+        if (panelSize.x < 1200f || panelSize.y < 700f)
+            panelSize = new Vector2(1410f, 840f);
 
         EnsurePanelBuilt();
     }
@@ -72,6 +96,14 @@ public class FocusTimerPanelUI : MonoBehaviour
         Refresh();
     }
 
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (!Application.isPlaying) return;
+        SyncPanelFx();
+    }
+#endif
+
     private void BuildPanel()
     {
         var overlay = CreateRect("FullscreenFocusTimerOverlay", transform, Vector2.zero);
@@ -80,18 +112,16 @@ public class FocusTimerPanelUI : MonoBehaviour
         overlay.offsetMin = Vector2.zero;
         overlay.offsetMax = Vector2.zero;
 
-        var overlayImage = overlay.gameObject.AddComponent<Image>();
-        overlayImage.color = new Color(0f, 0f, 0f, 0.55f);
-
         runtimePanel = CreateRect("FocusRuntimePanel", overlay, panelSize);
         runtimePanel.anchorMin = new Vector2(0.5f, 0.5f);
         runtimePanel.anchorMax = new Vector2(0.5f, 0.5f);
         runtimePanel.pivot = new Vector2(0.5f, 0.5f);
         runtimePanel.anchoredPosition = new Vector2(0f, 60f);
+        ApplyTranslucentPanelFx(runtimePanel.gameObject);
 
         var group = runtimePanel.gameObject.AddComponent<VerticalLayoutGroup>();
-        group.padding = new RectOffset(24, 24, 20, 20);
-        group.spacing = 8f;
+        group.padding = new RectOffset(48, 48, 36, 36);
+        group.spacing = 14f;
         group.childAlignment = TextAnchor.UpperCenter;
         group.childControlHeight = false;
         group.childControlWidth = true;
@@ -101,7 +131,7 @@ public class FocusTimerPanelUI : MonoBehaviour
         titleText = CreateText("Title", runtimePanel, "作業中", 68, TextAlignmentOptions.Center, 84f);
         cycleText = CreateText("Cycle", runtimePanel, "1/4サイクル", 36, TextAlignmentOptions.Center, 52f);
         timeText = CreateText("Time", runtimePanel, "25:00", 200, TextAlignmentOptions.Center, 220f);
-        timeText.enableWordWrapping = false;
+        timeText.textWrappingMode = TextWrappingModes.NoWrap;
         timeText.overflowMode = TextOverflowModes.Overflow;
 
         var progressTrack = CreateRect("ProgressTrack", runtimePanel, new Vector2(0f, 14f));
@@ -147,7 +177,10 @@ public class FocusTimerPanelUI : MonoBehaviour
     private void EnsurePanelBuilt()
     {
         var existingOverlay = transform.Find("FullscreenFocusTimerOverlay");
-        if (existingOverlay != null && titleText != null && timeText != null && primaryButtonText != null)
+        bool hasBuiltRefs = existingOverlay != null && titleText != null && timeText != null && primaryButtonText != null;
+        bool layoutMatches = runtimePanel != null && runtimePanel.sizeDelta == panelSize;
+
+        if (hasBuiltRefs && layoutMatches)
             return;
 
         if (existingOverlay != null)
@@ -260,6 +293,8 @@ public class FocusTimerPanelUI : MonoBehaviour
     {
         if (timerController == null) return;
 
+        SyncPanelFx();
+
         if (timerController.Phase == TimerController.TimerPhase.Completed && !completionHandled)
         {
             completionHandled = true;
@@ -306,19 +341,17 @@ public class FocusTimerPanelUI : MonoBehaviour
 
     private void BuildSettingsPanel(RectTransform overlay)
     {
-        settingsPanel = CreateRect("TimerSettingsPanel", overlay, new Vector2(760f, 430f)).gameObject;
+        settingsPanel = CreateRect("TimerSettingsPanel", overlay, new Vector2(900f, 520f)).gameObject;
         var rect = settingsPanel.GetComponent<RectTransform>();
         rect.anchorMin = new Vector2(0.5f, 0.5f);
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = new Vector2(0f, 40f);
-
-        var image = settingsPanel.AddComponent<Image>();
-        image.color = new Color(0f, 0f, 0f, 0.72f);
+        ApplyTranslucentPanelFx(settingsPanel);
 
         var group = settingsPanel.AddComponent<VerticalLayoutGroup>();
-        group.padding = new RectOffset(20, 20, 16, 16);
-        group.spacing = 10f;
+        group.padding = new RectOffset(28, 28, 24, 24);
+        group.spacing = 14f;
         group.childControlHeight = false;
         group.childControlWidth = true;
         group.childForceExpandHeight = false;
@@ -332,7 +365,7 @@ public class FocusTimerPanelUI : MonoBehaviour
         headerGroup.childControlWidth = true;
         headerGroup.childForceExpandWidth = false;
 
-        var title = CreateText("SettingsTitle", header, "ポモドーロ設定", 46, TextAlignmentOptions.Left, 60f);
+        var title = CreateText("SettingsTitle", header, "ポモドーロ設定", 52, TextAlignmentOptions.Left, 60f);
         title.color = Color.white;
         title.gameObject.GetComponent<LayoutElement>().flexibleWidth = 1f;
 
@@ -351,6 +384,88 @@ public class FocusTimerPanelUI : MonoBehaviour
         CreateActionButton("この設定で開始", footer, 320f, ApplySettingsAndStart);
 
         settingsPanel.SetActive(false);
+    }
+
+    private void ApplyTranslucentPanelFx(GameObject target)
+    {
+        bool canUseFx = useTranslucentPanelFx && Shader.Find("UI/TranslucentUIFX") != null;
+        if (!canUseFx)
+        {
+            var fallback = target.GetComponent<Image>();
+            if (fallback == null)
+                fallback = target.AddComponent<Image>();
+            fallback.color = panelFallbackColor;
+            return;
+        }
+
+        var fx = target.GetComponent<TranslucentImageFX>();
+        if (fx == null)
+            fx = target.AddComponent<TranslucentImageFX>();
+        fx.ApplyPreset(panelPreset);
+        fx.sprite = GetRoundedPanelSprite();
+        fx.type = Image.Type.Sliced;
+        fx.color = panelBaseColor;
+        fx.UpdateMode = panelUpdateMode;
+        fx.UpdateInterval = panelUpdateInterval;
+        fx.QualityMode = panelQualityMode;
+        fx.TintColor = panelTintColor;
+        fx.BlurStrength = panelBlurStrength;
+        fx.FrostAmount = panelFrostAmount;
+        fx.GlassIntensity = panelGlassIntensity;
+        fx.EnableEdgeLighting = panelEnableEdgeLighting;
+        fx.EdgeShape = panelEdgeShape;
+        fx.EdgeRounding = panelEdgeRounding;
+        fx.EdgeLightColor = panelEdgeLightColor;
+        fx.EdgeLightWidth = panelEdgeLightWidth;
+        fx.EdgeLightPower = panelEdgeLightPower;
+        fx.raycastTarget = true;
+    }
+
+    private void SyncPanelFx()
+    {
+        if (runtimePanel != null)
+            ApplyTranslucentPanelFx(runtimePanel.gameObject);
+        if (settingsPanel != null)
+            ApplyTranslucentPanelFx(settingsPanel);
+    }
+
+    private static Sprite GetRoundedPanelSprite()
+    {
+        if (roundedPanelSprite != null) return roundedPanelSprite;
+
+        const int size = 128;
+        const int radius = 24;
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+
+        var pixels = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float px = x + 0.5f;
+                float py = y + 0.5f;
+                float clampedX = Mathf.Clamp(px, radius, size - radius);
+                float clampedY = Mathf.Clamp(py, radius, size - radius);
+                float dx = px - clampedX;
+                float dy = py - clampedY;
+                float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                byte alpha = dist <= radius ? (byte)255 : (byte)0;
+                pixels[y * size + x] = new Color32(255, 255, 255, alpha);
+            }
+        }
+
+        texture.SetPixels32(pixels);
+        texture.Apply();
+        roundedPanelSprite = Sprite.Create(
+            texture,
+            new Rect(0, 0, size, size),
+            new Vector2(0.5f, 0.5f),
+            100f,
+            0,
+            SpriteMeshType.FullRect,
+            new Vector4(radius, radius, radius, radius));
+        return roundedPanelSprite;
     }
 
     private void CreateStepperRow(

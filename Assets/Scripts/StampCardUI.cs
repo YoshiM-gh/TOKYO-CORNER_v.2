@@ -27,6 +27,13 @@ public class StampCardUI : MonoBehaviour
     {
         if (stampText == null || SaveDataManager.Instance == null) return;
 
+        bool isFocusMode =
+            GameModeManager.Instance != null &&
+            GameModeManager.Instance.CurrentMode == GameModeManager.GameMode.Focus;
+        if (stampText.enabled != !isFocusMode)
+            stampText.enabled = !isFocusMode;
+        if (isFocusMode) return;
+
         int current = SaveDataManager.Instance.GetStampCount();
         int total = SaveDataManager.GetStampsPerCard();
         int cards = SaveDataManager.Instance.GetTotalCards();
