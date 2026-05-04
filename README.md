@@ -47,3 +47,31 @@ When save data is reset, `TimerController` defaults should be:
 - `focusMinutes`: `25`
 - `breakMinutes`: `5`
 - `pomodoroRounds`: `4`
+
+## Cross-OS Commit Policy (Mac / Windows)
+
+To keep commits reproducible between macOS and Windows, always commit only meaningful project changes (not OS-specific noise).
+
+### Commit / Push Checklist
+
+1. Pull latest before work:
+   - `git checkout main`
+   - `git pull`
+2. Open Unity with project settings kept as:
+   - `Version Control: Visible Meta Files`
+   - `Asset Serialization: Force Text`
+3. Before commit, confirm there is no accidental diff:
+   - `git status --short --branch`
+   - `git diff`
+4. If all changes are intended, commit and push.
+5. On the other OS, `git pull` and confirm:
+   - `git status --short --branch`
+   - no unexpected modifications
+
+### If Unexpected OS-Only Diffs Appear
+
+- Check line endings first (`.gitattributes` in this repo already enforces LF for Unity text assets).
+- Confirm Unity editor settings above are still correct.
+- If behavior differs but Git has no diffs, check local save data (`savedata.json`) and retry.
+
+This policy is used as the standard workflow for both Mac and Windows contributors.
