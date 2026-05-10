@@ -10,21 +10,23 @@ public class FocusTimerPanelUI : MonoBehaviour
     [SerializeField] private bool useTranslucentPanelFx = true;
     [Header("Translucent Panel FX (Inspector Tunable)")]
     [SerializeField] private GlassPreset panelPreset = GlassPreset.DarkGlass;
+    [SerializeField] private bool panelUseCustomOverrides = true;
+    [SerializeField] private bool panelLivePreviewInPlayMode = true;
     [SerializeField] private PerformanceMode panelQualityMode = PerformanceMode.Medium;
     [SerializeField] private TranslucentUpdateMode panelUpdateMode = TranslucentUpdateMode.Interval;
     [SerializeField, Range(1, 60)] private int panelUpdateInterval = 4;
-    [SerializeField] private Color panelBaseColor = new Color(1f, 1f, 1f, 0.12f);
-    [SerializeField] private Color panelTintColor = new Color(0.02f, 0.03f, 0.06f, 0.32f);
-    [SerializeField, Range(0f, 1f)] private float panelBlurStrength = 0.14f;
-    [SerializeField, Range(0f, 1f)] private float panelFrostAmount = 0.05f;
+    [SerializeField] private Color panelBaseColor = new Color(1f, 1f, 1f, 0.08f);
+    [SerializeField] private Color panelTintColor = new Color(0.02f, 0.03f, 0.06f, 0.2f);
+    [SerializeField, Range(0f, 1f)] private float panelBlurStrength = 0.08f;
+    [SerializeField, Range(0f, 1f)] private float panelFrostAmount = 0.02f;
     [SerializeField, Range(0f, 1f)] private float panelGlassIntensity = 1f;
     [SerializeField] private bool panelEnableEdgeLighting = true;
     [SerializeField] private EdgeShape panelEdgeShape = EdgeShape.RoundedRect;
-    [SerializeField, Range(0f, 0.5f)] private float panelEdgeRounding = 0.4f;
-    [SerializeField] private Color panelEdgeLightColor = new Color(1f, 1f, 1f, 0.12f);
-    [SerializeField, Range(0f, 0.5f)] private float panelEdgeLightWidth = 0.018f;
+    [SerializeField, Range(0f, 0.5f)] private float panelEdgeRounding = 0.48f;
+    [SerializeField] private Color panelEdgeLightColor = new Color(1f, 1f, 1f, 0.08f);
+    [SerializeField, Range(0f, 0.5f)] private float panelEdgeLightWidth = 0.014f;
     [SerializeField, Range(0.1f, 10f)] private float panelEdgeLightPower = 2.1f;
-    [SerializeField] private Color panelFallbackColor = new Color(0f, 0f, 0f, 0.42f);
+    [SerializeField] private Color panelFallbackColor = new Color(0f, 0f, 0f, 0f);
     [SerializeField] private Vector2 panelSize = new Vector2(1410f, 780f);
     [SerializeField, Range(1, 99)] private int minWorkMinutes = 1;
     [SerializeField, Range(1, 99)] private int maxWorkMinutes = 99;
@@ -34,6 +36,8 @@ public class FocusTimerPanelUI : MonoBehaviour
     [SerializeField, Range(1, 99)] private int maxRounds = 99;
 
     private RectTransform runtimePanel;
+    private RectTransform sharedBackgroundPanel;
+    private RectTransform glassLayerPanel;
     private TextMeshProUGUI titleText;
     private TextMeshProUGUI cycleText;
     private TextMeshProUGUI timeText;
@@ -51,6 +55,9 @@ public class FocusTimerPanelUI : MonoBehaviour
     private float nextRefresh;
     private bool completionHandled;
     private static Sprite roundedPanelSprite;
+    private int lastAppliedFxSettingsHash = int.MinValue;
+    private bool previousUseCustomOverrides = true;
+    private GlassPreset previousPanelPreset;
 
     private void Awake()
     {
@@ -77,6 +84,11 @@ public class FocusTimerPanelUI : MonoBehaviour
     private void OnEnable()
     {
         EnsurePanelBuilt();
+        lastAppliedFxSettingsHash = int.MinValue;
+        previousUseCustomOverrides = panelUseCustomOverrides;
+        previousPanelPreset = panelPreset;
+        if (!panelUseCustomOverrides)
+            ResetCustomOverridesFromPreset();
         if (timerController != null)
             timerController.OnTimerChanged += Refresh;
         ShowSettingsAsDefault();
@@ -91,6 +103,10 @@ public class FocusTimerPanelUI : MonoBehaviour
 
     private void Update()
     {
+        HandlePresetResetWhenNeeded();
+        if (panelLivePreviewInPlayMode)
+            TrySyncPanelFxIfSettingsChanged();
+
         if (Time.unscaledTime < nextRefresh) return;
         nextRefresh = Time.unscaledTime + 0.1f;
         Refresh();
@@ -100,24 +116,40 @@ public class FocusTimerPanelUI : MonoBehaviour
     private void OnValidate()
     {
         if (!Application.isPlaying) return;
-        SyncPanelFx();
+        HandlePresetResetWhenNeeded();
+        lastAppliedFxSettingsHash = int.MinValue;
+        if (panelLivePreviewInPlayMode)
+            SyncPanelFx();
     }
 #endif
 
     private void BuildPanel()
     {
-        var overlay = CreateRect("FullscreenFocusTimerOverlay", transform, Vector2.zero);
-        overlay.anchorMin = Vector2.zero;
-        overlay.anchorMax = Vector2.one;
-        overlay.offsetMin = Vector2.zero;
-        overlay.offsetMax = Vector2.zero;
+        sharedBackgroundPanel = CreateRect("FocusSharedBackground", transform, panelSize);
+        sharedBackgroundPanel.anchorMin = new Vector2(0.5f, 0.5f);
+        sharedBackgroundPanel.anchorMax = new Vector2(0.5f, 0.5f);
+        sharedBackgroundPanel.pivot = new Vector2(0.5f, 0.5f);
+        sharedBackgroundPanel.anchoredPosition = new Vector2(0f, 60f);
+        SetupRoundedMask(sharedBackgroundPanel.gameObject);
 
-        runtimePanel = CreateRect("FocusRuntimePanel", overlay, panelSize);
+        glassLayerPanel = CreateRect("FocusGlassLayer", sharedBackgroundPanel, panelSize);
+        glassLayerPanel.anchorMin = Vector2.zero;
+        glassLayerPanel.anchorMax = Vector2.one;
+        glassLayerPanel.offsetMin = Vector2.zero;
+        glassLayerPanel.offsetMax = Vector2.zero;
+        ApplyTranslucentPanelFx(glassLayerPanel.gameObject);
+
+        var contentRoot = CreateRect("FocusContentRoot", sharedBackgroundPanel, panelSize);
+        contentRoot.anchorMin = Vector2.zero;
+        contentRoot.anchorMax = Vector2.one;
+        contentRoot.offsetMin = Vector2.zero;
+        contentRoot.offsetMax = Vector2.zero;
+
+        runtimePanel = CreateRect("FocusRuntimePanel", contentRoot, panelSize);
         runtimePanel.anchorMin = new Vector2(0.5f, 0.5f);
         runtimePanel.anchorMax = new Vector2(0.5f, 0.5f);
         runtimePanel.pivot = new Vector2(0.5f, 0.5f);
-        runtimePanel.anchoredPosition = new Vector2(0f, 60f);
-        ApplyTranslucentPanelFx(runtimePanel.gameObject);
+        runtimePanel.anchoredPosition = Vector2.zero;
 
         var group = runtimePanel.gameObject.AddComponent<VerticalLayoutGroup>();
         group.padding = new RectOffset(48, 48, 36, 36);
@@ -166,9 +198,9 @@ public class FocusTimerPanelUI : MonoBehaviour
         nextPhaseButton = CreateActionButton("次へ", controlRow, 180f, HandleNextPhase);
         nextButtonText = nextPhaseButton.GetComponentInChildren<TextMeshProUGUI>();
 
-        BuildSettingsPanel(overlay);
+        BuildSettingsPanel(contentRoot);
 
-        overlay.SetAsLastSibling();
+        sharedBackgroundPanel.SetAsLastSibling();
         var stamp = transform.Find("StampCard");
         if (stamp != null)
             stamp.SetAsLastSibling();
@@ -177,14 +209,25 @@ public class FocusTimerPanelUI : MonoBehaviour
     private void EnsurePanelBuilt()
     {
         var existingOverlay = transform.Find("FullscreenFocusTimerOverlay");
-        bool hasBuiltRefs = existingOverlay != null && titleText != null && timeText != null && primaryButtonText != null;
-        bool layoutMatches = runtimePanel != null && runtimePanel.sizeDelta == panelSize;
+        if (existingOverlay != null)
+            Destroy(existingOverlay.gameObject);
+
+        var legacyRuntime = transform.Find("FocusRuntimePanel");
+        if (legacyRuntime != null)
+            Destroy(legacyRuntime.gameObject);
+        var existingShared = transform.Find("FocusSharedBackground");
+        if (existingShared != null && sharedBackgroundPanel == null)
+            Destroy(existingShared.gameObject);
+
+        bool hasBuiltRefs = sharedBackgroundPanel != null && titleText != null && timeText != null && primaryButtonText != null;
+        bool layoutMatches = runtimePanel != null &&
+                            sharedBackgroundPanel != null &&
+                            glassLayerPanel != null &&
+                            runtimePanel.sizeDelta == panelSize &&
+                            sharedBackgroundPanel.sizeDelta == panelSize;
 
         if (hasBuiltRefs && layoutMatches)
             return;
-
-        if (existingOverlay != null)
-            Destroy(existingOverlay.gameObject);
 
         BuildPanel();
     }
@@ -293,8 +336,6 @@ public class FocusTimerPanelUI : MonoBehaviour
     {
         if (timerController == null) return;
 
-        SyncPanelFx();
-
         if (timerController.Phase == TimerController.TimerPhase.Completed && !completionHandled)
         {
             completionHandled = true;
@@ -339,15 +380,14 @@ public class FocusTimerPanelUI : MonoBehaviour
                 : new Color(0.35f, 0.35f, 0.35f, 1f);
     }
 
-    private void BuildSettingsPanel(RectTransform overlay)
+    private void BuildSettingsPanel(RectTransform parent)
     {
-        settingsPanel = CreateRect("TimerSettingsPanel", overlay, new Vector2(900f, 520f)).gameObject;
+        settingsPanel = CreateRect("TimerSettingsPanel", parent, new Vector2(900f, 520f)).gameObject;
         var rect = settingsPanel.GetComponent<RectTransform>();
         rect.anchorMin = new Vector2(0.5f, 0.5f);
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(0f, 40f);
-        ApplyTranslucentPanelFx(settingsPanel);
+        rect.anchoredPosition = Vector2.zero;
 
         var group = settingsPanel.AddComponent<VerticalLayoutGroup>();
         group.padding = new RectOffset(28, 28, 24, 24);
@@ -388,45 +428,160 @@ public class FocusTimerPanelUI : MonoBehaviour
 
     private void ApplyTranslucentPanelFx(GameObject target)
     {
+        var existingFx = target.GetComponent<TranslucentImageFX>();
         bool canUseFx = useTranslucentPanelFx && Shader.Find("UI/TranslucentUIFX") != null;
         if (!canUseFx)
         {
-            var fallback = target.GetComponent<Image>();
-            if (fallback == null)
-                fallback = target.AddComponent<Image>();
-            fallback.color = panelFallbackColor;
+            // When FX is disabled, explicitly turn off translucent rendering so it doesn't
+            // keep affecting output after toggles.
+            if (existingFx != null)
+            {
+                existingFx.enabled = false;
+                existingFx.material = null;
+                existingFx.sprite = GetRoundedPanelSprite();
+                existingFx.type = Image.Type.Sliced;
+                existingFx.color = panelFallbackColor;
+                existingFx.raycastTarget = false;
+            }
+            else
+            {
+                var fallback = target.GetComponent<Image>();
+                if (fallback == null)
+                    fallback = target.AddComponent<Image>();
+                fallback.sprite = GetRoundedPanelSprite();
+                fallback.type = Image.Type.Sliced;
+                fallback.color = panelFallbackColor;
+                fallback.raycastTarget = false;
+            }
             return;
         }
 
-        var fx = target.GetComponent<TranslucentImageFX>();
+        var fx = existingFx;
         if (fx == null)
             fx = target.AddComponent<TranslucentImageFX>();
+        fx.enabled = true;
         fx.ApplyPreset(panelPreset);
         fx.sprite = GetRoundedPanelSprite();
         fx.type = Image.Type.Sliced;
-        fx.color = panelBaseColor;
+        fx.color = panelUseCustomOverrides ? panelBaseColor : GetPresetBaseColor(panelPreset);
         fx.UpdateMode = panelUpdateMode;
         fx.UpdateInterval = panelUpdateInterval;
         fx.QualityMode = panelQualityMode;
-        fx.TintColor = panelTintColor;
-        fx.BlurStrength = panelBlurStrength;
-        fx.FrostAmount = panelFrostAmount;
-        fx.GlassIntensity = panelGlassIntensity;
-        fx.EnableEdgeLighting = panelEnableEdgeLighting;
-        fx.EdgeShape = panelEdgeShape;
-        fx.EdgeRounding = panelEdgeRounding;
-        fx.EdgeLightColor = panelEdgeLightColor;
-        fx.EdgeLightWidth = panelEdgeLightWidth;
-        fx.EdgeLightPower = panelEdgeLightPower;
-        fx.raycastTarget = true;
+        if (panelUseCustomOverrides)
+        {
+            fx.TintColor = panelTintColor;
+            fx.BlurStrength = panelBlurStrength;
+            fx.FrostAmount = panelFrostAmount;
+            fx.GlassIntensity = panelGlassIntensity;
+            fx.EnableEdgeLighting = panelEnableEdgeLighting;
+            fx.EdgeShape = panelEdgeShape;
+            fx.EdgeRounding = panelEdgeRounding;
+            fx.EdgeLightColor = panelEdgeLightColor;
+            fx.EdgeLightWidth = panelEdgeLightWidth;
+            fx.EdgeLightPower = panelEdgeLightPower;
+        }
+        fx.raycastTarget = false;
+        TranslucentRendererFeature.RequestUpdate();
     }
 
     private void SyncPanelFx()
     {
-        if (runtimePanel != null)
-            ApplyTranslucentPanelFx(runtimePanel.gameObject);
-        if (settingsPanel != null)
-            ApplyTranslucentPanelFx(settingsPanel);
+        if (glassLayerPanel != null)
+            ApplyTranslucentPanelFx(glassLayerPanel.gameObject);
+        lastAppliedFxSettingsHash = ComputeFxSettingsHash();
+    }
+
+    private void TrySyncPanelFxIfSettingsChanged()
+    {
+        int currentHash = ComputeFxSettingsHash();
+        if (currentHash == lastAppliedFxSettingsHash)
+            return;
+        SyncPanelFx();
+    }
+
+    private void HandlePresetResetWhenNeeded()
+    {
+        bool toggledCustomOff = previousUseCustomOverrides && !panelUseCustomOverrides;
+        bool presetChangedWhileUsingPreset = !panelUseCustomOverrides && panelPreset != previousPanelPreset;
+        if (toggledCustomOff || presetChangedWhileUsingPreset)
+        {
+            ResetCustomOverridesFromPreset();
+            lastAppliedFxSettingsHash = int.MinValue;
+        }
+        previousUseCustomOverrides = panelUseCustomOverrides;
+        previousPanelPreset = panelPreset;
+    }
+
+    private void ResetCustomOverridesFromPreset()
+    {
+        if (glassLayerPanel == null)
+            return;
+
+        var fx = glassLayerPanel.GetComponent<TranslucentImageFX>();
+        if (fx == null)
+            return;
+
+        fx.ApplyPreset(panelPreset);
+        panelTintColor = fx.TintColor;
+        panelBlurStrength = fx.BlurStrength;
+        panelFrostAmount = fx.FrostAmount;
+        panelGlassIntensity = fx.GlassIntensity;
+        panelEnableEdgeLighting = fx.EnableEdgeLighting;
+        panelEdgeShape = fx.EdgeShape;
+        panelEdgeRounding = fx.EdgeRounding;
+        panelEdgeLightColor = fx.EdgeLightColor;
+        panelEdgeLightWidth = fx.EdgeLightWidth;
+        panelEdgeLightPower = fx.EdgeLightPower;
+        panelBaseColor = GetPresetBaseColor(panelPreset);
+    }
+
+    private static Color GetPresetBaseColor(GlassPreset preset)
+    {
+        // TranslucentUI shader multiplies final alpha by uiColor.a (Image.color alpha).
+        // Keep it fully opaque in preset mode so each preset shows its intended strength.
+        return Color.white;
+    }
+
+    private int ComputeFxSettingsHash()
+    {
+        unchecked
+        {
+            int hash = 17;
+            hash = hash * 31 + (int)panelPreset;
+            hash = hash * 31 + (panelUseCustomOverrides ? 1 : 0);
+            hash = hash * 31 + (panelLivePreviewInPlayMode ? 1 : 0);
+            hash = hash * 31 + (int)panelQualityMode;
+            hash = hash * 31 + (int)panelUpdateMode;
+            hash = hash * 31 + panelUpdateInterval;
+            hash = hash * 31 + panelBaseColor.GetHashCode();
+            hash = hash * 31 + panelTintColor.GetHashCode();
+            hash = hash * 31 + panelBlurStrength.GetHashCode();
+            hash = hash * 31 + panelFrostAmount.GetHashCode();
+            hash = hash * 31 + panelGlassIntensity.GetHashCode();
+            hash = hash * 31 + (panelEnableEdgeLighting ? 1 : 0);
+            hash = hash * 31 + (int)panelEdgeShape;
+            hash = hash * 31 + panelEdgeRounding.GetHashCode();
+            hash = hash * 31 + panelEdgeLightColor.GetHashCode();
+            hash = hash * 31 + panelEdgeLightWidth.GetHashCode();
+            hash = hash * 31 + panelEdgeLightPower.GetHashCode();
+            return hash;
+        }
+    }
+
+    private void SetupRoundedMask(GameObject target)
+    {
+        var maskImage = target.GetComponent<Image>();
+        if (maskImage == null)
+            maskImage = target.AddComponent<Image>();
+        maskImage.sprite = GetRoundedPanelSprite();
+        maskImage.type = Image.Type.Sliced;
+        maskImage.color = Color.white;
+        maskImage.raycastTarget = false;
+
+        var mask = target.GetComponent<Mask>();
+        if (mask == null)
+            mask = target.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
     }
 
     private static Sprite GetRoundedPanelSprite()
@@ -434,7 +589,7 @@ public class FocusTimerPanelUI : MonoBehaviour
         if (roundedPanelSprite != null) return roundedPanelSprite;
 
         const int size = 128;
-        const int radius = 24;
+        const int radius = 40;
         var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
         texture.wrapMode = TextureWrapMode.Clamp;
 
