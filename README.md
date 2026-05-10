@@ -75,3 +75,21 @@ To keep commits reproducible between macOS and Windows, always commit only meani
 - If behavior differs but Git has no diffs, check local save data (`savedata.json`) and retry.
 
 This policy is used as the standard workflow for both Mac and Windows contributors.
+
+## Focus UI Implementation Rules (Modern UI First)
+
+To avoid over-engineering, Focus UI changes must follow these rules:
+
+1. Build Focus UI primarily with `Assets/Modern UI Pack/Prefabs/*` components.
+2. Do not introduce custom UI frameworks or large runtime UI builders unless explicitly approved.
+3. Keep custom scripts to a minimum:
+   - `TimerController`: timer logic only
+   - UI binder script: connect existing timer state/actions to Modern UI components
+4. Prefer Inspector wiring and prefab composition over hard-coded hierarchy creation.
+5. Limit each implementation step to small, reviewable scope:
+   - layout placement
+   - action wiring (`Start`, `Pause/Resume`, `Next`)
+   - visual polish
+6. Reject scope creep by default. Any extra feature must be listed and approved before implementation.
+
+This project prioritizes maintainable and reusable UI over one-off custom visuals.
