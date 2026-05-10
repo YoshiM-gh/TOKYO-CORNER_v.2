@@ -6,6 +6,7 @@ using UnityEngine.UI;
 public class FocusTimerPanelUI : MonoBehaviour
 {
     [SerializeField] private TimerController timerController;
+    [SerializeField] private bool autoBindOnAwake = true;
 
     [Header("Panels")]
     [SerializeField] private GameObject runtimePanel;
@@ -52,6 +53,9 @@ public class FocusTimerPanelUI : MonoBehaviour
 
     private void Awake()
     {
+        if (autoBindOnAwake)
+            AutoBindIfMissing();
+
         if (timerController == null)
             timerController = GetComponent<TimerController>();
         if (timerController == null)
@@ -66,6 +70,7 @@ public class FocusTimerPanelUI : MonoBehaviour
 
         ConfigureSliders();
         PushSelectionToSliders();
+        LogMissingCriticalReferences();
     }
 
     private void OnEnable()
@@ -115,6 +120,109 @@ public class FocusTimerPanelUI : MonoBehaviour
         ConfigureSlider(workMinutesSlider, minWorkMinutes, maxWorkMinutes);
         ConfigureSlider(breakMinutesSlider, minBreakMinutes, maxBreakMinutes);
         ConfigureSlider(roundsSlider, minRounds, maxRounds);
+    }
+
+    [ContextMenu("Auto Bind Missing Focus UI References")]
+    private void AutoBindIfMissing()
+    {
+        if (runtimePanel == null)
+            runtimePanel = FindChildGameObject("FocusRuntimePanel");
+        if (settingsPanel == null)
+            settingsPanel = FindChildGameObject("FocusSettingsPanel");
+
+        if (titleText == null)
+            titleText = FindChildText("TitleText") ?? FindChildText("PomodoroNotificationText");
+        if (cycleText == null)
+            cycleText = FindChildText("CycleText");
+        if (timeText == null)
+            timeText = FindChildText("TimeText") ?? FindChildText("TimerText");
+        if (percentText == null)
+            percentText = FindChildText("PercentText");
+
+        if (workValueText == null)
+            workValueText = FindChildText("WorkValueText");
+        if (breakValueText == null)
+            breakValueText = FindChildText("BreakValueText");
+        if (roundsValueText == null)
+            roundsValueText = FindChildText("RoundsValueText");
+
+        if (radialProgressBar == null)
+            radialProgressBar = FindProgressBarByName("PB - Radial (Regular)");
+        if (horizontalProgressBar == null)
+            horizontalProgressBar = FindProgressBarByName("PB - Standard");
+
+        if (primaryActionButton == null)
+            primaryActionButton = FindButtonManager("PrimaryActionButton");
+        if (nextPhaseButton == null)
+            nextPhaseButton = FindButtonManager("NextPhaseButton");
+        if (backToSettingsButton == null)
+            backToSettingsButton = FindButtonManager("BackToSettingsButton");
+        if (startWithSettingsButton == null)
+            startWithSettingsButton = FindButtonManager("StartWithSettingsButton");
+
+        if (workMinutesSlider == null)
+            workMinutesSlider = FindSliderManager("WorkMinutesSlider");
+        if (breakMinutesSlider == null)
+            breakMinutesSlider = FindSliderManager("BreakMinutesSlider");
+        if (roundsSlider == null)
+            roundsSlider = FindSliderManager("RoundsSlider");
+    }
+
+    private GameObject FindChildGameObject(string name)
+    {
+        Transform child = FindDescendantByName(name);
+        return child != null ? child.gameObject : null;
+    }
+
+    private TextMeshProUGUI FindChildText(string name)
+    {
+        Transform child = FindDescendantByName(name);
+        if (child == null) return null;
+        return child.GetComponent<TextMeshProUGUI>();
+    }
+
+    private ProgressBar FindProgressBarByName(string name)
+    {
+        Transform child = FindDescendantByName(name);
+        if (child == null) return null;
+        return child.GetComponent<ProgressBar>();
+    }
+
+    private ButtonManager FindButtonManager(string name)
+    {
+        Transform child = FindDescendantByName(name);
+        if (child == null) return null;
+        return child.GetComponent<ButtonManager>();
+    }
+
+    private SliderManager FindSliderManager(string name)
+    {
+        Transform child = FindDescendantByName(name);
+        if (child == null) return null;
+        return child.GetComponent<SliderManager>();
+    }
+
+    private Transform FindDescendantByName(string name)
+    {
+        foreach (Transform t in GetComponentsInChildren<Transform>(true))
+        {
+            if (t.name == name)
+                return t;
+        }
+
+        return null;
+    }
+
+    private void LogMissingCriticalReferences()
+    {
+        if (timerController == null)
+            Debug.LogWarning("[FocusUI] TimerController is not assigned.", this);
+        if (runtimePanel == null)
+            Debug.LogWarning("[FocusUI] RuntimePanel is missing.", this);
+        if (settingsPanel == null)
+            Debug.LogWarning("[FocusUI] FocusSettingsPanel is missing. Settings screen will not be shown.", this);
+        if (primaryActionButton == null)
+            Debug.LogWarning("[FocusUI] PrimaryActionButton is missing. Start/Pause action will be unavailable.", this);
     }
 
     private static void ConfigureSlider(SliderManager sliderManager, int min, int max)
