@@ -18,11 +18,6 @@ public class FocusTimerPanelUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI timeText;
     [SerializeField] private TextMeshProUGUI percentText;
 
-    [Header("Setting Value Text")]
-    [SerializeField] private TextMeshProUGUI workValueText;
-    [SerializeField] private TextMeshProUGUI breakValueText;
-    [SerializeField] private TextMeshProUGUI roundsValueText;
-
     [Header("Progress Bars (Modern UI Pack)")]
     [SerializeField] private ProgressBar radialProgressBar;
     [SerializeField] private ProgressBar horizontalProgressBar;
@@ -138,13 +133,6 @@ public class FocusTimerPanelUI : MonoBehaviour
             timeText = FindChildText("TimeText") ?? FindChildText("TimerText");
         if (percentText == null)
             percentText = FindChildText("PercentText");
-
-        if (workValueText == null)
-            workValueText = FindChildText("WorkValueText");
-        if (breakValueText == null)
-            breakValueText = FindChildText("BreakValueText");
-        if (roundsValueText == null)
-            roundsValueText = FindChildText("RoundsValueText");
 
         if (radialProgressBar == null)
             radialProgressBar = FindProgressBarByName("PB - Radial (Regular)");
@@ -364,10 +352,6 @@ public class FocusTimerPanelUI : MonoBehaviour
                 : $"0/{selectedRounds}サイクル";
         if (timeText != null) timeText.text = TimerController.FormatTime(remainingSeconds);
         if (percentText != null) percentText.text = $"{percent}%";
-
-        if (workValueText != null) workValueText.text = $"{selectedWorkMinutes}";
-        if (breakValueText != null) breakValueText.text = $"{selectedBreakMinutes}";
-        if (roundsValueText != null) roundsValueText.text = $"{selectedRounds}";
 
         SetProgressBarValue(radialProgressBar, percent);
         SetProgressBarValue(horizontalProgressBar, percent);

@@ -59,6 +59,7 @@ namespace Controller
 
         private MovementHandler m_Movement;
         private AnimationHandler m_Animation;
+        private bool m_IsInitialized;
 
         private Vector2 m_Axis;
         private Vector3 m_Target;
@@ -81,23 +82,41 @@ namespace Controller
 
         private void Awake()
         {
+            InitializeRuntime();
+        }
+
+        private bool InitializeRuntime()
+        {
             m_Transform = transform;
             m_Controller = GetComponent<CharacterController>();
+            m_Animator = GetComponent<Animator>();
+            if (m_Controller == null || m_Animator == null)
+            {
+                m_IsInitialized = false;
+                return false;
+            }
+
             if (m_AutoFitController)
             {
                 FitControllerToCharacter();
             }
-            m_Animator = GetComponent<Animator>();
             m_Animators = BuildAnimatorTargets();
             m_CurrentPlaySpeed = m_IdleAnimPlaySpeed;
             SetAllAnimatorPlaySpeeds(m_CurrentPlaySpeed);
 
             m_Movement = new MovementHandler(m_Controller, m_Transform, m_WalkSpeed, m_RunSpeed, m_RotateSpeed, m_JumpHeight, m_Space);
             m_Animation = new AnimationHandler(m_Animators, m_HorizontalID,  m_VerticalID, m_StateID, m_JumpID);
+            m_IsInitialized = true;
+            return true;
         }
 
         private void Update()
         {
+            if (!m_IsInitialized && !InitializeRuntime())
+            {
+                return;
+            }
+
             m_Movement.Move(Time.deltaTime, in m_Axis, in m_Target, m_IsRun, m_IsJump, m_IsMoving, out var animAxis, out var isAir);
             m_Animation.Animate(in animAxis, m_IsRun? 1f : 0f, isAir, Time.deltaTime);
             UpdateAnimatorPlaySpeeds(isAir, Time.deltaTime);
@@ -105,6 +124,10 @@ namespace Controller
 
         private void OnAnimatorIK()
         {
+            if (!m_IsInitialized || m_Animation == null)
+            {
+                return;
+            }
             m_Animation.AnimateIK(in m_Target, m_LookWeight);
         }
 
