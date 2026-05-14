@@ -34,8 +34,21 @@ public class GameModeManager : MonoBehaviour
         if (movePlayerInput != null) movePlayerInput.enabled = false;
         cameraFollow.SetTarget(seatTransform);
         cameraFollow.SetOffset(focusOffset);
-        if (focusCameraPoint != null)
+        
+        // ✅ 椅子固有の FocusCameraPoint を自動検索
+        Transform chairFocusPoint = FindFocusCameraPoint(seatTransform);
+        
+        if (chairFocusPoint != null)
+        {
+            cameraFollow.SetFocusTransform(chairFocusPoint);
+            Debug.Log($"[Focus] Using FocusCameraPoint from {seatTransform.parent.name}");
+        }
+        else if (focusCameraPoint != null)
+        {
+            // フォールバック：Inspector で設定された global FocusCameraPoint
             cameraFollow.SetFocusTransform(focusCameraPoint);
+            Debug.LogWarning($"[Focus] Chair {seatTransform.parent.name} has no FocusCameraPoint, using global");
+        }
         else
         {
             cameraFollow.SetLookAt(true);
@@ -57,5 +70,28 @@ public class GameModeManager : MonoBehaviour
         if (focusUI != null) focusUI.SetActive(false);
         if (timerController != null) timerController.StopSession();
         Debug.Log("[Focus] Exited focus mode.");
+    }
+
+    /// <summary>
+    /// SitPoint の親（椅子）から FocusCameraPoint を検索
+    /// </summary>
+    private Transform FindFocusCameraPoint(Transform sitPoint)
+    {
+        if (sitPoint == null) return null;
+        
+        // SitPoint の親（椅子）を取得
+        Transform chair = sitPoint.parent;
+        if (chair == null) return null;
+        
+        // 椅子の直下から FocusCameraPoint を探す
+        foreach (Transform child in chair)
+        {
+            if (child.name == "FocusCameraPoint")
+            {
+                return child;
+            }
+        }
+        
+        return null;
     }
 }

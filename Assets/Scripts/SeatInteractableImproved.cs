@@ -2,10 +2,16 @@ using Controller;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections;
+using System.Collections.Generic;
 
-public class SeatInteractable : MonoBehaviour
+/// <summary>
+/// 改善版 SeatInteractable (Fixed版)
+/// CharacterController を一時的に無効化してテレポート
+/// interactRange を 0.9f に調整（椅子を近づけて配置しやすく）
+/// </summary>
+public class SeatInteractableImproved : MonoBehaviour
 {
-    [SerializeField] private float interactRange = 1.5f;
+    [SerializeField] private float interactRange = 0.9f;  // ✅ 0.9f に変更（より小さい判定範囲）
     [SerializeField] private Transform sitPoint;
     [Tooltip("未指定時は椅子の前方（-forward）に離席します。")]
     [SerializeField] private Transform standPoint;
@@ -25,12 +31,13 @@ public class SeatInteractable : MonoBehaviour
     [SerializeField] private bool forceCrossFadeState = true;
     [SerializeField] private string sitStateName = "Adult_SitTableIdle";
     [SerializeField] private string moveStateName = "Movement";
-    [SerializeField] private bool debugLogs = false;
+    [SerializeField] private bool debugLogs = true;
 
     private Transform player;
     private CharacterMover playerMover;
     private CharacterController playerController;
     private Collider[] seatColliders;
+    private HashSet<Collider> seatCollidersSet;
     private SitPoseHotkeyDebug sitDebugBridge;
     private Animator[] playerAnimators;
     private bool isSeated = false;
@@ -43,6 +50,7 @@ public class SeatInteractable : MonoBehaviour
     {
         AutoAssignPointsIfMissing();
         seatColliders = GetComponentsInChildren<Collider>(true);
+        seatCollidersSet = new HashSet<Collider>(seatColliders);
     }
 
     private void Start()
@@ -85,7 +93,6 @@ public class SeatInteractable : MonoBehaviour
 
     private void SitDown()
     {
-        // Remember where the player came from so auto-stand can return to that side.
         lastApproachGroundPos = player.position;
         lastApproachGroundPos.y = 0f;
 
@@ -108,43 +115,103 @@ public class SeatInteractable : MonoBehaviour
     private void StandUp()
     {
         isSeated = false;
+        
         Vector3 sitWorld = sitPoint != null ? sitPoint.position : transform.position;
         Vector3 standPos = ComputeStandPosition(sitWorld);
-        bool restoreCollisionNextFrame = TeleportPlayerSafely(standPos);
+        Vector3 validatedStandPos = ValidateStandPosition(standPos, sitWorld);
+        
+        if (debugLogs)
+        {
+            Debug.Log($"[Seat] StandUp: '{gameObject.name}'");
+            Debug.Log($"  sitWorld: ({sitWorld.x:F2}, {sitWorld.y:F2}, {sitWorld.z:F2})");
+            Debug.Log($"  computedPos: ({standPos.x:F2}, {standPos.y:F2}, {standPos.z:F2})");
+            Debug.Log($"  validatedPos: ({validatedStandPos.x:F2}, {validatedStandPos.y:F2}, {validatedStandPos.z:F2})");
+            if (standPoint != null)
+                Debug.Log($"  standPoint (assigned): ({standPoint.position.x:F2}, {standPoint.position.y:F2}, {standPoint.position.z:F2})");
+            else
+                Debug.Log($"  standPoint: NOT ASSIGNED (using auto-stand)");
+        }
+        
+        // ✅ CRITICAL FIX: CharacterController を一時的に完全に無効化してテレポート
+        bool ccWasEnabled = false;
+        if (playerController != null && playerController.enabled)
+        {
+            ccWasEnabled = true;
+            playerController.enabled = false;
+            if (debugLogs)
+                Debug.Log($"[Seat] CharacterController disabled for teleport");
+        }
+        
+        // プレイヤーを確実に移動
+        player.position = validatedStandPos;
+        if (debugLogs)
+            Debug.Log($"[Seat] Teleported player to: ({validatedStandPos.x:F2}, {validatedStandPos.y:F2}, {validatedStandPos.z:F2})");
+        
+        // CharacterController を再度有効化
+        if (ccWasEnabled)
+        {
+            playerController.enabled = true;
+            if (debugLogs)
+                Debug.Log($"[Seat] CharacterController re-enabled");
+        }
 
         if (sitDebugBridge != null) sitDebugBridge.SetSitState(false);
+        SetSitAnimatorState(false);
+        
         if (playerMover != null)
             playerMover.enabled = true;
-        SetSitAnimatorState(false);
+        
         GameModeManager.Instance.ExitFocusMode(player);
-        if (restoreCollisionNextFrame)
-            StartCoroutine(RestoreCollisionsNextFrame());
+        
         Debug.Log($"[Seat] Stood up from: {gameObject.name}");
     }
 
     private Vector3 ComputeStandPosition(Vector3 sitWorld)
     {
-        if (standPoint == null)
-            return ComputeAutoStandPosition(sitWorld);
-
-        Vector3 explicitPos = standPoint.position;
-        Vector3 delta = explicitPos - sitWorld;
-        delta.y = 0f;
-
-        float minDistance = standOffDistance;
-        if (TryGetSeatBounds(out Bounds seatBounds))
-            minDistance = Mathf.Max(minDistance, Mathf.Max(seatBounds.extents.x, seatBounds.extents.z) + 0.2f);
-
-        if (delta.sqrMagnitude >= minDistance * minDistance)
+        if (standPoint != null)
+        {
+            Vector3 explicitPos = standPoint.position;
+            
+            if (!IsHeightAboveGround(explicitPos))
+            {
+                if (debugLogs)
+                    Debug.LogWarning($"[Seat] StandPoint Y ({explicitPos.y:F2}) is too low, attempting correction");
+                
+                if (TrySnapToGround(explicitPos, out float safeY))
+                {
+                    explicitPos.y = safeY;
+                    if (debugLogs)
+                        Debug.Log($"[Seat] Corrected standPoint.y to ground: {safeY:F2}");
+                }
+                else
+                {
+                    explicitPos.y = sitWorld.y + 1.7f;
+                    if (debugLogs)
+                        Debug.Log($"[Seat] Set standPoint.y to sit.y + 1.7m: {explicitPos.y:F2}");
+                }
+            }
+            
+            Vector3 deltaXZ = new Vector3(explicitPos.x - sitWorld.x, 0, explicitPos.z - sitWorld.z);
+            float distXZ = deltaXZ.magnitude;
+            
+            if (debugLogs)
+                Debug.Log($"[Seat] StandPoint XZ distance: {distXZ:F2} (min required: {standOffDistance * 0.5f:F2})");
+            
+            if (distXZ < standOffDistance * 0.5f)
+            {
+                if (debugLogs)
+                    Debug.LogWarning($"[Seat] StandPoint too close, pushing away...");
+                
+                Vector3 dir = distXZ > 0.0001f ? deltaXZ.normalized : -transform.forward;
+                Vector3 corrected = sitWorld + dir * standOffDistance;
+                corrected.y = explicitPos.y;
+                return corrected;
+            }
+            
             return explicitPos;
+        }
 
-        Vector3 dir = delta.sqrMagnitude > 0.0001f ? delta.normalized : -transform.forward;
-        if (dir.sqrMagnitude < 0.0001f)
-            dir = Vector3.forward;
-
-        Vector3 corrected = sitWorld + dir * minDistance;
-        corrected.y = explicitPos.y;
-        return corrected;
+        return ComputeAutoStandPosition(sitWorld);
     }
 
     private Vector3 ComputeAutoStandPosition(Vector3 sitWorld)
@@ -177,7 +244,6 @@ public class SeatInteractable : MonoBehaviour
         float distance = Mathf.Max(standOffDistance, seatRadius + 0.35f);
         Vector3 standPos = seatOrigin + dir * distance;
 
-        // Snap to floor while ignoring this seat's own colliders.
         if (TrySnapToGround(standPos, out float groundedY))
             standPos.y = groundedY;
         else
@@ -185,10 +251,56 @@ public class SeatInteractable : MonoBehaviour
 
         if (debugLogs)
         {
-            Debug.Log($"[Seat] Auto stand computed on '{gameObject.name}' -> xz=({standPos.x:F2},{standPos.z:F2}) y={standPos.y:F2} (sit xz=({seatOrigin.x:F2},{seatOrigin.z:F2}))");
+            Debug.Log($"[Seat] Auto stand computed on '{gameObject.name}'");
+            Debug.Log($"  result xz=({standPos.x:F2},{standPos.z:F2}) y={standPos.y:F2}");
+            Debug.Log($"  sit xz=({seatOrigin.x:F2},{seatOrigin.z:F2})");
         }
 
         return standPos;
+    }
+
+    private Vector3 ValidateStandPosition(Vector3 standPos, Vector3 sitWorld)
+    {
+        Vector2 deltaXZ = new Vector2(standPos.x - sitWorld.x, standPos.z - sitWorld.z);
+        float distXZ = deltaXZ.magnitude;
+        
+        if (distXZ < standOffDistance * 0.4f)
+        {
+            Debug.LogWarning($"[Seat] Stand Position XZ too close to sit! Distance: {distXZ:F2}");
+            Vector2 dir = distXZ > 0.01f ? deltaXZ.normalized : new Vector2(-transform.forward.x, -transform.forward.z);
+            if (dir.sqrMagnitude < 0.0001f) dir = new Vector2(1, 0);
+            
+            Vector3 corrected = sitWorld + new Vector3(dir.x, 0, dir.y) * (standOffDistance * 1.2f);
+            corrected.y = standPos.y;
+            
+            if (debugLogs)
+                Debug.Log($"[Seat] Corrected XZ distance to {(corrected - sitWorld).magnitude:F2}");
+            
+            return corrected;
+        }
+        
+        if (TryGetSeatBounds(out Bounds seatBounds))
+        {
+            float seatTopY = seatBounds.max.y;
+            if (standPos.y < seatTopY + 0.3f)
+            {
+                Debug.LogWarning($"[Seat] Stand Position Y ({standPos.y:F2}) below seat top ({seatTopY:F2})!");
+                standPos.y = seatTopY + 1.7f;
+                
+                if (debugLogs)
+                    Debug.Log($"[Seat] Corrected Y to {standPos.y:F2}");
+            }
+        }
+        
+        return standPos;
+    }
+
+    private bool IsHeightAboveGround(Vector3 pos)
+    {
+        if (!TrySnapToGround(pos, out float groundY))
+            return true;
+        
+        return pos.y >= groundY + 0.1f;
     }
 
     private bool TryGetSeatBounds(out Bounds bounds)
@@ -218,63 +330,49 @@ public class SeatInteractable : MonoBehaviour
         return initialized;
     }
 
-    private bool TeleportPlayerSafely(Vector3 worldPos)
-    {
-        if (player == null)
-            return false;
-
-        if (playerController == null || !playerController.enabled)
-        {
-            player.position = worldPos;
-            return false;
-        }
-
-        bool restoreCollisionNextFrame = playerController.detectCollisions;
-        if (restoreCollisionNextFrame)
-            playerController.detectCollisions = false;
-
-        player.position = worldPos;
-        return restoreCollisionNextFrame;
-    }
-
-    private IEnumerator RestoreCollisionsNextFrame()
-    {
-        yield return null;
-        if (playerController != null && playerController.enabled)
-            playerController.detectCollisions = true;
-    }
-
     private bool TrySnapToGround(Vector3 standPos, out float groundedY)
     {
         groundedY = 0f;
         Vector3 rayStart = standPos + Vector3.up * 2f;
         Ray ray = new Ray(rayStart, Vector3.down);
+        
         RaycastHit[] hits = Physics.RaycastAll(ray, 6f, standSnapLayerMask, QueryTriggerInteraction.Ignore);
         if (hits == null || hits.Length == 0)
             return false;
 
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        
         float bestY = float.PositiveInfinity;
         bool found = false;
+        
         for (int i = 0; i < hits.Length; i++)
         {
-            Transform hitTransform = hits[i].collider != null ? hits[i].collider.transform : null;
-            if (hitTransform == null) continue;
+            Collider hitCollider = hits[i].collider;
+            if (hitCollider == null) continue;
 
-            // Ignore this seat's colliders so we don't stand on top of the chair/sofa mesh.
-            if (hitTransform == transform || hitTransform.IsChildOf(transform))
+            if (seatCollidersSet.Contains(hitCollider))
+            {
+                if (debugLogs)
+                    Debug.Log($"[Seat] Raycast hit ignored (seat collider): {hitCollider.gameObject.name}");
                 continue;
+            }
 
             float y = hits[i].point.y;
             if (y < bestY)
             {
                 bestY = y;
                 found = true;
+                if (debugLogs)
+                    Debug.Log($"[Seat] Raycast ground hit: {hitCollider.gameObject.name} at y={y:F2}");
             }
         }
 
         if (!found)
+        {
+            if (debugLogs)
+                Debug.Log($"[Seat] No ground found in raycast");
             return false;
+        }
 
         groundedY = bestY;
         return true;
@@ -305,7 +403,7 @@ public class SeatInteractable : MonoBehaviour
         });
 
         if (debugLogs)
-            Debug.Log($"[Seat] Animator sit={sit} bool='{sitBoolParameter}' altBool='{sitBoolParameterAlt}' trigger='{sitTriggerParameter}'");
+            Debug.Log($"[Seat] Animator sit={sit}");
 
         appliedSitAnimatorState = sit;
         hasAppliedSitAnimatorState = true;
