@@ -253,6 +253,19 @@ public class TimerController : MonoBehaviour
             ShowNotification(nextNotification);
     }
 
+    /// <summary>実行中・一時停止中でも強制的に次フェーズへ進む</summary>
+    public void ForceAdvancePhase()
+    {
+        if (phase == TimerPhase.Stopped || phase == TimerPhase.Completed) return;
+        // フェーズを強制終了してAdvancePhaseへ
+        elapsedBeforePauseSeconds = phaseDurationSeconds;
+        isRunning = false;
+        isPaused  = false;
+        AdvancePhase();
+        // AwaitingNextPhase になったら即座に進める
+        if (awaitingNextPhase) AdvanceToNextPhase();
+    }
+
     public string GetNextPhaseLabel()
     {
         return IsAwaitingNextPhase ? GetPhaseLabel(queuedPhase) : string.Empty;

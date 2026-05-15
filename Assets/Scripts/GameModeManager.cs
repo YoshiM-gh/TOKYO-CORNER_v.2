@@ -54,7 +54,8 @@ public class GameModeManager : MonoBehaviour
             cameraFollow.SetLookAt(true);
             cameraFollow.SetLookAtOffset(focusLookAtOffset);
         }
-        if (focusUI != null) focusUI.SetActive(true);
+        if (FocusOverlayController.Instance != null) FocusOverlayController.Instance.OpenSettings();
+        else if (focusUI != null) focusUI.SetActive(true);
         if (timerController != null) timerController.StartSession();
         Debug.Log("[Focus] Entered focus mode.");
     }
@@ -67,7 +68,8 @@ public class GameModeManager : MonoBehaviour
         cameraFollow.SetOffset(roamingOffset);
         cameraFollow.ClearFocusTransform();
         cameraFollow.SetLookAt(false);
-        if (focusUI != null) focusUI.SetActive(false);
+        if (FocusOverlayController.Instance != null) FocusOverlayController.Instance.Close();
+        else if (focusUI != null) focusUI.SetActive(false);
         if (timerController != null) timerController.StopSession();
         Debug.Log("[Focus] Exited focus mode.");
     }
