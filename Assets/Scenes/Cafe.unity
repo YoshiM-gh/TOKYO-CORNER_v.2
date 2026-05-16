@@ -16819,42 +16819,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6a0e7c96e629c4845b87a1e63b5c134c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FocusEmoteController
-  animator: {fileID: 1926188883}
-  emoteClips:
-  - {fileID: 7400000, guid: cfcb34c9206f59d4080fb490de55b106, type: 2}
-  - {fileID: 7400000, guid: f81bba57f3b64e342b8f3e2277e40c16, type: 2}
-  - {fileID: 7400000, guid: 2c83671dec8e22044ae569e190581271, type: 2}
-  - {fileID: 7400000, guid: e13c489eef0c3a54d88b74aa5cdbeebf, type: 2}
-  - {fileID: 7400000, guid: 8e145e41a2cf8894fae1e5228b2f2a3c, type: 2}
-  - {fileID: 7400000, guid: d7995f92003194c46ba9f92527524f02, type: 2}
-  - {fileID: 7400000, guid: 8a530016b661d5c428fb9d0d1a184d5e, type: 2}
-  - {fileID: 7400000, guid: fa40ea6755100d549b9a3ec9d499523c, type: 2}
-  - {fileID: 7400000, guid: 0badd03be8978714fbc392bf7bdfee6e, type: 2}
-  - {fileID: 7400000, guid: 310ffca5c0dfd8b48b0bcacd66386401, type: 2}
-  - {fileID: 7400000, guid: 2568b29f43c0f0245a87962043e72444, type: 2}
-  - {fileID: 7400000, guid: abbb0c92f2b0a224798136f5881999a7, type: 2}
-  - {fileID: 7400000, guid: b2ffe56cad34b9e409b6e7c3ec776dad, type: 2}
-  - {fileID: 7400000, guid: 961c35e3d90f06949b2ae44161558420, type: 2}
-  - {fileID: 7400000, guid: e91ef033228de5249ab834b6de87de27, type: 2}
-  - {fileID: 7400000, guid: 75ff748c7133f114eb0ed885b05ed869, type: 2}
-  - {fileID: 7400000, guid: 9139e9c8fe2fed046b2bc31055a5100c, type: 2}
-  - {fileID: 7400000, guid: 5b5f817b02fed6d4894a22b7bfa8f4fe, type: 2}
-  - {fileID: 7400000, guid: 9b3bb9ec2a9fcee4c80412e6ae0bb122, type: 2}
-  - {fileID: 7400000, guid: 27f1c7f36368d9242bd1e132e38d5f7d, type: 2}
-  - {fileID: 7400000, guid: aee218e239abc7d4399744f774a773e3, type: 2}
-  - {fileID: 7400000, guid: 08df522edd8e0c84d87eb1eb875e897d, type: 2}
-  - {fileID: 7400000, guid: 5a3ec60a714b4994b8f854d87657ca5e, type: 2}
-  - {fileID: 7400000, guid: 856ed3e6160dc3a49a23566c8ce6f33e, type: 2}
-  - {fileID: 7400000, guid: 72da33df9bf85a1429d2fa77e78d22a0, type: 2}
-  triggerAtHalf: 0.5
-  triggerAt5Min: 300
-  triggerAt1Min: 60
-  baseStateName: Idle
-  _timer: {fileID: 0}
-  _firedHalf: 0
-  _fired5Min: 0
-  _fired1Min: 0
-  _isActive: 0
 --- !u!114 &1340067681 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 114481518211063104, guid: 8cf74ef4b41c8274e9ea7b32b5f45d11, type: 3}
@@ -17729,8 +17693,8 @@ Camera:
   m_GameObject: {fileID: 1443662112}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -25279,11 +25243,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 2063950966}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0c0914155e98749bea326c88c124ab45, type: 3}
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TranslucentUIFX.TranslucentImageFX
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -25300,31 +25264,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
-  CurrentPreset: 3
-  AdvancedMode: 0
-  GlassIntensity: 1
-  LuminosityBoost: 0.14
-  Brightness: 0.9
-  Saturation: 1.3
-  Contrast: 1.15
-  AutoReadability: 1
-  BlurStrength: 0.35
-  TintColor: {r: 0.05, g: 0.05, b: 0.08, a: 0.72}
-  FrostAmount: 0.05
-  NoiseAmount: 0
-  RefractionAmount: 0.03
-  SphericalDistortion: 0
-  ChromaticAberration: 0
-  SpecularGlare: 0
-  EnableEdgeLighting: 1
-  EdgeShape: 0
-  EdgeRounding: 0.1
-  EdgeLightColor: {r: 0.1, g: 0.12, b: 0.3, a: 0.9}
-  EdgeLightWidth: 0.03
-  EdgeLightPower: 4
-  QualityMode: 2
-  UpdateMode: 0
-  UpdateInterval: 3
 --- !u!1001 &2064067831
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -25619,9 +25558,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FocusOverlayController
   focusPanel: {fileID: 960304358}
-  translucentBackground: {fileID: 2063950970}
+  background: {fileID: 2063950970}
   fadeInDuration: 0.35
   fadeOutDuration: 0.25
+  backgroundAlpha: 0.85
   referenceResolution: {x: 1920, y: 1080}
 --- !u!114 &2125175990
 MonoBehaviour:
@@ -25677,14 +25617,14 @@ Canvas:
   m_PlaneDistance: 100
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
-  m_OverrideSorting: 0
+  m_OverrideSorting: 1
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 100
   m_TargetDisplay: 0
 --- !u!4 &2125453514 stripped
 Transform:

@@ -1,4 +1,4 @@
-using TranslucentUIFX;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,10 +11,11 @@ public class FocusOverlayController : MonoBehaviour
     [Header("単一パネル")]
     [SerializeField] private GameObject focusPanel;
 
-    [Header("Translucent 背景")]
-    [SerializeField] private TranslucentImageFX translucentBackground;
+    [Header("背景")]
+    [SerializeField] private Image background;
     [SerializeField] private float fadeInDuration  = 0.35f;
     [SerializeField] private float fadeOutDuration = 0.25f;
+    [SerializeField] private float backgroundAlpha = 1f;
 
     [Header("Canvas スケール")]
     [SerializeField] private Vector2 referenceResolution = new Vector2(1920f, 1080f);
@@ -22,6 +23,7 @@ public class FocusOverlayController : MonoBehaviour
     private Canvas       _canvas;
     private CanvasScaler _scaler;
     private bool         _isOpen;
+    private Coroutine    _fadeCoroutine;
 
     private void Awake()
     {
@@ -32,16 +34,19 @@ public class FocusOverlayController : MonoBehaviour
         _scaler = GetComponent<CanvasScaler>();
         _canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
         _canvas.sortingOrder = 100;
-        _scaler.uiScaleMode          = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        _scaler.referenceResolution  = referenceResolution;
-        _scaler.screenMatchMode      = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        _scaler.matchWidthOrHeight   = 1f;
+        _scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        _scaler.referenceResolution = referenceResolution;
+        _scaler.screenMatchMode     = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        _scaler.matchWidthOrHeight  = 1f;
 
-        if (translucentBackground == null)
+        if (background == null)
         {
             var bgT = transform.Find("FullscreenBG");
-            if (bgT != null) translucentBackground = bgT.GetComponent<TranslucentImageFX>();
+            if (bgT != null) background = bgT.GetComponent<Image>();
         }
+
+        if (background != null)
+            background.color = new Color(0f, 0f, 0f, 0f);
 
         gameObject.SetActive(false);
     }
@@ -55,7 +60,8 @@ public class FocusOverlayController : MonoBehaviour
         CancelInvoke(nameof(HideCanvas));
         gameObject.SetActive(true);
         if (focusPanel != null) focusPanel.SetActive(true);
-        if (translucentBackground != null) translucentBackground.FadeIn(fadeInDuration);
+        if (_fadeCoroutine != null) StopCoroutine(_fadeCoroutine);
+        if (background != null) _fadeCoroutine = StartCoroutine(FadeBackground(0f, backgroundAlpha, fadeInDuration));
     }
 
     public void Close()
@@ -63,8 +69,22 @@ public class FocusOverlayController : MonoBehaviour
         if (!_isOpen) return;
         _isOpen = false;
         CancelInvoke(nameof(HideCanvas));
-        if (translucentBackground != null) translucentBackground.FadeOut(fadeOutDuration);
+        if (_fadeCoroutine != null) StopCoroutine(_fadeCoroutine);
+        if (background != null) _fadeCoroutine = StartCoroutine(FadeBackground(backgroundAlpha, 0f, fadeOutDuration));
         Invoke(nameof(HideCanvas), fadeOutDuration + 0.05f);
+    }
+
+    private IEnumerator FadeBackground(float from, float to, float duration)
+    {
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float alpha = UnityEngine.Mathf.Lerp(from, to, elapsed / duration);
+            background.color = new Color(0f, 0f, 0f, alpha);
+            yield return null;
+        }
+        background.color = new Color(0f, 0f, 0f, to);
     }
 
     // 旧API互換
