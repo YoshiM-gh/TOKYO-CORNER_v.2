@@ -39,7 +39,8 @@ public class SeatInteractableImproved : MonoBehaviour
     private Collider[] seatColliders;
     private HashSet<Collider> seatCollidersSet;
     private SitPoseHotkeyDebug sitDebugBridge;
-    private Animator[] playerAnimators;
+        private Animator[] playerAnimators;
+    private Renderer[] playerRenderers;
     private bool isSeated = false;
     private bool warnedPlayerMissing = false;
     private Vector3 lastApproachGroundPos;
@@ -91,7 +92,7 @@ public class SeatInteractableImproved : MonoBehaviour
         }
     }
 
-    private void SitDown()
+private void SitDown()
     {
         lastApproachGroundPos = player.position;
         lastApproachGroundPos.y = 0f;
@@ -108,11 +109,12 @@ public class SeatInteractableImproved : MonoBehaviour
         SetSitAnimatorState(true);
         if (sitDebugBridge != null) sitDebugBridge.SetSitState(true);
         if (playerMover != null) playerMover.enabled = false;
+        SetPlayerVisible(false);
         GameModeManager.Instance.EnterFocusMode(sitPoint != null ? sitPoint : transform);
         Debug.Log($"[Seat] Sat down at: {gameObject.name}");
     }
 
-    private void StandUp()
+private void StandUp()
     {
         isSeated = false;
         
@@ -132,7 +134,6 @@ public class SeatInteractableImproved : MonoBehaviour
                 Debug.Log($"  standPoint: NOT ASSIGNED (using auto-stand)");
         }
         
-        // ✅ CRITICAL FIX: CharacterController を一時的に完全に無効化してテレポート
         bool ccWasEnabled = false;
         if (playerController != null && playerController.enabled)
         {
@@ -142,12 +143,10 @@ public class SeatInteractableImproved : MonoBehaviour
                 Debug.Log($"[Seat] CharacterController disabled for teleport");
         }
         
-        // プレイヤーを確実に移動
         player.position = validatedStandPos;
         if (debugLogs)
             Debug.Log($"[Seat] Teleported player to: ({validatedStandPos.x:F2}, {validatedStandPos.y:F2}, {validatedStandPos.z:F2})");
         
-        // CharacterController を再度有効化
         if (ccWasEnabled)
         {
             playerController.enabled = true;
@@ -157,6 +156,7 @@ public class SeatInteractableImproved : MonoBehaviour
 
         if (sitDebugBridge != null) sitDebugBridge.SetSitState(false);
         SetSitAnimatorState(false);
+        SetPlayerVisible(true);
         
         if (playerMover != null)
             playerMover.enabled = true;
@@ -530,5 +530,17 @@ public class SeatInteractableImproved : MonoBehaviour
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, interactRange);
+    }
+
+
+private void SetPlayerVisible(bool visible)
+    {
+        if (player == null) return;
+        if (playerRenderers == null || playerRenderers.Length == 0)
+            playerRenderers = player.GetComponentsInChildren<Renderer>(true);
+        foreach (var r in playerRenderers)
+            if (r != null) r.enabled = visible;
+        if (debugLogs)
+            Debug.Log($"[Seat] Player visible={visible}");
     }
 }
