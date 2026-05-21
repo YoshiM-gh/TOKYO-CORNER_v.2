@@ -138,7 +138,7 @@ public class FloatingWindowController : MonoBehaviour
     }
 
     // ─── 3. 追加・編集フォーム ────────────────────────────
-    public void OpenAddForm(string defaultDate, ScheduleEvent editTarget)
+public void OpenAddForm(string defaultDate, ScheduleEvent editTarget, string defaultTime = null)
     {
         bool isEdit = editTarget != null;
         titleText.text = isEdit ? "予定を編集" : "予定を追加";
@@ -175,7 +175,6 @@ public class FloatingWindowController : MonoBehaviour
             tTxt.alignment = TextAlignmentOptions.Center;
             tagBtns.Add((tBtn, tImg, tTxt, tagDef.id));
         }
-        // タグ選択状態を更新するローカル関数
         void UpdateTagBtns(string selId)
         {
             selectedTagId = selId;
@@ -195,21 +194,13 @@ public class FloatingWindowController : MonoBehaviour
         }
         UpdateTagBtns(selectedTagId);
 
-        // タイトル入力
         var titleInput = CreateInputField("タイトル", isEdit ? editTarget.title : "");
-
-        // 日付入力（読み取り専用表示）
-        var dateRow = CreateRow("日付");
-        var dateTxt = CreateValueText(dateRow, FormatDate(defaultDate));
-
-        // 時間入力
-        var timeInput = CreateInputField("時間（任意）", isEdit ? editTarget.time ?? "" : "");
+        var dateRow    = CreateRow("日付");
+        var dateTxt    = CreateValueText(dateRow, FormatDate(defaultDate));
+        var timeInput  = CreateInputField("時間（任意）", isEdit ? editTarget.time ?? "" : defaultTime ?? "");
         timeInput.placeholder.GetComponent<TextMeshProUGUI>().text = "例：14:00";
-
-        // 内容入力
         var memoInput  = CreateInputField("内容", isEdit ? editTarget.memo ?? "" : "");
 
-        // フッター：保存・キャンセル
         footer.SetActive(true);
         primaryBtnText.text   = "保存";
         secondaryBtnText.text = "キャンセル";
