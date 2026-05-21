@@ -2,96 +2,76 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// ─────────────────────────────────────────
-// Monthly
-// ─────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// ScheduleEvent
+// 月・週・日・管理タブが共有する予定データ
+// タグは TagConfig.cs で定義された id を参照
+// ─────────────────────────────────────────────────────────
 [Serializable]
-public class MonthlyEntry
+public class ScheduleEvent
 {
-    public string date;          // "yyyy-MM-dd"
-    public string text;          // その日に書き留めたこと
-    public int colorMark;        // 0=なし 1=赤 2=青 3=緑 4=黄
-}
-
-[Serializable]
-public class MonthlyData
-{
-    public List<MonthlyEntry> entries = new List<MonthlyEntry>();
-}
-
-// ─────────────────────────────────────────
-// Weekly
-// ─────────────────────────────────────────
-[Serializable]
-public class WeeklyEntry
-{
-    public string weekKey;       // "2026-W21"
-    public int dayOfWeek;        // 0=日 〜 6=土
-    public string note;
-}
-
-[Serializable]
-public class WeeklyData
-{
-    public List<WeeklyEntry> entries = new List<WeeklyEntry>();
-}
-
-// ─────────────────────────────────────────
-// Daily
-// ─────────────────────────────────────────
-[Serializable]
-public class DailyScheduleBlock
-{
-    public int hour;             // 0〜23
-    public string text;
-}
-
-[Serializable]
-public class DailyEntry
-{
-    public string date;          // "yyyy-MM-dd"
-    public List<DailyScheduleBlock> schedule = new List<DailyScheduleBlock>();
-    public string freeMemo;
-}
-
-[Serializable]
-public class DailyData
-{
-    public List<DailyEntry> entries = new List<DailyEntry>();
-}
-
-// ─────────────────────────────────────────
-// Todo
-// ─────────────────────────────────────────
-[Serializable]
-public class TodoItem
-{
-    public string id;
-    public string text;
+    public string id;           // GUID
+    public string tagId;        // TagConfig の id（"habit","yotei","mokuhyo","todo"）
+    public string title;
+    public string date;         // "yyyy-MM-dd"（null可＝日付なし）
+    public string time;         // "HH:mm"（null可＝時間未設定）
+    public string endTime;      // "HH:mm"（null可）
+    public string memo;
     public bool isCompleted;
-    public string createdAt;     // "yyyy-MM-dd"
+    public string completedAt;  // "yyyy-MM-dd HH:mm"（完了した日時）
+    public string createdAt;    // "yyyy-MM-dd HH:mm"
 }
 
 [Serializable]
-public class TodoData
+public class ScheduleData
 {
-    public List<TodoItem> items = new List<TodoItem>();
+    public List<ScheduleEvent> events = new List<ScheduleEvent>();
 }
 
-// ─────────────────────────────────────────
-// Memo
-// ─────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// MemoEntry
+// メモタブ専用。日付に紐づかない独立ノート
+// ─────────────────────────────────────────────────────────
 [Serializable]
 public class MemoEntry
 {
     public string id;
     public string title;
     public string body;
-    public string updatedAt;     // "yyyy-MM-dd HH:mm"
+    public string updatedAt;    // "yyyy-MM-dd HH:mm"
+    public string createdAt;    // "yyyy-MM-dd HH:mm"
 }
 
 [Serializable]
 public class MemoData
 {
     public List<MemoEntry> entries = new List<MemoEntry>();
+}
+
+// ─────────────────────────────────────────────────────────
+// LifetimeStats
+// 完了数などの生涯カウントデータ（永久保存）
+// ─────────────────────────────────────────────────────────
+[Serializable]
+public class TagCompletionCount
+{
+    public string tagId;
+    public int count;
+}
+
+[Serializable]
+public class DailyCompletionRecord
+{
+    public string date;         // "yyyy-MM-dd"
+    public int count;
+}
+
+[Serializable]
+public class LifetimeStats
+{
+    public int totalCompleted;
+    public List<TagCompletionCount> completedByTag = new List<TagCompletionCount>();
+    public List<DailyCompletionRecord> dailyRecords = new List<DailyCompletionRecord>();
+    public int longestStreak;
+    public int currentStreak;
 }

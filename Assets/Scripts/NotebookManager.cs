@@ -1,27 +1,28 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
-/// Monthly / Weekly / Daily / Todo / Memo の保存・読み込みを一元管理。
-/// SaveDataManager とは独立したファイルで保持する。
+/// ScheduleEvent / MemoEntry / LifetimeStats の保存・読み込みを一元管理。
+/// 月・週・日・管理タブは全て ScheduleEvent を共有する。
 /// </summary>
 public class NotebookManager : MonoBehaviour
 {
     public static NotebookManager Instance { get; private set; }
 
-    private MonthlyData  monthlyData  = new MonthlyData();
-    private WeeklyData   weeklyData   = new WeeklyData();
-    private DailyData    dailyData    = new DailyData();
-    private TodoData     todoData     = new TodoData();
-    private MemoData     memoData     = new MemoData();
+    private ScheduleData  scheduleData  = new ScheduleData();
+    private MemoData      memoData      = new MemoData();
+    private LifetimeStats lifetimeStats = new LifetimeStats();
 
-    private string PathMonthly => Path.Combine(Application.persistentDataPath, "notebook_monthly.json");
-    private string PathWeekly  => Path.Combine(Application.persistentDataPath, "notebook_weekly.json");
-    private string PathDaily   => Path.Combine(Application.persistentDataPath, "notebook_daily.json");
-    private string PathTodo    => Path.Combine(Application.persistentDataPath, "notebook_todo.json");
-    private string PathMemo    => Path.Combine(Application.persistentDataPath, "notebook_memo.json");
+    // 表示対象期間：過去1年・未来1年
+    private static readonly int RANGE_DAYS = 365;
+
+    private string PathSchedule  => Path.Combine(Application.persistentDataPath, "notebook_schedule.json");
+    private string PathMemo      => Path.Combine(Application.persistentDataPath, "notebook_memo.json");
+    private string PathLifetime  => Path.Combine(Application.persistentDataPath, "notebook_lifetime.json");
 
     private void Awake()
     {
@@ -30,27 +31,24 @@ public class NotebookManager : MonoBehaviour
         LoadAll();
     }
 
-    private void OnApplicationPause(bool pause) { if (pause) SaveAll(); }
+    private void OnApplicationPause(bool pause) { if (pause)  SaveAll(); }
     private void OnApplicationFocus(bool focus)  { if (!focus) SaveAll(); }
     private void OnApplicationQuit()             { SaveAll(); }
 
     // ─── Save / Load ──────────────────────────────────────
     public void SaveAll()
     {
-        WriteJson(PathMonthly, monthlyData);
-        WriteJson(PathWeekly,  weeklyData);
-        WriteJson(PathDaily,   dailyData);
-        WriteJson(PathTodo,    todoData);
-        WriteJson(PathMemo,    memoData);
+        WriteJson(PathSchedule, scheduleData);
+        WriteJson(PathMemo,     memoData);
+        WriteJson(PathLifetime, lifetimeStats);
     }
 
     private void LoadAll()
     {
-        monthlyData = ReadJson<MonthlyData>(PathMonthly)  ?? new MonthlyData();
-        weeklyData  = ReadJson<WeeklyData>(PathWeekly)    ?? new WeeklyData();
-        dailyData   = ReadJson<DailyData>(PathDaily)      ?? new DailyData();
-        todoData    = ReadJson<TodoData>(PathTodo)        ?? new TodoData();
-        memoData    = ReadJson<MemoData>(PathMemo)        ?? new MemoData();
+        scheduleData  = ReadJson<ScheduleData>(PathSchedule)   ?? new ScheduleData();
+        memoData      = ReadJson<MemoData>(PathMemo)           ?? new MemoData();
+        lifetimeStats = ReadJson<LifetimeStats>(PathLifetime)  ?? new LifetimeStats();
+        PruneOldEvents();
     }
 
     private static void WriteJson<T>(string path, T data)
@@ -63,110 +61,103 @@ public class NotebookManager : MonoBehaviour
         catch { return null; }
     }
 
-    // ─── Monthly ──────────────────────────────────────────
-    public MonthlyEntry GetMonthlyEntry(DateTime date)
+    // ─── ScheduleEvent CRUD ───────────────────────────────
+
+    /// <summary>全イベントを返す</summary>
+    public List<ScheduleEvent> GetAllEvents() => scheduleData.events;
+
+    /// <summary>指定日のイベントを返す</summary>
+    public List<ScheduleEvent> GetEventsByDate(DateTime date)
     {
         string key = DateKey(date);
-        return monthlyData.entries.Find(e => e.date == key);
+        return scheduleData.events.Where(e => e.date == key).ToList();
     }
 
-    public void SetMonthlyEntry(DateTime date, string text, int colorMark = 0)
+    /// <summary>指定月のイベントを返す</summary>
+    public List<ScheduleEvent> GetEventsByMonth(int year, int month)
     {
-        string key = DateKey(date);
-        var entry = monthlyData.entries.Find(e => e.date == key);
-        if (entry == null)
-        {
-            entry = new MonthlyEntry { date = key };
-            monthlyData.entries.Add(entry);
-        }
-        entry.text = text;
-        entry.colorMark = colorMark;
-        SaveAll();
+        string prefix = $"{year}-{month:D2}";
+        return scheduleData.events.Where(e => e.date != null && e.date.StartsWith(prefix)).ToList();
     }
 
-    // ─── Weekly ───────────────────────────────────────────
-    public WeeklyEntry GetWeeklyEntry(string weekKey, int dayOfWeek)
-        => weeklyData.entries.Find(e => e.weekKey == weekKey && e.dayOfWeek == dayOfWeek);
-
-    public void SetWeeklyEntry(string weekKey, int dayOfWeek, string note)
+    /// <summary>指定週（月曜起点）のイベントを返す</summary>
+    public List<ScheduleEvent> GetEventsByWeek(DateTime anyDayInWeek)
     {
-        var entry = weeklyData.entries.Find(e => e.weekKey == weekKey && e.dayOfWeek == dayOfWeek);
-        if (entry == null)
-        {
-            entry = new WeeklyEntry { weekKey = weekKey, dayOfWeek = dayOfWeek };
-            weeklyData.entries.Add(entry);
-        }
-        entry.note = note;
-        SaveAll();
+        var monday = anyDayInWeek.AddDays(-(int)anyDayInWeek.DayOfWeek + (int)DayOfWeek.Monday);
+        if (anyDayInWeek.DayOfWeek == DayOfWeek.Sunday) monday = anyDayInWeek.AddDays(-6);
+        var keys = Enumerable.Range(0, 7).Select(i => DateKey(monday.AddDays(i))).ToHashSet();
+        return scheduleData.events.Where(e => e.date != null && keys.Contains(e.date)).ToList();
     }
 
-    public static string GetWeekKey(DateTime date)
-    {
-        var cal = CultureInfo.InvariantCulture.Calendar;
-        int week = cal.GetWeekOfYear(date, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
-        return $"{date.Year}-W{week:D2}";
-    }
+    /// <summary>タグでフィルタ</summary>
+    public List<ScheduleEvent> GetEventsByTag(string tagId)
+        => scheduleData.events.Where(e => e.tagId == tagId).ToList();
 
-    // ─── Daily ────────────────────────────────────────────
-    public DailyEntry GetDailyEntry(DateTime date)
+    /// <summary>イベントを追加</summary>
+    public ScheduleEvent AddEvent(string tagId, string title, string date = null, string time = null, string memo = "")
     {
-        string key = DateKey(date);
-        return dailyData.entries.Find(e => e.date == key);
-    }
-
-    public DailyEntry GetOrCreateDailyEntry(DateTime date)
-    {
-        string key = DateKey(date);
-        var entry = dailyData.entries.Find(e => e.date == key);
-        if (entry != null) return entry;
-        entry = new DailyEntry { date = key };
-        dailyData.entries.Add(entry);
-        return entry;
-    }
-
-    public void SaveDailyEntry(DailyEntry entry)
-    {
-        var existing = dailyData.entries.Find(e => e.date == entry.date);
-        if (existing == null) dailyData.entries.Add(entry);
-        SaveAll();
-    }
-
-    // ─── Todo ─────────────────────────────────────────────
-    public System.Collections.Generic.List<TodoItem> GetAllTodos()
-        => todoData.items;
-
-    public TodoItem AddTodo(string text)
-    {
-        if (todoData.items.Count >= 100) return null;
-        var item = new TodoItem
+        var ev = new ScheduleEvent
         {
             id          = Guid.NewGuid().ToString(),
-            text        = text,
+            tagId       = tagId,
+            title       = title,
+            date        = date,
+            time        = time,
+            memo        = memo,
             isCompleted = false,
-            createdAt   = DateKey(DateTime.Now)
+            createdAt   = NowKey(),
         };
-        todoData.items.Add(item);
+        scheduleData.events.Add(ev);
         SaveAll();
-        return item;
+        return ev;
     }
 
-    public void SetTodoCompleted(string id, bool completed)
+    /// <summary>イベントを更新</summary>
+    public bool UpdateEvent(string id, string tagId, string title, string date, string time, string endTime, string memo)
     {
-        var item = todoData.items.Find(i => i.id == id);
-        if (item == null) return;
-        item.isCompleted = completed;
+        var ev = scheduleData.events.Find(e => e.id == id);
+        if (ev == null) return false;
+        ev.tagId   = tagId;
+        ev.title   = title;
+        ev.date    = date;
+        ev.time    = time;
+        ev.endTime = endTime;
+        ev.memo    = memo;
         SaveAll();
+        return true;
     }
 
-    public void DeleteTodo(string id)
+    /// <summary>完了状態を切り替え</summary>
+    public void SetCompleted(string id, bool completed)
     {
-        todoData.items.RemoveAll(i => i.id == id);
+        var ev = scheduleData.events.Find(e => e.id == id);
+        if (ev == null) return;
+        ev.isCompleted  = completed;
+        ev.completedAt  = completed ? NowKey() : null;
+        if (completed) RecordCompletion(ev.tagId);
         SaveAll();
     }
 
-    // ─── Memo ─────────────────────────────────────────────
-    public System.Collections.Generic.List<MemoEntry> GetAllMemos()
-        => memoData.entries;
+    /// <summary>イベントを削除</summary>
+    public bool DeleteEvent(string id)
+    {
+        int removed = scheduleData.events.RemoveAll(e => e.id == id);
+        if (removed > 0) SaveAll();
+        return removed > 0;
+    }
+
+    /// <summary>表示範囲外の古いイベントを削除（日付なしは残す）</summary>
+    private void PruneOldEvents()
+    {
+        var cutoff = DateTime.Now.AddDays(-RANGE_DAYS);
+        var cutoffKey = DateKey(cutoff);
+        scheduleData.events.RemoveAll(e =>
+            e.date != null && string.Compare(e.date, cutoffKey) < 0);
+    }
+
+    // ─── MemoEntry CRUD ───────────────────────────────────
+
+    public List<MemoEntry> GetAllMemos() => memoData.entries;
 
     public MemoEntry AddMemo(string title = "新しいメモ")
     {
@@ -175,33 +166,91 @@ public class NotebookManager : MonoBehaviour
             id        = Guid.NewGuid().ToString(),
             title     = title,
             body      = "",
-            updatedAt = NowKey()
+            createdAt = NowKey(),
+            updatedAt = NowKey(),
         };
         memoData.entries.Insert(0, entry);
         SaveAll();
         return entry;
     }
 
-    public void SaveMemo(string id, string title, string body)
+    public bool SaveMemo(string id, string title, string body)
     {
         var entry = memoData.entries.Find(e => e.id == id);
-        if (entry == null) return;
+        if (entry == null) return false;
         entry.title     = title;
         entry.body      = body;
         entry.updatedAt = NowKey();
         SaveAll();
+        return true;
     }
 
-    public void DeleteMemo(string id)
+    public bool DeleteMemo(string id)
     {
-        memoData.entries.RemoveAll(e => e.id == id);
-        SaveAll();
+        int removed = memoData.entries.RemoveAll(e => e.id == id);
+        if (removed > 0) SaveAll();
+        return removed > 0;
+    }
+
+    // ─── LifetimeStats ────────────────────────────────────
+
+    public LifetimeStats GetLifetimeStats() => lifetimeStats;
+
+    private void RecordCompletion(string tagId)
+    {
+        lifetimeStats.totalCompleted++;
+
+        var tagCount = lifetimeStats.completedByTag.Find(t => t.tagId == tagId);
+        if (tagCount == null)
+        {
+            tagCount = new TagCompletionCount { tagId = tagId, count = 0 };
+            lifetimeStats.completedByTag.Add(tagCount);
+        }
+        tagCount.count++;
+
+        string today = DateKey(DateTime.Now);
+        var daily = lifetimeStats.dailyRecords.Find(d => d.date == today);
+        if (daily == null)
+        {
+            daily = new DailyCompletionRecord { date = today, count = 0 };
+            lifetimeStats.dailyRecords.Add(daily);
+        }
+        daily.count++;
+
+        UpdateStreak();
+    }
+
+    private void UpdateStreak()
+    {
+        var sorted = lifetimeStats.dailyRecords
+            .Where(d => d.count > 0)
+            .OrderByDescending(d => d.date)
+            .ToList();
+
+        int current = 0;
+        var today = DateTime.Now.Date;
+        for (int i = 0; i < sorted.Count; i++)
+        {
+            var d = DateTime.Parse(sorted[i].date).Date;
+            if ((today - d).Days == i) current++;
+            else break;
+        }
+        lifetimeStats.currentStreak = current;
+        if (current > lifetimeStats.longestStreak)
+            lifetimeStats.longestStreak = current;
     }
 
     // ─── Helpers ──────────────────────────────────────────
-    private static string DateKey(DateTime d)
+    public static string DateKey(DateTime d)
         => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    private static string NowKey()
+    public static string NowKey()
         => DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+    public static string GetWeekKey(DateTime date)
+    {
+        var cal = CultureInfo.InvariantCulture.Calendar;
+        int week = cal.GetWeekOfYear(date, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+        return $"{date.Year}-W{week:D2}";
+    }
 }
