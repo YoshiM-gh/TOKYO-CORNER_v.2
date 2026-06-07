@@ -28,7 +28,8 @@ public class MonthlyCalendarUI : MonoBehaviour
     [SerializeField] private GameObject dayCellPrefab;    // 日付セルPrefab
 
     [Header("フローティングウィンドウ参照")]
-    [SerializeField] private FloatingWindowController floatingWindow;
+    [SerializeField] private EventModal       eventModal;
+    [SerializeField] private DayEventsPopup   dayEventsPopup;
 
     // 内部状態
     private int currentYear;
@@ -54,12 +55,19 @@ public class MonthlyCalendarUI : MonoBehaviour
 
     private void OnEnable()
     {
+        UITheme_FocusMode.OnThemeChanged += Refresh;
         var now = DateTime.Now;
         currentYear  = now.Year;
         currentMonth = now.Month;
         selectedDate = NotebookManager.DateKey(now);
         SetupButtons();
+        UpdateGridCellSize();
         Refresh();
+    }
+
+    private void OnDisable()
+    {
+        UITheme_FocusMode.OnThemeChanged -= Refresh;
     }
 
     private void SetupButtons()
@@ -86,8 +94,24 @@ public class MonthlyCalendarUI : MonoBehaviour
     private void SetWeekStart(int dow)
     {
         weekStartDow = dow;
+        UpdateWeekBtn(weekStartSunBtn, dow == 0);
+        UpdateWeekBtn(weekStartMonBtn, dow == 1);
         RefreshDowHeader();
         RefreshGrid();
+    }
+
+    private void UpdateWeekBtn(Button btn, bool isActive)
+    {
+        if (btn == null) return;
+        var cb = btn.colors;
+        cb.normalColor      = isActive ? new Color(0.06f,0.59f,0.99f,0.60f) : new Color(1f,1f,1f,0.08f);
+        cb.highlightedColor = isActive ? new Color(0.06f,0.59f,0.99f,0.80f) : new Color(1f,1f,1f,0.16f);
+        cb.pressedColor     = isActive ? new Color(0.06f,0.59f,0.99f,0.45f) : new Color(1f,1f,1f,0.05f);
+        cb.selectedColor    = cb.normalColor;
+        cb.colorMultiplier  = 1f;
+        btn.colors = cb;
+        var img = btn.GetComponent<Image>() ?? btn.targetGraphic as Image;
+        if (img != null) img.color = Color.white;
     }
 
     public void Refresh()
@@ -116,6 +140,18 @@ public class MonthlyCalendarUI : MonoBehaviour
     }
 
     // ─── 日付グリッド ─────────────────────────────────────
+
+    private void UpdateGridCellSize()
+    {
+        if (calGridParent == null) return;
+        var grid = calGridParent.GetComponent<UnityEngine.UI.GridLayoutGroup>();
+        var rt   = calGridParent.GetComponent<RectTransform>();
+        if (grid == null || rt.rect.width <= 0) return;
+        float w = (rt.rect.width  - grid.spacing.x * 6f) / 7f;
+        float h = (rt.rect.height - grid.spacing.y * 4f) / 5f; // 最大5週表示
+        grid.cellSize = new Vector2(Mathf.Max(1f, w), Mathf.Max(1f, h));
+    }
+
     private void RefreshGrid()
     {
         if (calGridParent == null || dayCellPrefab == null) return;
@@ -162,9 +198,96 @@ public class MonthlyCalendarUI : MonoBehaviour
             cell.name = dateKey;
             SetupDayCell(cell, d, dateKey, isToday, isSelected, isHoliday, isSun, isSat, dayEvs);
         }
+            // 1フレーム待ってからチップ幅を修正（GLGレイアウト完了後）
+        StartCoroutine(FixChipWidths());
     }
 
-    private void SetCellEmpty(GameObject cell)
+    private System.Collections.IEnumerator FixChipWidths()
+    {
+        yield return null;            // GLG がセルサイズを確定するまで待つ
+        Canvas.ForceUpdateCanvases();
+
+        if (calGridParent == null) yield break;
+        var glg = calGridParent.GetComponent<UnityEngine.UI.GridLayoutGroup>();
+        if (glg == null) yield break;
+
+        float cellW = glg.cellSize.x;
+        float chipW = cellW - 8f;
+        const float DAY_NUM_H = 28f;
+        const float CHIP_H    = 30f;
+        const float SPACING   = 2f;
+
+        foreach (Transform cell in calGridParent)
+        {
+            // ── DayNumber フォント設定 ───────────────────────────
+            var dayNum = cell.Find("DayNumber");
+            if (dayNum != null)
+            {
+                var dnTmp = dayNum.GetComponent<TextMeshProUGUI>();
+                if (dnTmp != null)
+                {
+                    dnTmp.enableWordWrapping = false;
+                    dnTmp.overflowMode       = TextOverflowModes.Overflow;
+                    dnTmp.enableAutoSizing   = false;
+                    dnTmp.fontSize           = UITheme_FocusMode.FontCalendarDate;
+                }
+            }
+
+            // ── Chips: VLG・CSF を無効化して手動配置 ───────────
+            var chips = cell.Find("Chips");
+            if (chips == null) continue;
+
+            // VLG と CSF を無効化（VLG が chip サイズを上書きしないように）
+            var chipsVLG = chips.GetComponent<UnityEngine.UI.VerticalLayoutGroup>();
+            if (chipsVLG != null) chipsVLG.enabled = false;
+            var chipsCSF = chips.GetComponent<UnityEngine.UI.ContentSizeFitter>();
+            if (chipsCSF != null) chipsCSF.enabled = false;
+
+            // Chips コンテナを anchor=(0,1)-(0,1) で絶対配置
+            var chipsRT = chips.GetComponent<RectTransform>();
+            int chipCount = chips.childCount;
+            float totalH  = chipCount > 0
+                ? chipCount * CHIP_H + (chipCount - 1) * SPACING
+                : 0f;
+
+            chipsRT.anchorMin = new Vector2(0f, 1f);
+            chipsRT.anchorMax = new Vector2(0f, 1f);
+            chipsRT.pivot     = new Vector2(0f, 1f);
+            chipsRT.offsetMin = new Vector2(4f, -(DAY_NUM_H + totalH));
+            chipsRT.offsetMax = new Vector2(4f + chipW, -DAY_NUM_H);
+
+            // 各チップを手動で積み上げ
+            int idx = 0;
+            foreach (Transform chip in chips)
+            {
+                var chipRT = chip.GetComponent<RectTransform>();
+                if (chipRT == null) { idx++; continue; }
+
+                // anchor = top-left of Chips
+                chipRT.anchorMin = new Vector2(0f, 1f);
+                chipRT.anchorMax = new Vector2(0f, 1f);
+                chipRT.pivot     = new Vector2(0f, 1f);
+
+                bool isMore = chip.name == "MoreLabel";
+                float h = isMore ? 20f : CHIP_H;
+                chipRT.sizeDelta = new Vector2(chipW, h);
+                chipRT.anchoredPosition = new Vector2(0f, -(idx * (CHIP_H + SPACING)));
+                idx++;
+            }
+        }
+
+        // TMP を強制更新（Ellipsis が正確な幅で動くように）
+        yield return null;
+        foreach (Transform cell in calGridParent)
+        {
+            var chips = cell.Find("Chips");
+            if (chips == null) continue;
+            foreach (Transform chip in chips)
+                chip.GetComponentInChildren<TextMeshProUGUI>()?.ForceMeshUpdate();
+        }
+    }
+
+private void SetCellEmpty(GameObject cell)
     {
         var img = cell.GetComponent<Image>();
         if (img != null) img.color = Color.clear;
@@ -211,6 +334,14 @@ public class MonthlyCalendarUI : MonoBehaviour
         var chipsParent = cell.transform.Find("Chips");
         if (chipsParent != null)
         {
+            // Chips: top-stretch アンカーに統一（FixChipWidthsと同じ）
+            var chipsRT = chipsParent.GetComponent<RectTransform>();
+            chipsRT.anchorMin = new Vector2(0f, 1f);
+            chipsRT.anchorMax = new Vector2(1f, 1f);
+            chipsRT.pivot     = new Vector2(0.5f, 1f);
+            chipsRT.offsetMin = new Vector2(4f, -86f); // 左4px・高さの初期値（CSFが上書き）
+            chipsRT.offsetMax = new Vector2(-4f, -30f); // DayNumber(28px)+2px 下
+
             // 既存チップをクリア
             foreach (Transform c in chipsParent) Destroy(c.gameObject);
 
@@ -219,7 +350,10 @@ public class MonthlyCalendarUI : MonoBehaviour
             {
                 var ev  = dayEvs[i];
                 var tag = TagConfig.GetById(ev.tagId);
-                CreateChip(chipsParent, ev, tag);
+                float _cw = 180f;
+                var _glg = calGridParent?.GetComponent<UnityEngine.UI.GridLayoutGroup>();
+                if (_glg != null) _cw = _glg.cellSize.x - 16f;
+                CreateChip(chipsParent, ev, tag, _cw);
             }
 
             // 「他N件」
@@ -229,11 +363,34 @@ public class MonthlyCalendarUI : MonoBehaviour
                 var moreGO  = new GameObject("MoreLabel");
                 moreGO.transform.SetParent(chipsParent, false);
                 var moreRT  = moreGO.AddComponent<RectTransform>();
-                moreRT.sizeDelta = new Vector2(0f, 13f);
-                var moreTxt = moreGO.AddComponent<TextMeshProUGUI>();
+                moreRT.sizeDelta = new Vector2(0f, 20f);
+                var moreBG  = moreGO.AddComponent<UnityEngine.UI.Image>(); moreBG.color = Color.clear;
+                var moreBtn = moreGO.AddComponent<UnityEngine.UI.Button>();
+                var moreCB  = UnityEngine.UI.ColorBlock.defaultColorBlock;
+                moreCB.highlightedColor = new Color(1f,1f,1f,0.1f);
+                moreBtn.colors = moreCB; moreBtn.targetGraphic = moreBG;
+                // TMP は子 GO に配置（Button と同 GO だと Awake 競合が発生するため）
+                var moreTxtGO = new GameObject("Text");
+                moreTxtGO.transform.SetParent(moreGO.transform, false);
+                var moreTxtRT = moreTxtGO.AddComponent<RectTransform>();
+                moreTxtRT.anchorMin = Vector2.zero; moreTxtRT.anchorMax = Vector2.one;
+                moreTxtRT.offsetMin = moreTxtRT.offsetMax = Vector2.zero;
+                var moreTxt = moreTxtGO.AddComponent<TextMeshProUGUI>();
                 moreTxt.text      = $"他 {overflow} 件";
-                moreTxt.fontSize  = UITheme_FocusMode.FontMicro;
-                moreTxt.color     = UITheme_FocusMode.TextDisabled;
+                moreTxt.fontSize  = UITheme_FocusMode.FontMoreLabel;
+                moreTxt.color     = UITheme_FocusMode.AccentSatBlue;
+                moreTxt.alignment = TextAlignmentOptions.MidlineLeft;
+                // クリックでポップアップ
+                string _capDate = dateKey;
+                var _capEvs = new System.Collections.Generic.List<ScheduleEvent>(dayEvs);
+                var _capCell = cell;
+                moreBtn.onClick.AddListener(() => {
+                    if (dayEventsPopup == null) return;
+                    var _cRT = _capCell.GetComponent<RectTransform>();
+                    var _corners = new Vector3[4]; _cRT.GetWorldCorners(_corners);
+                    var _sp = new Vector2((_corners[0].x+_corners[2].x)*0.5f, (_corners[0].y+_corners[2].y)*0.5f);
+                    dayEventsPopup.Show(_capDate, _capEvs, ev => OpenEventDetail(ev), _sp);
+                });
                 var moreLE  = moreGO.AddComponent<LayoutElement>();
                 moreLE.preferredHeight = 13f;
             }
@@ -250,7 +407,7 @@ public class MonthlyCalendarUI : MonoBehaviour
         }
     }
 
-    private void CreateChip(Transform parent, ScheduleEvent ev, TagDefinition tag)
+    private void CreateChip(Transform parent, ScheduleEvent ev, TagDefinition tag, float chipWidth = 180f)
     {
         var chipGO  = new GameObject("Chip");
         chipGO.transform.SetParent(parent, false);
@@ -258,10 +415,10 @@ public class MonthlyCalendarUI : MonoBehaviour
         chipImg.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
 
         var chipRT = chipGO.GetComponent<RectTransform>();
-        chipRT.sizeDelta = new Vector2(0f, 13f);
+        // 幅は VLG が自動設定（sizeDelta.x は不要）
 
         var chipLE = chipGO.AddComponent<LayoutElement>();
-        chipLE.preferredHeight = 13f;
+        chipLE.preferredHeight = 30f;
 
         // テキスト
         var txtGO  = new GameObject("Text");
@@ -269,13 +426,17 @@ public class MonthlyCalendarUI : MonoBehaviour
         var txtRT  = txtGO.AddComponent<RectTransform>();
         txtRT.anchorMin = Vector2.zero;
         txtRT.anchorMax = Vector2.one;
-        txtRT.offsetMin = new Vector2(3f, 0f);
-        txtRT.offsetMax = Vector2.zero;
+        txtRT.offsetMin = new Vector2(4f, 2f);
+        txtRT.offsetMax = new Vector2(-4f, -2f);
         var txt    = txtGO.AddComponent<TextMeshProUGUI>();
-        txt.text      = (ev.time != null ? ev.time + " " : "") + ev.title;
-        txt.fontSize  = UITheme_FocusMode.FontMicro;
+        txt.text      = ev.title;
+        txt.fontSize  = UITheme_FocusMode.FontChipTitle;
         txt.color     = Color.white;
-        txt.overflowMode = TextOverflowModes.Ellipsis;
+        txt.alignment = TextAlignmentOptions.MidlineLeft;  // 縦中央
+        txt.enableWordWrapping = false;
+        txt.overflowMode    = TextOverflowModes.Overflow;
+        if (chipGO.GetComponent<UnityEngine.UI.RectMask2D>() == null)
+            chipGO.AddComponent<UnityEngine.UI.RectMask2D>();
 
         // クリック
         var btn = chipGO.AddComponent<Button>();
@@ -290,23 +451,23 @@ public class MonthlyCalendarUI : MonoBehaviour
         selectedDate = dateKey;
         RefreshGrid();
 
-        if (floatingWindow == null) return;
+        if (eventModal == null) return;
 
         if (dayEvs.Count == 0)
         {
             // 予定なし → 追加フォームを直接開く
-            floatingWindow.OpenAddForm(dateKey, null);
+            eventModal.OpenAddForm(dateKey, () => Refresh());
         }
         else
         {
             // 予定あり → 日の予定一覧を表示
-            floatingWindow.OpenDayList(dateKey, dayEvs, () => Refresh());
+            eventModal.OpenAddForm(dateKey, () => Refresh());
         }
     }
 
     private void OpenEventDetail(ScheduleEvent ev)
     {
-        if (floatingWindow == null) return;
-        floatingWindow.OpenEventDetail(ev, () => Refresh());
+        if (eventModal == null) return;
+        eventModal.OpenEditForm(ev, () => Refresh());
     }
 }

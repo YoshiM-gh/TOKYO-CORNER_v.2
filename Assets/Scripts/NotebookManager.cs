@@ -16,13 +16,15 @@ public class NotebookManager : MonoBehaviour
     private ScheduleData  scheduleData  = new ScheduleData();
     private MemoData      memoData      = new MemoData();
     private LifetimeStats lifetimeStats = new LifetimeStats();
+    private WeeklyMemoData weeklyMemoData = new WeeklyMemoData();
 
     // 表示対象期間：過去1年・未来1年
     private static readonly int RANGE_DAYS = 365;
 
     private string PathSchedule  => Path.Combine(Application.persistentDataPath, "notebook_schedule.json");
     private string PathMemo      => Path.Combine(Application.persistentDataPath, "notebook_memo.json");
-    private string PathLifetime  => Path.Combine(Application.persistentDataPath, "notebook_lifetime.json");
+    private string PathLifetime     => Path.Combine(Application.persistentDataPath, "notebook_lifetime.json");
+    private string PathWeeklyMemo  => Path.Combine(Application.persistentDataPath, "notebook_weekly_memo.json");
 
     private void Awake()
     {
@@ -41,13 +43,15 @@ public class NotebookManager : MonoBehaviour
         WriteJson(PathSchedule, scheduleData);
         WriteJson(PathMemo,     memoData);
         WriteJson(PathLifetime, lifetimeStats);
+        WriteJson(PathWeeklyMemo, weeklyMemoData);
     }
 
     private void LoadAll()
     {
         scheduleData  = ReadJson<ScheduleData>(PathSchedule)   ?? new ScheduleData();
         memoData      = ReadJson<MemoData>(PathMemo)           ?? new MemoData();
-        lifetimeStats = ReadJson<LifetimeStats>(PathLifetime)  ?? new LifetimeStats();
+        lifetimeStats   = ReadJson<LifetimeStats>(PathLifetime)   ?? new LifetimeStats();
+        weeklyMemoData  = ReadJson<WeeklyMemoData>(PathWeeklyMemo) ?? new WeeklyMemoData();
         PruneOldEvents();
     }
 
@@ -83,9 +87,9 @@ public class NotebookManager : MonoBehaviour
     /// <summary>指定週（月曜起点）のイベントを返す</summary>
     public List<ScheduleEvent> GetEventsByWeek(DateTime anyDayInWeek)
     {
-        var monday = anyDayInWeek.AddDays(-(int)anyDayInWeek.DayOfWeek + (int)DayOfWeek.Monday);
-        if (anyDayInWeek.DayOfWeek == DayOfWeek.Sunday) monday = anyDayInWeek.AddDays(-6);
-        var keys = Enumerable.Range(0, 7).Select(i => DateKey(monday.AddDays(i))).ToHashSet();
+        // 日曜始まりで週の日曜を求める
+        var sunday = anyDayInWeek.AddDays(-(int)anyDayInWeek.DayOfWeek);
+        var keys = Enumerable.Range(0, 7).Select(i => DateKey(sunday.AddDays(i))).ToHashSet();
         return scheduleData.events.Where(e => e.date != null && keys.Contains(e.date)).ToList();
     }
 
@@ -190,6 +194,30 @@ public class NotebookManager : MonoBehaviour
         int removed = memoData.entries.RemoveAll(e => e.id == id);
         if (removed > 0) SaveAll();
         return removed > 0;
+    }
+
+    // ─── WeeklyMemo ────────────────────────────────────────
+
+    /// <summary>週メモを取得（weekKey = その週の先頭日 "yyyy-MM-dd"）</summary>
+    public string GetWeeklyMemo(string weekKey)
+    {
+        var entry = weeklyMemoData.entries.Find(e => e.weekKey == weekKey);
+        return entry?.text ?? string.Empty;
+    }
+
+    /// <summary>週メモを保存・更新</summary>
+    public void SetWeeklyMemo(string weekKey, string text)
+    {
+        var entry = weeklyMemoData.entries.Find(e => e.weekKey == weekKey);
+        if (entry == null)
+        {
+            weeklyMemoData.entries.Add(new WeeklyMemoEntry { weekKey = weekKey, text = text });
+        }
+        else
+        {
+            entry.text = text;
+        }
+        SaveAll();
     }
 
     // ─── LifetimeStats ────────────────────────────────────

@@ -75,3 +75,20 @@ public class LifetimeStats
     public int longestStreak;
     public int currentStreak;
 }
+
+// ─────────────────────────────────────────────────────────
+// WeeklyMemoEntry / WeeklyMemoData
+// Weeklyタブ専用のメモ（週単位・先頭日キーで管理）
+// ─────────────────────────────────────────────────────────
+[Serializable]
+public class WeeklyMemoEntry
+{
+    public string weekKey;   // "yyyy-MM-dd"（その週の先頭日）
+    public string text;
+}
+
+[Serializable]
+public class WeeklyMemoData
+{
+    public List<WeeklyMemoEntry> entries = new List<WeeklyMemoEntry>();
+}

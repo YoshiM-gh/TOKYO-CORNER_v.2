@@ -32,8 +32,8 @@ public class DailyCalendarUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI detailEmptyText;
 
     private static readonly string[] DowLabels = { "日", "月", "火", "水", "木", "金", "土" };
-    private const int START_HOUR = 5;
-    private const int END_HOUR   = 23;
+    private const int START_HOUR = 0;
+    private const int END_HOUR   = 24;
     private const float ROW_HEIGHT = 36f;
 
     private DateTime currentDate;

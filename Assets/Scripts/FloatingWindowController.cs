@@ -45,7 +45,8 @@ public class FloatingWindowController : MonoBehaviour
     }
 
     // ─── 1. 日の予定一覧 ──────────────────────────────────
-    public void OpenDayList(string dateKey, List<ScheduleEvent> events, Action onRefreshCallback)
+    public void OpenDayList(string dateKey, List<ScheduleEvent> events, Action onRefreshCallback,
+        Action<ScheduleEvent> onEventDetail = null, Action onAddNew = null)
     {
         onRefresh = onRefreshCallback;
         titleText.text = FormatDate(dateKey);
@@ -56,7 +57,7 @@ public class FloatingWindowController : MonoBehaviour
         foreach (var ev in events)
         {
             var item = Instantiate(eventListItemPrefab, contentParent);
-            SetupListItem(item, ev, dateKey);
+            SetupListItem(item, ev, dateKey, onEventDetail);
         }
 
         // 「+ この日に予定を追加」ボタン
@@ -72,7 +73,7 @@ public class FloatingWindowController : MonoBehaviour
         Show();
     }
 
-    private void SetupListItem(GameObject item, ScheduleEvent ev, string dateKey)
+    private void SetupListItem(GameObject item, ScheduleEvent ev, string dateKey, Action<ScheduleEvent> onEventDetail = null)
     {
         var tag     = TagConfig.GetById(ev.tagId);
         var dotImg  = item.transform.Find("Dot")?.GetComponent<Image>();
