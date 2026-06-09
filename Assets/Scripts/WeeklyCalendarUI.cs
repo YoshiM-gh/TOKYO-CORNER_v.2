@@ -43,7 +43,8 @@ public class WeeklyCalendarUI : MonoBehaviour
     private const int   HOUR_COUNT     = 24;
     private const float NOTIME_ITEM_H  = 28f;
     private const int   NOTIME_VISIBLE = 3;    // 最大表示件数（超過 → 他N件）
-    private const float MEMO_ROW_H     = 68f;  // 3行分の高さ
+    private const float MEMO_ROW_H     = 80f;  // 3行分の高さ (14pt対応)
+    private static readonly string[] POLICY_OPTIONS = { "", "ガンガンいこうぜ", "しっかりマイペース", "いろいろやろうぜ", "ととのえていこうぜ", "かいふくゆうせん", "ともだちだいじに", "かぞくをだいじに", "じぶんをだいじに" };
     private const float NOTIME_ROW_H   = 92f;  // 3行分 + 余白
 
     private static readonly string[] DowLabels =
@@ -134,7 +135,7 @@ public class WeeklyCalendarUI : MonoBehaviour
         {
             var le = memoRow.GetComponent<LayoutElement>();
             if (le != null) le.preferredHeight = MEMO_ROW_H;
-            AddTimeSpacerLabel(memoRow.Find("TimeSpacer"), "メモ");
+            AddTimeSpacerLabel(memoRow.Find("TimeSpacer"), "方針");
         }
         if (noTimeRow != null)
         {
@@ -213,7 +214,13 @@ public class WeeklyCalendarUI : MonoBehaviour
     {
         if (row == null) return;
         string key = atTop ? "HBorder_Top" : "HBorder_Bot";
-        if (row.Find(key) != null) return;
+        var existingBorder = row.Find(key);
+        if (existingBorder != null)
+        {
+            var existImg = existingBorder.GetComponent<Image>();
+            if (existImg != null) existImg.color = UITheme_FocusMode.BorderDivider;
+            return;
+        }
         var go = new GameObject(key, typeof(RectTransform));
         go.transform.SetParent(row, false);
         var rt = go.GetComponent<RectTransform>();
@@ -319,72 +326,77 @@ public class WeeklyCalendarUI : MonoBehaviour
                 bdr.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
                 bdr.AddComponent<LayoutElement>().ignoreLayout = true;
 
-                // TMP_InputField（複数行・3行）
-                var fldGO = new GameObject($"MemoField_{d}", typeof(RectTransform));
-                fldGO.transform.SetParent(colGO.transform, false);
-                fldGO.AddComponent<Image>().color = new Color(0f,0f,0f,0.01f);
-                var fRT   = fldGO.GetComponent<RectTransform>();
-                fRT.anchorMin = Vector2.zero; fRT.anchorMax = Vector2.one;
-                fRT.offsetMin = new Vector2(4f,2f); fRT.offsetMax = new Vector2(-2f,-2f);
-                var field = fldGO.AddComponent<TMP_InputField>();
-
-                var taGO = new GameObject("TextArea", typeof(RectTransform));
-                taGO.transform.SetParent(fldGO.transform, false);
-                var taRT = taGO.GetComponent<RectTransform>();
-                taRT.anchorMin = Vector2.zero; taRT.anchorMax = Vector2.one;
-                taRT.offsetMin = taRT.offsetMax = Vector2.zero;
-                taGO.AddComponent<RectMask2D>();
-
-                var phGO = new GameObject("Placeholder", typeof(RectTransform));
-                phGO.transform.SetParent(taGO.transform, false);
-                var phRT = phGO.GetComponent<RectTransform>();
-                phRT.anchorMin = Vector2.zero; phRT.anchorMax = Vector2.one;
-                phRT.offsetMin = phRT.offsetMax = Vector2.zero;
-                var ph = phGO.AddComponent<TextMeshProUGUI>();
-                ph.text = ""; ph.color = UITheme_FocusMode.TextPlaceholder;
-                ph.fontSize = UITheme_FocusMode.FontCaption; ph.enableWordWrapping = true;
-                ph.raycastTarget = false;
-
-                var txtGO = new GameObject("Text", typeof(RectTransform));
-                txtGO.transform.SetParent(taGO.transform, false);
-                var txtRT = txtGO.GetComponent<RectTransform>();
-                txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one;
-                txtRT.offsetMin = txtRT.offsetMax = Vector2.zero;
-                var txt = txtGO.AddComponent<TextMeshProUGUI>();
-                txt.color = UITheme_FocusMode.TextBody;
-                txt.fontSize = UITheme_FocusMode.FontCaption; txt.enableWordWrapping = true;
-                txt.raycastTarget = false;
-
-                field.textViewport  = taRT;
-                field.placeholder   = ph;
-                field.textComponent = txt;
-                field.lineType      = TMP_InputField.LineType.MultiLineNewline;
-                field.interactable = true;
-                field.targetGraphic = fldGO.GetComponent<Image>();
+                // 方針サイクルボタン
+                var cellGO = new GameObject($"PolicyCell_{d}", typeof(RectTransform));
+                cellGO.transform.SetParent(colGO.transform, false);
+                var cellRT = cellGO.GetComponent<RectTransform>();
+                cellRT.anchorMin = Vector2.zero; cellRT.anchorMax = Vector2.one;
+                cellRT.offsetMin = new Vector2(6f, 4f); cellRT.offsetMax = new Vector2(-4f, -4f);
+                var cellImg = cellGO.AddComponent<Image>();
+                cellImg.color = Color.white;
+                var btn = cellGO.AddComponent<Button>();
+                var lblGO = new GameObject("Label", typeof(RectTransform));
+                lblGO.transform.SetParent(cellGO.transform, false);
+                var lblRT = lblGO.GetComponent<RectTransform>();
+                lblRT.anchorMin = Vector2.zero; lblRT.anchorMax = Vector2.one;
+                lblRT.offsetMin = new Vector2(8f, 0f); lblRT.offsetMax = new Vector2(-4f, 0f);
+                var lbl = lblGO.AddComponent<TextMeshProUGUI>();
+                lbl.enableAutoSizing = true;
+                lbl.fontSizeMin = 12f;
+                lbl.fontSizeMax = 20f;
+                lbl.color = UITheme_FocusMode.TextMuted;
+                lbl.alignment = TextAlignmentOptions.Center;
+                lbl.overflowMode = TextOverflowModes.Ellipsis;
+                lbl.enableWordWrapping = false;
+                lbl.raycastTarget = false;
+                btn.targetGraphic = cellImg;
+                var cbP = ColorBlock.defaultColorBlock;
+                cbP.normalColor      = new Color(1f, 1f, 1f, 0.04f);
+                cbP.highlightedColor = new Color(0.314f, 0.549f, 1f, 0.15f);
+                cbP.pressedColor     = new Color(0.314f, 0.549f, 1f, 0.25f);
+                cbP.selectedColor    = new Color(0.314f, 0.549f, 1f, 0.15f);
+                cbP.colorMultiplier  = 1f;
+                cbP.fadeDuration     = 0.1f;
+                btn.colors = cbP;
+                btn.transition = UnityEngine.UI.Selectable.Transition.ColorTint;
             }
         }
 
-        // テキスト値を曜日ごとに更新
+        // 方針値を曜日ごとに更新
         for (int d = 0; d < 7; d++)
         {
             var col = memoRow.Find($"MemoCol_{d}");
             if (col == null) continue;
-            var field   = col.GetComponentInChildren<TMP_InputField>(true);
-            if (field == null) continue;
+            var cell = col.Find($"PolicyCell_{d}");
+            if (cell == null) continue;
+            var lbl2 = cell.Find("Label")?.GetComponent<TextMeshProUGUI>();
+            if (lbl2 == null) continue;
+            var btn2 = cell.GetComponent<Button>();
+            if (btn2 == null) continue;
             var dateKey = NotebookManager.DateKey(weekStart.AddDays(d));
             var saved   = NotebookManager.Instance?.GetWeeklyMemo(dateKey) ?? "";
-            field.SetTextWithoutNotify(saved);
-            field.onEndEdit.RemoveAllListeners();
+            lbl2.text  = saved;
+            lbl2.color = saved == "" ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextBody;
+            btn2.onClick.RemoveAllListeners();
             var capKey = dateKey;
-            field.onEndEdit.AddListener(val =>
-                NotebookManager.Instance?.SetWeeklyMemo(capKey, val));
+            var capLbl = lbl2;
+            btn2.onClick.AddListener(() =>
+            {
+                var cur = NotebookManager.Instance?.GetWeeklyMemo(capKey) ?? "";
+                var idx = System.Array.IndexOf(POLICY_OPTIONS, cur);
+                if (idx < 0) idx = 0;
+                idx = (idx + 1) % POLICY_OPTIONS.Length;
+                var next = POLICY_OPTIONS[idx];
+                NotebookManager.Instance?.SetWeeklyMemo(capKey, next);
+                capLbl.text  = next;
+                capLbl.color = next == "" ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextBody;
+            });
         }
     }
-
-    // ── 時間なしエリア ────────────────────────────────────────
     private void RefreshNoTimeRow()
     {
         if (noTimeRow == null) return;
+
         var events = NotebookManager.Instance != null
             ? NotebookManager.Instance.GetEventsByWeek(weekStart)
             : new List<ScheduleEvent>();
