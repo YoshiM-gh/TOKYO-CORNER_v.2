@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// フォーカスモードUI のデザイントークン定義。
@@ -50,6 +50,9 @@ public static class UITheme_FocusMode
 
     /// <summary>テーマ変更イベント（各パネルはここで Refresh() を呼ぶ）</summary>
     public static event System.Action OnThemeChanged;
+
+    /// <summary>ThemeManager がテーマ切替時に呼ぶ（カラー変更通知）</summary>
+    internal static void RaiseThemeChanged() => OnThemeChanged?.Invoke();
 
     // スケール係数（Medium = 1.0 基準）
     private static float S => _fontScale switch {
@@ -120,44 +123,44 @@ public static class UITheme_FocusMode
         }
     }
     // ─── 背景色 ───────────────────────────────────────────────
-    public static readonly Color DashboardBG  = new Color(0.039f, 0.039f, 0.055f, 0.97f);
-    public static readonly Color PanelBG      = new Color(1f, 1f, 1f, 0.04f);
-    public static readonly Color SubPanelBG   = new Color(1f, 1f, 1f, 0.02f);
-    public static readonly Color InputBG      = new Color(1f, 1f, 1f, 0.055f);
-    public static readonly Color FloatBG      = new Color(0.071f, 0.071f, 0.086f, 0.98f);
-    public static readonly Color DayCellBG    = new Color(1f, 1f, 1f, 0.025f);
+    public static Color DashboardBG  => ThemeManager.Current.dashboardBG;
+    public static Color PanelBG      => ThemeManager.Current.panelBG;
+    public static Color SubPanelBG   => ThemeManager.Current.subPanelBG;
+    public static Color InputBG      => ThemeManager.Current.inputBG;
+    public static Color FloatBG      => ThemeManager.Current.floatBG;
+    public static Color DayCellBG    => ThemeManager.Current.dayCellBG;
 
     // ─── テキスト色 ───────────────────────────────────────────
-    public static readonly Color TextPrimary     = new Color(1f, 1f, 1f, 1.00f);
-    public static readonly Color TextSecondary   = new Color(1f, 1f, 1f, 0.82f);
-    public static readonly Color TextBody        = new Color(1f, 1f, 1f, 0.65f);
-    public static readonly Color TextMuted       = new Color(1f, 1f, 1f, 0.35f);
-    public static readonly Color TextCaption     = new Color(1f, 1f, 1f, 0.28f);
-    public static readonly Color TextPlaceholder = new Color(1f, 1f, 1f, 0.22f);
-    public static readonly Color TextDisabled    = new Color(1f, 1f, 1f, 0.18f);
+    public static Color TextPrimary     => ThemeManager.Current.textPrimary;
+    public static Color TextSecondary   => ThemeManager.Current.textSecondary;
+    public static Color TextBody        => ThemeManager.Current.textBody;
+    public static Color TextMuted       => ThemeManager.Current.textMuted;
+    public static Color TextCaption     => ThemeManager.Current.textCaption;
+    public static Color TextPlaceholder => ThemeManager.Current.textPlaceholder;
+    public static Color TextDisabled    => ThemeManager.Current.textDisabled;
 
     // ─── ボーダー色 ───────────────────────────────────────────
-    public static readonly Color BorderPanel   = new Color(1f, 1f, 1f, 0.08f);
-    public static readonly Color BorderInput   = new Color(1f, 1f, 1f, 0.09f);
-    public static readonly Color BorderFloat   = new Color(1f, 1f, 1f, 0.13f);
-    public static readonly Color BorderDivider = new Color(1f, 1f, 1f, 0.07f);
-    public static readonly Color BorderSubtle  = new Color(1f, 1f, 1f, 0.05f);
+    public static Color BorderPanel   => ThemeManager.Current.borderPanel;
+    public static Color BorderInput   => ThemeManager.Current.borderInput;
+    public static Color BorderFloat   => ThemeManager.Current.borderFloat;
+    public static Color BorderDivider => ThemeManager.Current.borderDivider;
+    public static Color BorderSubtle  => ThemeManager.Current.borderSubtle;
 
     // ─── アクセント ───────────────────────────────────────────
-    public static readonly Color AccentBlue       = new Color(0.314f, 0.549f, 1.0f, 0.50f);
-    public static readonly Color AccentBlueFaint  = new Color(0.314f, 0.549f, 1.0f, 0.18f);
-    public static readonly Color AccentBlueSolid  = new Color(0.314f, 0.549f, 1.0f, 0.75f);
-    public static readonly Color AccentRed        = new Color(1.0f, 0.392f, 0.392f, 0.75f);
-    public static readonly Color AccentSatBlue    = new Color(0.431f, 0.608f, 1.0f, 0.75f);
+    public static Color AccentBlue       => ThemeManager.Current.accentMain;
+    public static Color AccentBlueFaint  => ThemeManager.Current.accentFaint;
+    public static Color AccentBlueSolid  => ThemeManager.Current.accentSolid;
+    public static Color AccentRed        => ThemeManager.Current.accentDanger;
+    public static Color AccentSatBlue    => ThemeManager.Current.accentStrong;
 
     // ─── ホバー・選択状態 ─────────────────────────────────────
-    public static readonly Color HoverBG    = new Color(1f, 1f, 1f, 0.07f);
-    public static readonly Color SelectedBG = new Color(1f, 1f, 1f, 0.09f);
-    public static readonly Color DoneBG     = new Color(1f, 1f, 1f, 0.03f);
+    public static Color HoverBG    => ThemeManager.Current.hoverBG;
+    public static Color SelectedBG => ThemeManager.Current.selectedBG;
+    public static Color DoneBG     => ThemeManager.Current.doneBG;
 
     // ─── 影 ──────────────────────────────────────────────────
-    public static readonly Color ShadowColor    = new Color(0f, 0f, 0f, 0.60f);
-    public static readonly Vector2 ShadowOffset = new Vector2(0f, -8f);
+    public static Color ShadowColor    => ThemeManager.Current.shadowColor;
+    public static Vector2 ShadowOffset => ThemeManager.Current.shadowOffset;
 
     // ─── 角丸 ─────────────────────────────────────────────────
     public const float RadiusPanel   = 8f;

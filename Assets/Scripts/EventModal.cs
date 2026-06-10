@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -24,6 +24,8 @@ public class EventModal : MonoBehaviour
     [SerializeField] private Button          minDecBtn;
     [SerializeField] private TMP_InputField  minInput;    // 直接入力対応
     [SerializeField] private Button          minIncBtn;
+    [SerializeField] private TMP_InputField  endHourInput; // 終了 時（直接入力・ドラッグ作成で自動セット）
+    [SerializeField] private TMP_InputField  endMinInput;  // 終了 分
     [SerializeField] private Button          timeClearBtn;
     [SerializeField] private TextMeshProUGUI timeClearBtnLabel;
     [Header("メモ")]
@@ -33,6 +35,7 @@ public class EventModal : MonoBehaviour
     private string _selectedTagId = "yotei";
     private string _editingId     = null;  // 編集中イベントID（null=新規追加）
     private int _hour = -1, _minute = 0;
+    private int _endHour = -1, _endMinute = 0;   // 終了時刻（-1=未設定）
     private ScheduleEvent _editTarget;
     private Action _onSaved;
     private const int MIN_STEP = 15;
@@ -62,6 +65,19 @@ public class EventModal : MonoBehaviour
             { if (_hour < 0) _hour = 0; _minute = Mathf.Clamp(m, 0, 59); }
             RefreshTimeDisplay();
         });
+        // 終了時刻の直接入力
+        endHourInput?.onEndEdit.AddListener(v =>
+        {
+            if (int.TryParse(v, out int h)) _endHour = Mathf.Clamp(h, 0, 24);
+            else if (string.IsNullOrWhiteSpace(v)) _endHour = -1;
+            RefreshTimeDisplay();
+        });
+        endMinInput?.onEndEdit.AddListener(v =>
+        {
+            if (int.TryParse(v, out int m))
+            { if (_endHour < 0) _endHour = _hour >= 0 ? Mathf.Min(_hour + 1, 24) : 10; _endMinute = Mathf.Clamp(m, 0, 59); }
+            RefreshTimeDisplay();
+        });
 
         datePicker?.gameObject.SetActive(false);
         // 削除ボタン onClick（Play 時に必ず設定）
@@ -84,7 +100,7 @@ public class EventModal : MonoBehaviour
     }
 
     // ── 公開 API ─────────────────────────────────────────────
-    public void OpenAddForm(string dateKey, Action onSaved = null, string defaultTime = null)
+    public void OpenAddForm(string dateKey, Action onSaved = null, string defaultTime = null, string defaultEndTime = null)
     {
         _editTarget = null; _onSaved = onSaved;
         ForceCleanField(titleInput);
@@ -96,7 +112,7 @@ public class EventModal : MonoBehaviour
         if (!string.IsNullOrEmpty(defaultTime) && defaultTime.Length >= 5 &&
             int.TryParse(defaultTime.Substring(0,2), out int dtH) &&
             int.TryParse(defaultTime.Substring(3,2), out int dtM))
-        { _hour = dtH; _minute = dtM; RefreshTimeDisplay(); }
+        { _hour = dtH; _minute = dtM; SetEndFromString(defaultEndTime); RefreshTimeDisplay(); }
         else ClearTime();
         if (modal != null) { modal.titleText = "アイテムを追加"; modal.UpdateUI(); modal.OpenWindow(); }
         datePicker?.Close();
@@ -116,6 +132,7 @@ public class EventModal : MonoBehaviour
             int.TryParse(ev.time.Substring(3,2), out int m))
         { _hour = h; _minute = m; }
         else ClearTime();
+        SetEndFromString(ev.endTime);
         RefreshTimeDisplay();
         if (modal != null) { modal.titleText = "アイテムを編集"; modal.UpdateUI(); modal.OpenWindow(); }
         datePicker?.Close();
@@ -146,7 +163,17 @@ public class EventModal : MonoBehaviour
     }
 
     // ── 時間 ─────────────────────────────────────────────────
-    private void ClearTime() { _hour = -1; _minute = 0; RefreshTimeDisplay(); }
+    /// <summary>"HH:mm" 文字列から終了時刻状態を設定（null/不正なら未設定）</summary>
+    private void SetEndFromString(string s)
+    {
+        if (!string.IsNullOrEmpty(s) && s.Length >= 5 &&
+            int.TryParse(s.Substring(0,2), out int eh) &&
+            int.TryParse(s.Substring(3,2), out int em))
+        { _endHour = eh; _endMinute = em; }
+        else { _endHour = -1; _endMinute = 0; }
+    }
+
+    private void ClearTime() { _hour = -1; _minute = 0; _endHour = -1; _endMinute = 0; RefreshTimeDisplay(); }
 
     private void ShiftHour(int d)
     { if (_hour < 0) _hour = 9; _hour = (_hour + d + 24) % 24; RefreshTimeDisplay(); }
@@ -160,6 +187,9 @@ public class EventModal : MonoBehaviour
         // placeholder は常に "00" のまま。text だけで有無を表現する
         if (hourInput) hourInput.text = has ? _hour.ToString("D2") : "";
         if (minInput)  minInput.text  = has ? _minute.ToString("D2") : "";
+        bool hasEnd = has && _endHour >= 0;
+        if (endHourInput) endHourInput.text = hasEnd ? _endHour.ToString("D2") : "";
+        if (endMinInput)  endMinInput.text  = hasEnd ? _endMinute.ToString("D2") : "";
         if (timeClearBtnLabel) timeClearBtnLabel.text = has ? "クリア" : "時間なし";
     }
 
@@ -168,15 +198,31 @@ public class EventModal : MonoBehaviour
     {
         if (NotebookManager.Instance == null) return;
         string t = _hour >= 0 ? $"{_hour:D2}:{_minute:D2}" : null;
+        // 終了時刻: 開始あり・終了あり・終了 > 開始 のときのみ有効
+        string endT = null;
+        if (t != null && _endHour >= 0)
+        {
+            int sMin = _hour * 60 + _minute;
+            int eMin = _endHour * 60 + _endMinute;
+            if (eMin > sMin) endT = $"{_endHour:D2}:{_endMinute:D2}";
+        }
         if (_editTarget == null)
-            NotebookManager.Instance.AddEvent(_selectedTagId, titleInput.text, _selectedDate ?? "", t, memoInput.text);
+        {
+            var newEv = NotebookManager.Instance.AddEvent(_selectedTagId, titleInput.text, _selectedDate ?? "", t, memoInput.text);
+            if (newEv != null && endT != null)
+            {
+                newEv.endTime = endT;
+                NotebookManager.Instance.SaveAll();
+            }
+        }
         else
         {
-            _editTarget.tagId  = _selectedTagId;
-            _editTarget.title = titleInput.text;
-            _editTarget.date  = _selectedDate ?? _editTarget.date;
-            _editTarget.time  = t;
-            _editTarget.memo  = memoInput.text;
+            _editTarget.tagId   = _selectedTagId;
+            _editTarget.title   = titleInput.text;
+            _editTarget.date    = _selectedDate ?? _editTarget.date;
+            _editTarget.time    = t;
+            _editTarget.endTime = endT;
+            _editTarget.memo    = memoInput.text;
             NotebookManager.Instance.SaveAll();
         }
         _onSaved?.Invoke();

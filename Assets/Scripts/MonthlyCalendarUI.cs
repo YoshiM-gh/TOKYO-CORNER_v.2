@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -56,6 +56,7 @@ public class MonthlyCalendarUI : MonoBehaviour
     private void OnEnable()
     {
         UITheme_FocusMode.OnThemeChanged += Refresh;
+        NavHeaderStyler.Style(transform.Find("Content/Header"));  // Phase1: ヘッダー部品規格
         var now = DateTime.Now;
         currentYear  = now.Year;
         currentMonth = now.Month;

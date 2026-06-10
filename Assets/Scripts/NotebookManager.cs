@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -17,6 +17,10 @@ public class NotebookManager : MonoBehaviour
     private MemoData      memoData      = new MemoData();
     private LifetimeStats lifetimeStats = new LifetimeStats();
     private WeeklyMemoData weeklyMemoData = new WeeklyMemoData();
+    private StickyNotesData stickyNotesData = new StickyNotesData();
+    private TodoListData    todoData    = new TodoListData();
+    private RoutineListData routineData = new RoutineListData();
+    private MemoNotesData   memoNotes   = new MemoNotesData();
 
     // 表示対象期間：過去1年・未来1年
     private static readonly int RANGE_DAYS = 365;
@@ -25,6 +29,10 @@ public class NotebookManager : MonoBehaviour
     private string PathMemo      => Path.Combine(Application.persistentDataPath, "notebook_memo.json");
     private string PathLifetime     => Path.Combine(Application.persistentDataPath, "notebook_lifetime.json");
     private string PathWeeklyMemo  => Path.Combine(Application.persistentDataPath, "notebook_weekly_memo.json");
+    private string PathStickyNotes => Path.Combine(Application.persistentDataPath, "notebook_sticky.json");
+    private string PathTodo      => Path.Combine(Application.persistentDataPath, "notebook_todo.json");
+    private string PathRoutine   => Path.Combine(Application.persistentDataPath, "notebook_routine.json");
+    private string PathMemoNotes => Path.Combine(Application.persistentDataPath, "notebook_memo_notes.json");
 
     private void Awake()
     {
@@ -44,6 +52,10 @@ public class NotebookManager : MonoBehaviour
         WriteJson(PathMemo,     memoData);
         WriteJson(PathLifetime, lifetimeStats);
         WriteJson(PathWeeklyMemo, weeklyMemoData);
+        WriteJson(PathStickyNotes, stickyNotesData);
+        WriteJson(PathTodo,      todoData);
+        WriteJson(PathRoutine,   routineData);
+        WriteJson(PathMemoNotes, memoNotes);
     }
 
     private void LoadAll()
@@ -52,6 +64,11 @@ public class NotebookManager : MonoBehaviour
         memoData      = ReadJson<MemoData>(PathMemo)           ?? new MemoData();
         lifetimeStats   = ReadJson<LifetimeStats>(PathLifetime)   ?? new LifetimeStats();
         weeklyMemoData  = ReadJson<WeeklyMemoData>(PathWeeklyMemo) ?? new WeeklyMemoData();
+        stickyNotesData = ReadJson<StickyNotesData>(PathStickyNotes) ?? new StickyNotesData();
+        todoData    = ReadJson<TodoListData>(PathTodo)         ?? new TodoListData();
+        routineData = ReadJson<RoutineListData>(PathRoutine)   ?? new RoutineListData();
+        memoNotes   = ReadJson<MemoNotesData>(PathMemoNotes)   ?? new MemoNotesData();
+        EnsureDefaultMemoFolder();
         PruneOldEvents();
     }
 
@@ -280,5 +297,211 @@ public class NotebookManager : MonoBehaviour
         var cal = CultureInfo.InvariantCulture.Calendar;
         int week = cal.GetWeekOfYear(date, CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
         return $"{date.Year}-W{week:D2}";
+    }
+
+    // ─── StickyNote CRUD ──────────────────────────────────
+    public List<StickyNoteData> GetStickyNotes(string dateKey)
+        => stickyNotesData.notes.Where(n => n.dateKey == dateKey).ToList();
+
+    public StickyNoteData AddStickyNote(string dateKey, float ax, float ay, string tagId = "")
+    {
+        var note = new StickyNoteData {
+            id = Guid.NewGuid().ToString(), dateKey = dateKey,
+            content = "", anchorX = ax, anchorY = ay,
+            width = 200f, height = 200f, colorIndex = 0 };
+        stickyNotesData.notes.Add(note);
+        SaveAll();
+        return note;
+    }
+
+    public void UpdateStickyNote(StickyNoteData data)
+    {
+        var idx = stickyNotesData.notes.FindIndex(n => n.id == data.id);
+        if (idx >= 0) stickyNotesData.notes[idx] = data;
+        SaveAll();
+    }
+
+    public void DeleteStickyNote(string id)
+    {
+        stickyNotesData.notes.RemoveAll(n => n.id == id);
+        SaveAll();
+    }
+
+    // ─── Todo CRUD ────────────────────────────────────────
+    /// <summary>優先度高→sortOrder→作成順。includeCompleted=false で未完了のみ</summary>
+    public List<TodoItem> GetTodos(bool includeCompleted = true)
+    {
+        var list = includeCompleted ? new List<TodoItem>(todoData.items)
+                                    : todoData.items.FindAll(t => !t.isCompleted);
+        list.Sort((a, b) => {
+            if (a.priorityHigh != b.priorityHigh) return a.priorityHigh ? -1 : 1;
+            if (a.sortOrder != b.sortOrder) return a.sortOrder.CompareTo(b.sortOrder);
+            return string.Compare(a.createdAt, b.createdAt, StringComparison.Ordinal);
+        });
+        return list;
+    }
+
+    public List<TodoItem> GetTodosOn(string dateKey) =>
+        todoData.items.FindAll(t => t.dateKey == dateKey);
+
+    public TodoItem AddTodo(string title)
+    {
+        var t = new TodoItem { id = Guid.NewGuid().ToString(), title = title, createdAt = NowKey() };
+        todoData.items.Add(t);
+        SaveAll();
+        return t;
+    }
+
+    public void UpdateTodo(TodoItem item)
+    {
+        var idx = todoData.items.FindIndex(t => t.id == item.id);
+        if (idx >= 0) todoData.items[idx] = item;
+        SaveAll();
+    }
+
+    public void SetTodoCompleted(string id, bool done)
+    {
+        var t = todoData.items.Find(x => x.id == id);
+        if (t == null) return;
+        t.isCompleted = done;
+        t.completedAt = done ? NowKey() : null;
+        SaveAll();
+    }
+
+    public void DeleteTodo(string id)
+    {
+        todoData.items.RemoveAll(t => t.id == id);
+        SaveAll();
+    }
+
+    // ─── Routine CRUD ─────────────────────────────────────
+    public List<RoutineItem> GetRoutines() => new List<RoutineItem>(routineData.items);
+
+    /// <summary>指定日に出現する Routine 一覧（カレンダーアイコン・Daily 表示用）</summary>
+    public List<RoutineItem> GetRoutinesOn(DateTime day) =>
+        routineData.items.FindAll(r => r.OccursOn(day));
+
+    public RoutineItem AddRoutine(string title)
+    {
+        var r = new RoutineItem {
+            id = Guid.NewGuid().ToString(), title = title,
+            startDate = DateTime.Now.ToString("yyyy-MM-dd"), createdAt = NowKey()
+        };
+        routineData.items.Add(r);
+        SaveAll();
+        return r;
+    }
+
+    public void UpdateRoutine(RoutineItem item)
+    {
+        var idx = routineData.items.FindIndex(r => r.id == item.id);
+        if (idx >= 0) routineData.items[idx] = item;
+        SaveAll();
+    }
+
+    /// <summary>occurrence（日付）単位の完了トグル</summary>
+    public void SetRoutineDone(string id, string dateKey, bool done)
+    {
+        var r = routineData.items.Find(x => x.id == id);
+        if (r == null) return;
+        if (done) { if (!r.completedDates.Contains(dateKey)) r.completedDates.Add(dateKey); }
+        else        r.completedDates.Remove(dateKey);
+        SaveAll();
+    }
+
+    public void DeleteRoutine(string id)
+    {
+        routineData.items.RemoveAll(r => r.id == id);
+        SaveAll();
+    }
+
+    // ─── Memo（新仕様）CRUD ───────────────────────────────
+    public const string DefaultMemoFolderId = "default";
+
+    private void EnsureDefaultMemoFolder()
+    {
+        if (memoNotes.folders.Exists(f => f.id == DefaultMemoFolderId)) return;
+        memoNotes.folders.Insert(0, new MemoFolder { id = DefaultMemoFolderId, name = "メモ", sortOrder = 0 });
+    }
+
+    public List<MemoFolder> GetMemoFolders() => new List<MemoFolder>(memoNotes.folders);
+
+    public MemoFolder AddMemoFolder(string name)
+    {
+        var f = new MemoFolder { id = Guid.NewGuid().ToString(), name = name,
+                                 sortOrder = memoNotes.folders.Count };
+        memoNotes.folders.Add(f);
+        SaveAll();
+        return f;
+    }
+
+    /// <summary>フォルダ削除。中のノートはデフォルトフォルダへ移動</summary>
+    public void DeleteMemoFolder(string folderId)
+    {
+        if (folderId == DefaultMemoFolderId) return; // デフォルトは削除不可
+        foreach (var note in memoNotes.notes)
+            if (note.folderId == folderId) note.folderId = DefaultMemoFolderId;
+        memoNotes.folders.RemoveAll(f => f.id == folderId);
+        SaveAll();
+    }
+
+    /// <summary>ピン留め→更新日降順。folderId=null で全フォルダ。ゴミ箱は除外</summary>
+    public List<MemoNote> GetMemoNotes(string folderId = null)
+    {
+        var list = memoNotes.notes.FindAll(m =>
+            !m.IsTrashed && (folderId == null || m.folderId == folderId));
+        list.Sort((a, b) => {
+            if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+            return string.Compare(b.updatedAt, a.updatedAt, StringComparison.Ordinal);
+        });
+        return list;
+    }
+
+    public List<MemoNote> GetTrashedMemoNotes() =>
+        memoNotes.notes.FindAll(m => m.IsTrashed);
+
+    public List<MemoNote> GetMemoNotesOn(string dateKey) =>
+        memoNotes.notes.FindAll(m => !m.IsTrashed && m.dateKey == dateKey);
+
+    public MemoNote AddMemoNote(string folderId = DefaultMemoFolderId)
+    {
+        var m = new MemoNote {
+            id = Guid.NewGuid().ToString(), folderId = folderId ?? DefaultMemoFolderId,
+            title = "", createdAt = NowKey(), updatedAt = NowKey()
+        };
+        memoNotes.notes.Add(m);
+        SaveAll();
+        return m;
+    }
+
+    public void UpdateMemoNote(MemoNote note)
+    {
+        var idx = memoNotes.notes.FindIndex(m => m.id == note.id);
+        if (idx < 0) return;
+        note.updatedAt = NowKey();
+        memoNotes.notes[idx] = note;
+        SaveAll();
+    }
+
+    public void TrashMemoNote(string id)
+    {
+        var m = memoNotes.notes.Find(x => x.id == id);
+        if (m == null) return;
+        m.deletedAt = NowKey();
+        SaveAll();
+    }
+
+    public void RestoreMemoNote(string id)
+    {
+        var m = memoNotes.notes.Find(x => x.id == id);
+        if (m == null) return;
+        m.deletedAt = null;
+        SaveAll();
+    }
+
+    public void DeleteMemoNotePermanently(string id)
+    {
+        memoNotes.notes.RemoveAll(m => m.id == id);
+        SaveAll();
     }
 }

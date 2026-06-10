@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -28,15 +28,17 @@ public class DayEventsPopup : MonoBehaviour
             foreach (Transform c in eventList) Destroy(c.gameObject);
         foreach (var ev in events)
             CreateRow(ev).transform.SetParent(eventList, false);
-        StartCoroutine(PositionAfterLayout(GetComponent<RectTransform>(), screenPos));
+
+        // コルーチン廃止: SetActive 直後に ForceUpdateCanvases で同期的に位置決め
+        // StartCoroutine は activeInHierarchy=false の場合に失敗するため置き換え
+        Canvas.ForceUpdateCanvases();
+        PositionPopup(GetComponent<RectTransform>(), screenPos);
     }
 
     public void Hide() => gameObject.SetActive(false);
 
-    private System.Collections.IEnumerator PositionAfterLayout(RectTransform rt, Vector2 pos)
+    private void PositionPopup(RectTransform rt, Vector2 pos)
     {
-        yield return null;
-        Canvas.ForceUpdateCanvases();
         float w = rt.rect.width, h = rt.rect.height;
         float x = Mathf.Clamp(pos.x, w * 0.5f, Screen.width  - w * 0.5f);
         float y = Mathf.Clamp(pos.y, h * 0.5f, Screen.height - h * 0.5f);
@@ -52,13 +54,11 @@ public class DayEventsPopup : MonoBehaviour
         hlg.padding = new RectOffset(12, 12, 0, 0);
         hlg.childForceExpandWidth = false; hlg.childControlWidth = true;
         hlg.childForceExpandHeight = true; hlg.childControlHeight = true;
-        // ドット
         var dotGO = new GameObject("Dot"); dotGO.transform.SetParent(go.transform, false);
         var dLE = dotGO.AddComponent<LayoutElement>(); dLE.minWidth = 10f; dLE.preferredWidth = 10f; dLE.flexibleWidth = 0;
         var dImg = dotGO.AddComponent<Image>();
         var tag = TagConfig.GetById(ev.tagId);
         dImg.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
-        // テキスト
         var tGO = new GameObject("Text"); tGO.transform.SetParent(go.transform, false);
         tGO.AddComponent<LayoutElement>().flexibleWidth = 1;
         var tmp = tGO.AddComponent<TextMeshProUGUI>();
@@ -66,7 +66,6 @@ public class DayEventsPopup : MonoBehaviour
         tmp.fontSize = 18f; tmp.color = UITheme_FocusMode.TextBody;
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
         tmp.overflowMode = TextOverflowModes.Ellipsis; tmp.enableWordWrapping = false;
-        // ボタン
         var bgI = go.AddComponent<Image>(); bgI.color = Color.clear;
         var btn = go.AddComponent<Button>();
         var cb  = ColorBlock.defaultColorBlock; cb.highlightedColor = new Color(1f,1f,1f,0.08f);

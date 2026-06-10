@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,7 +44,7 @@ public class WeeklyCalendarUI : MonoBehaviour
     private const float NOTIME_ITEM_H  = 28f;
     private const int   NOTIME_VISIBLE = 3;    // 最大表示件数（超過 → 他N件）
     private const float MEMO_ROW_H     = 80f;  // 3行分の高さ (14pt対応)
-    private static readonly string[] POLICY_OPTIONS = { "", "ガンガンいこうぜ", "しっかりマイペース", "いろいろやろうぜ", "ととのえていこうぜ", "かいふくゆうせん", "ともだちだいじに", "かぞくをだいじに", "じぶんをだいじに" };
+    private static readonly string[] POLICY_OPTIONS = { "", "ガンガンいこうぜ", "しっかりマイペース", "いろいろやろうぜ", "ととのえていこうぜ", "かいふくゆうせん", "ともだちだいじに", "かぞくをだいじに", "じぶんをだいじに", "こいびとだいじに" };
     private const float NOTIME_ROW_H   = 92f;  // 3行分 + 余白
 
     private static readonly string[] DowLabels =
@@ -63,6 +63,8 @@ public class WeeklyCalendarUI : MonoBehaviour
     // ── ライフサイクル ────────────────────────────────────────
     private void OnEnable()
     {
+        if (timelineScroll != null) timelineScroll.scrollSensitivity = 60f;
+        NavHeaderStyler.Style(transform.Find("Content/Header"));  // Phase1: ヘッダー部品規格
         UITheme_FocusMode.OnThemeChanged += Refresh;
         weekStart = GetWeekStart(DateTime.Now, weekStartDow);
         SetupButtons();
@@ -288,8 +290,7 @@ public class WeeklyCalendarUI : MonoBehaviour
             bool isHoliday = HolidayKeys.Contains(NotebookManager.DateKey(date));
             cells[i].Set(DowLabels[dow], date.Day.ToString(),
                 date.Date == today, dow == 0 || isHoliday, dow == 6);
-            int cap = i;
-            cells[i].SetClickAction(() => OnDowCellClicked(cap));
+            cells[i].SetClickAction(() => { }); // ヘッダークリック無効（旧UI非表示）
         }
     }
 
@@ -419,6 +420,19 @@ public class WeeklyCalendarUI : MonoBehaviour
             foreach (Transform old in container) Destroy(old.gameObject);
 
             string dateKey = NotebookManager.DateKey(weekStart.AddDays(d));
+
+            // 空欄クリックで時間なし予定追加モーダルを開く
+            var colBtn = col.GetComponent<Button>();
+            if (colBtn == null) colBtn = col.gameObject.AddComponent<Button>();
+            var colImg = col.GetComponent<Image>();
+            if (colImg != null) colBtn.targetGraphic = colImg;
+            colBtn.onClick.RemoveAllListeners();
+            var capAddKey = dateKey;
+            colBtn.onClick.AddListener(() =>
+            {
+                if (eventModal != null) eventModal.OpenAddForm(capAddKey, Refresh);
+                else floatingWindow?.OpenAddForm(capAddKey, null);
+            });
             var dayEvs     = noTimeEvs.Where(e => e.date == dateKey).ToList();
 
             // 最大 NOTIME_VISIBLE 件表示
@@ -590,6 +604,15 @@ public class WeeklyCalendarUI : MonoBehaviour
         colRT.pivot     = new Vector2(0f,1f);
         colRT.sizeDelta = new Vector2(colW, totalH);
         colRT.anchoredPosition = new Vector2(colX, 0f);
+
+        // ── ドラッグで時間範囲を選択してアイテム追加（Google Cal 風）────
+        var dragCreator = col.AddComponent<TimelineDragCreator>();
+        string dragDk   = dateKey;
+        dragCreator.Setup(dragDk, HOUR_COUNT, HOUR_HEIGHT, (dk2, st, en) =>
+        {
+            if (eventModal != null) eventModal.OpenAddForm(dk2, Refresh, st, en);
+            else floatingWindow?.OpenAddForm(dk2, null, st);
+        });
 
 
         if (isToday)

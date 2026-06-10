@@ -1,464 +1,1027 @@
-using System;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 
 /// <summary>
-/// 日カレンダーUI
-/// - 左：時間軸タイムライン（縦スクロール）
-/// - 右：選択した予定の詳細 or 追加フォーム（並列表示）
-/// - 時間帯クリック → 右カラムに追加フォーム（時間自動入力）
-/// - 予定クリック  → 右カラムに詳細
+/// Dailyタブ。左 1/3 = タイムライン、右 2/3 = Google Keep 風付箋エリア。
+/// BuildScaffold() で全 UI をコード生成（シーン上の Static 構造不要）。
 /// </summary>
 public class DailyCalendarUI : MonoBehaviour
 {
-    [Header("ナビゲーション")]
-    [SerializeField] private Button prevDayBtn;
-    [SerializeField] private Button nextDayBtn;
-    [SerializeField] private TextMeshProUGUI dayLabel;
+    // ── 定数 ──────────────────────────────────────────────────
+    private const float HOUR_HEIGHT    = 60f;
+    private const float TIME_COL_W     = 72f;
+    private const int   HOUR_COUNT     = 24;
+    private const float NOTIME_ITEM_H  = 28f;
+    private const int   NOTIME_VISIBLE = 3;
+    private const float NOTIME_ROW_H   = 92f;
+    private const float POLICY_ROW_H   = 80f;
+    private const float DOW_ROW_H      = 56f;
+    private const float NOTE_W         = 200f;
+    private const float NOTE_H         = 200f;
 
-    [Header("左：タイムライン")]
-    [SerializeField] private ScrollRect timelineScroll;
-    [SerializeField] private Transform  timelineParent;
+    private static readonly string[] POLICY_OPTIONS =
+    { "", "ガンガンいこうぜ", "しっかりマイペース", "いろいろやろうぜ",
+      "ととのえていこうぜ", "かいふくゆうせん", "ともだちだいじに",
+      "かぞくをだいじに", "じぶんをだいじに", "こいびとだいじに" };
 
-    [Header("右：詳細パネル")]
-    [SerializeField] private TextMeshProUGUI detailTitle;
-    [SerializeField] private Transform       detailContent;  // 動的UIの親
-    [SerializeField] private GameObject      detailFooter;
-    [SerializeField] private Button          detailSaveBtn;
-    [SerializeField] private Button          detailDeleteBtn;
-    [SerializeField] private TextMeshProUGUI detailEmptyText;
+    private static readonly string[] DOW_LABELS =
+        { "日", "月", "火", "水", "木", "金", "土" };
 
-    private static readonly string[] DowLabels = { "日", "月", "火", "水", "木", "金", "土" };
-    private const int START_HOUR = 0;
-    private const int END_HOUR   = 24;
-    private const float ROW_HEIGHT = 36f;
+    private static readonly HashSet<string> HOLIDAY_KEYS = new HashSet<string>
+    {
+        "2026-01-01","2026-01-12","2026-02-11","2026-02-23","2026-03-20",
+        "2026-04-29","2026-05-03","2026-05-04","2026-05-05","2026-07-20",
+        "2026-08-11","2026-09-21","2026-09-23","2026-10-12",
+        "2026-11-03","2026-11-23",
+    };
 
-    private DateTime currentDate;
-    private ScheduleEvent selectedEvent;
-    private string pendingTime; // 追加フォームの時間
+    // ── 状態 ──────────────────────────────────────────────────
+    private DateTime _currentDate;
+    private int      _weekStartDow = 0; // 0=日、1=月
+    private bool     _blockNextNoteSpawn;  // 空ノート削除直後のスポーン抑制
+
+    // ── UI 参照 ────────────────────────────────────────────────
+    private Button           _prevBtn;
+    private Button           _nextBtn;
+    private TextMeshProUGUI  _dayLabel;
+    private Button           _sunBtn;
+    private Button           _monBtn;
+
+    private Transform        _dowRow;
+    private Transform        _policyRow;
+    private Transform        _noTimeRow;
+    private ScrollRect       _timelineScroll;
+    private Transform        _timelineParent;
+    private RectTransform    _stickyCanvas;
+
+    // DowRow 内の直接 TMP 参照
+    private TextMeshProUGUI  _dayDowTxt;
+    private TextMeshProUGUI  _dayDateTxt;
+    private Image            _dayCellImg;
+
+    // モーダル参照
+    private EventModal               _eventModal;
+    private FloatingWindowController _floatingWindow;
+    private DayEventsPopup           _dayEventsPopup;
+
+    private bool _scaffoldBuilt;
+
+    // ── ライフサイクル ─────────────────────────────────────────
+    private void Awake()
+    {
+        _eventModal     = FindObjectOfType<EventModal>(true);
+        _floatingWindow = FindObjectOfType<FloatingWindowController>(true);
+        _dayEventsPopup = FindObjectOfType<DayEventsPopup>(true);
+        BuildScaffold();
+    }
 
     private void OnEnable()
     {
-        currentDate = DateTime.Now.Date;
+        UITheme_FocusMode.OnThemeChanged += Refresh;
+        _currentDate = DateTime.Now.Date;
         SetupButtons();
         Refresh();
     }
 
+    private void OnDisable()
+    {
+        UITheme_FocusMode.OnThemeChanged -= Refresh;
+    }
+
+    // =========================================================
+    // BuildScaffold ── 一度だけ実行
+    // =========================================================
+private void BuildScaffold()
+    {
+        if (_scaffoldBuilt) return;
+        _scaffoldBuilt = true;
+
+        var content = transform.Find("Content");
+        if (content == null) { Debug.LogError("[DailyCalendarUI] 'Content' child not found"); return; }
+
+        // 既存の子を全削除
+        var toKill = new System.Collections.Generic.List<GameObject>();
+        foreach (Transform c in content) toKill.Add(c.gameObject);
+        foreach (var g in toKill) DestroyImmediate(g);
+
+        // Content 背景透明 + VLG ゟ刑除
+        // Content 背景はシーン値（白1.6%・他タブと共通）を維持する — 透明化しない
+        var cVLG = content.GetComponent<VerticalLayoutGroup>();
+        if (cVLG != null) DestroyImmediate(cVLG);
+
+        // ─ Header （アンカー直指定: 上 48px 固定） ──────────────────────
+        var header = BuildHeader(content);
+        var hRT    = header.GetComponent<RectTransform>();
+        hRT.anchorMin = new Vector2(0f, 1f);
+        hRT.anchorMax = new Vector2(1f, 1f);
+        hRT.pivot     = new Vector2(0.5f, 1f);
+        hRT.sizeDelta = new Vector2(0f, 48f);
+        hRT.anchoredPosition = Vector2.zero;
+
+        // ─ BodyArea （アンカー直指定: Header 下を充塘） ─────────────────
+        var body  = BuildBodyArea(content);
+        var bRT   = body.GetComponent<RectTransform>();
+        bRT.anchorMin = new Vector2(0f, 0f);
+        bRT.anchorMax = new Vector2(1f, 1f);
+        bRT.pivot     = new Vector2(0.5f, 0.5f);
+        bRT.offsetMin = new Vector2(0f, 0f);
+        bRT.offsetMax = new Vector2(0f, -48f);
+    }
+
+    // ── ヘッダー ──────────────────────────────────────────────
+    private GameObject BuildHeader(Transform parent)
+    {
+        var go  = MakeGO("Header", parent);
+        go.AddComponent<Image>().color = Color.clear;
+        // VLG なし・アンカー直接指定（Weekly と同じ方式）
+
+        var wContent = transform.parent.Find("Weekly/Content");
+        var wHdr     = wContent?.Find("Header");
+
+        // ── PrevDayBtn（左端固定、48px）───────────────────
+        var prevGO = CloneSrcBtn(wHdr?.Find("PrevMonthBtn")?.gameObject, go.transform, "PrevDayBtn", "<");
+        SetBtnRT(prevGO, ancLeft: true,  width: 48f, vMgn: 4f, offset: 4f);
+        _prevBtn = prevGO?.GetComponent<Button>();
+        _prevBtn?.onClick.RemoveAllListeners();
+
+        // ── NextDayBtn（右端固定、48px）──────────────────
+        var nextGO = CloneSrcBtn(wHdr?.Find("NextMonthBtn")?.gameObject, go.transform, "NextDayBtn", ">");
+        SetBtnRT(nextGO, ancLeft: false, width: 48f, vMgn: 4f, offset: 4f);
+        _nextBtn = nextGO?.GetComponent<Button>();
+        _nextBtn?.onClick.RemoveAllListeners();
+
+        // ── 月曜はじまり（右から 56px）──────────────────
+        var monGO = CloneSrcBtn(wHdr?.Find("WeekStartMonBtn")?.gameObject, go.transform, "WeekStartMonBtn", "月曜はじまり");
+        SetBtnRT(monGO, ancLeft: false, width: 108f, vMgn: 3f, offset: 56f);
+        _monBtn = monGO?.GetComponent<Button>();
+        _monBtn?.onClick.RemoveAllListeners();
+
+        // ── 日曜はじまり（右から 168px）─────────────────
+        var sunGO = CloneSrcBtn(wHdr?.Find("WeekStartSunBtn")?.gameObject, go.transform, "WeekStartSunBtn", "日曜はじまり");
+        SetBtnRT(sunGO, ancLeft: false, width: 108f, vMgn: 3f, offset: 168f);
+        _sunBtn = sunGO?.GetComponent<Button>();
+        _sunBtn?.onClick.RemoveAllListeners();
+
+        // ── DayLabel（ボタン間を充填）────────────────────
+        var lblGO = MakeGO("DayLabel", go.transform);
+        var lblRT = lblGO.GetComponent<RectTransform>();
+        lblRT.anchorMin = Vector2.zero; lblRT.anchorMax = Vector2.one;
+        lblRT.offsetMin = new Vector2(56f, 4f);
+        lblRT.offsetMax = new Vector2(-280f, -4f);
+        _dayLabel = lblGO.AddComponent<TextMeshProUGUI>();
+        var wWL = wHdr?.Find("WeekLabel")?.GetComponent<TextMeshProUGUI>();
+        if (wWL != null) { _dayLabel.font = wWL.font; _dayLabel.fontSize = wWL.fontSize; }
+        else _dayLabel.fontSize = 26f;
+        _dayLabel.color     = UITheme_FocusMode.TextBody;
+        _dayLabel.alignment = TextAlignmentOptions.Center;
+
+        NavHeaderStyler.Style(go.transform);  // Phase1: ヘッダー部品規格
+        return go;
+    }
+
+    /// <summary>Weekly ボタンをクローンしてテキストだけ差し替え</summary>
+    private static GameObject CloneSrcBtn(GameObject src, Transform parent, string name, string label)
+    {
+        if (src == null) return null;
+        var clone = UnityEngine.Object.Instantiate(src, parent, false);
+        clone.name = name;
+        var txt = clone.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (txt) txt.text = label;
+        return clone;
+    }
+
+    /// <summary>ボタンを左/右アンカー固定で配置</summary>
+    private static void SetBtnRT(GameObject go, bool ancLeft, float width, float vMgn, float offset)
+    {
+        if (go == null) return;
+        var rt = go.GetComponent<RectTransform>();
+        float ax = ancLeft ? 0f : 1f;
+        rt.anchorMin = new Vector2(ax, 0f); rt.anchorMax = new Vector2(ax, 1f);
+        rt.pivot     = new Vector2(ax, 0.5f);
+        rt.sizeDelta = new Vector2(width, -vMgn * 2f);
+        rt.anchoredPosition = new Vector2(ancLeft ? offset : -offset, 0f);
+    }
+    private Button MakeFallbackBtn(Transform parent, string name, string txt, float w)
+    {
+        var go  = MakeGO(name, parent);
+        var img = go.AddComponent<Image>(); img.color = new Color(1f,1f,1f,0.08f);
+        var btn = go.AddComponent<Button>(); btn.targetGraphic = img;
+        var le  = go.AddComponent<LayoutElement>(); le.preferredWidth = w; le.minWidth = w;
+        var tGO = MakeGO("Text", go.transform);
+        StretchRT(tGO);
+        var t = tGO.AddComponent<TextMeshProUGUI>();
+        t.text = txt; t.fontSize = 15f;
+        t.color = UITheme_FocusMode.TextBody; t.alignment = TextAlignmentOptions.Center;
+        t.raycastTarget = false;
+        return btn;
+    }
+
+    private TextMeshProUGUI MakeLabel(Transform parent, string name)
+    {
+        var go = MakeGO(name, parent);
+        go.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        var t = go.AddComponent<TextMeshProUGUI>();
+        t.fontSize = UITheme_FocusMode.FontSectionTitle;
+        t.color = UITheme_FocusMode.TextBody; t.alignment = TextAlignmentOptions.Center;
+        return t;
+    }
+
+    private GameObject BuildBodyArea(Transform parent)
+    {
+        var go  = MakeGO("BodyArea", parent);
+        go.AddComponent<Image>().color = Color.clear;
+        var hlg = go.AddComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.UpperLeft;
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = true;
+        hlg.spacing = 0f;
+        go.AddComponent<LayoutElement>().flexibleHeight = 1f;
+
+        BuildLeftPanel(go.transform);
+
+        // 縦境界線
+        var div  = MakeGO("BodyDivider", go.transform);
+        div.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
+        var divLE = div.AddComponent<LayoutElement>(); divLE.preferredWidth = 2f; divLE.minWidth = 2f;
+
+        BuildStickyPanel(go.transform);
+        return go;
+}
+
+    private void BuildLeftPanel(Transform parent)
+    {
+        var go  = MakeGO("LeftPanel", parent);
+        go.AddComponent<Image>().color = Color.clear;
+        go.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        // VLG を使わずアンカー直指定で各行を配置
+        const float hDow    = 56f;
+        const float hPolicy = 80f;
+        const float hNoTime = 92f;
+        float yOff = 0f;
+
+        _dowRow = BuildDowRow(go.transform);
+        var drRT = _dowRow.GetComponent<RectTransform>();
+        drRT.anchorMin = new Vector2(0f, 1f); drRT.anchorMax = new Vector2(1f, 1f);
+        drRT.pivot     = new Vector2(0.5f, 1f);
+        drRT.sizeDelta = new Vector2(0f, hDow);
+        drRT.anchoredPosition = new Vector2(0f, yOff);
+        yOff -= hDow;
+
+        _policyRow = BuildPolicyRow(go.transform);
+        var prRT = _policyRow.GetComponent<RectTransform>();
+        prRT.anchorMin = new Vector2(0f, 1f); prRT.anchorMax = new Vector2(1f, 1f);
+        prRT.pivot     = new Vector2(0.5f, 1f);
+        prRT.sizeDelta = new Vector2(0f, hPolicy);
+        prRT.anchoredPosition = new Vector2(0f, yOff);
+        yOff -= hPolicy;
+
+        _noTimeRow = BuildNoTimeRow(go.transform);
+        var ntRT = _noTimeRow.GetComponent<RectTransform>();
+        ntRT.anchorMin = new Vector2(0f, 1f); ntRT.anchorMax = new Vector2(1f, 1f);
+        ntRT.pivot     = new Vector2(0.5f, 1f);
+        ntRT.sizeDelta = new Vector2(0f, hNoTime);
+        ntRT.anchoredPosition = new Vector2(0f, yOff);
+        yOff -= hNoTime;
+
+        BuildTimelineScroll(go.transform);
+        var tsGO = go.transform.Find("TimelineScroll");
+        if (tsGO != null)
+        {
+            var tsRT = tsGO.GetComponent<RectTransform>();
+            tsRT.anchorMin = new Vector2(0f, 0f); tsRT.anchorMax = new Vector2(1f, 1f);
+            tsRT.pivot     = new Vector2(0.5f, 0.5f);
+            tsRT.offsetMin = new Vector2(0f, 0f);
+            tsRT.offsetMax = new Vector2(-3f, yOff); // 右 3px = スクロールバー幅
+
+            // 垂直スクロールバー追加
+            var vSb = BuildVScrollbar(go.transform, yOff);
+            if (vSb != null)
+            {
+                var sr = tsGO.GetComponent<ScrollRect>();
+                if (sr != null)
+                {
+                    sr.verticalScrollbar = vSb;
+                    sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+                }
+            }
+        }
+
+    }
+    // ─ DowRow ─────────────────────────────────────────────────
+    private Transform BuildDowRow(Transform parent)
+    {
+        var row = MakeHLGRow("DowRow", parent, DOW_ROW_H);
+
+        // TimeSpacer（ラベルなし）
+        MakeTimeSpacer(row, "");
+
+        // DayHeaderCell
+        var cell   = MakeGO("DayHeaderCell", row.transform);
+        _dayCellImg = cell.AddComponent<Image>(); _dayCellImg.color = Color.clear;
+        cell.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+        var dtGO = MakeGO("DowText", cell.transform);
+        var dtRT = dtGO.GetComponent<RectTransform>();
+        dtRT.anchorMin = new Vector2(0f,0.5f); dtRT.anchorMax = new Vector2(1f,1f);
+        dtRT.offsetMin = dtRT.offsetMax = Vector2.zero;
+        _dayDowTxt = dtGO.AddComponent<TextMeshProUGUI>();
+        _dayDowTxt.fontSize = UITheme_FocusMode.FontSectionTitle;
+        _dayDowTxt.alignment = TextAlignmentOptions.Center;
+
+        var dnGO = MakeGO("DateText", cell.transform);
+        var dnRT = dnGO.GetComponent<RectTransform>();
+        dnRT.anchorMin = new Vector2(0f,0f); dnRT.anchorMax = new Vector2(1f,0.5f);
+        dnRT.offsetMin = dnRT.offsetMax = Vector2.zero;
+        _dayDateTxt = dnGO.AddComponent<TextMeshProUGUI>();
+        _dayDateTxt.fontSize = UITheme_FocusMode.FontCalendarDate;
+        _dayDateTxt.alignment = TextAlignmentOptions.Center;
+
+        return row.transform;
+    }
+
+    // ─ PolicyRow ──────────────────────────────────────────────
+    private Transform BuildPolicyRow(Transform parent)
+    {
+        var row = MakeHLGRow("PolicyRow", parent, POLICY_ROW_H);
+        MakeTimeSpacer(row, "方針");
+
+        var cell = MakeGO("PolicyCell", row.transform);
+        cell.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        var img = cell.AddComponent<Image>(); img.color = new Color(1f,1f,1f,0.04f);
+        var btn = cell.AddComponent<Button>(); btn.targetGraphic = img;
+        var cb  = ColorBlock.defaultColorBlock;
+        cb.normalColor      = new Color(1f,1f,1f,0.04f);
+        cb.highlightedColor = new Color(0.314f,0.549f,1f,0.15f);
+        cb.pressedColor     = new Color(0.314f,0.549f,1f,0.25f);
+        cb.selectedColor    = new Color(0.314f,0.549f,1f,0.15f);
+        cb.colorMultiplier  = 1f; btn.colors = cb;
+
+        var lGO  = MakeGO("Label", cell.transform);
+        StretchRT(lGO, 8f, 0f);
+        var lbl  = lGO.AddComponent<TextMeshProUGUI>();
+        lbl.enableAutoSizing = true; lbl.fontSizeMin = 12f; lbl.fontSizeMax = 20f;
+        lbl.color = UITheme_FocusMode.TextMuted; lbl.alignment = TextAlignmentOptions.Center;
+        lbl.overflowMode = TextOverflowModes.Ellipsis; lbl.enableWordWrapping = false;
+        lbl.raycastTarget = false;
+
+        return row.transform;
+    }
+
+    // ─ NoTimeRow ──────────────────────────────────────────────
+    private Transform BuildNoTimeRow(Transform parent)
+    {
+        var row = MakeHLGRow("NoTimeRow", parent, NOTIME_ROW_H);
+        MakeTimeSpacer(row, "");
+
+        var col  = MakeGO("NoTimeCol_0", row.transform);
+        var cImg = col.AddComponent<Image>(); cImg.color = Color.clear;
+        col.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+        // 左縦罫線
+        var bdr   = MakeGO("ColBorder", col.transform);
+        var bdrRT = bdr.GetComponent<RectTransform>();
+        bdrRT.anchorMin = new Vector2(0f,0f); bdrRT.anchorMax = new Vector2(0f,1f);
+        bdrRT.sizeDelta = new Vector2(2f,0f); bdrRT.anchoredPosition = Vector2.zero;
+        bdr.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
+        bdr.AddComponent<LayoutElement>().ignoreLayout = true;
+
+        // Scroll > Viewport > Container
+        var sr    = MakeGO("Scroll", col.transform);
+        var srRT  = sr.GetComponent<RectTransform>();
+        srRT.anchorMin = Vector2.zero; srRT.anchorMax = Vector2.one; srRT.offsetMin = srRT.offsetMax = Vector2.zero;
+        var scroll = sr.AddComponent<ScrollRect>(); scroll.horizontal = false; scroll.vertical = false;
+
+        var vp   = MakeGO("Viewport", sr.transform);
+        var vpRT = vp.GetComponent<RectTransform>();
+        vpRT.anchorMin = Vector2.zero; vpRT.anchorMax = Vector2.one; vpRT.offsetMin = vpRT.offsetMax = Vector2.zero;
+        vp.AddComponent<RectMask2D>();
+
+        var ct   = MakeGO("Container", vp.transform);
+        var ctRT = ct.GetComponent<RectTransform>();
+        ctRT.anchorMin = new Vector2(0f,1f); ctRT.anchorMax = new Vector2(1f,1f);
+        ctRT.pivot = new Vector2(0.5f,1f); ctRT.sizeDelta = Vector2.zero;
+        var ctVLG = ct.AddComponent<VerticalLayoutGroup>();
+        ctVLG.childForceExpandWidth = true; ctVLG.childForceExpandHeight = false; ctVLG.spacing = 2f;
+        ct.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        scroll.content = ctRT;
+
+        return row.transform;
+    }
+
+    // ─ TimelineScroll ─────────────────────────────────────────
+    private void BuildTimelineScroll(Transform parent)
+    {
+        var go  = MakeGO("TimelineScroll", parent);
+        var le  = go.AddComponent<LayoutElement>(); le.flexibleHeight = 1f;
+        var sr  = go.AddComponent<ScrollRect>(); sr.horizontal = false; sr.vertical = true;
+        sr.scrollSensitivity = 60f;
+        sr.movementType = ScrollRect.MovementType.Clamped;
+
+        var vp  = MakeGO("Viewport", go.transform);
+        var vpRT = vp.GetComponent<RectTransform>();
+        vpRT.anchorMin = Vector2.zero; vpRT.anchorMax = Vector2.one; vpRT.offsetMin = vpRT.offsetMax = Vector2.zero;
+        vp.AddComponent<RectMask2D>();
+
+        var tl   = MakeGO("TimelineParent", vp.transform);
+        var tlRT = tl.GetComponent<RectTransform>();
+        tlRT.anchorMin = new Vector2(0f,1f); tlRT.anchorMax = new Vector2(1f,1f);
+        tlRT.pivot = new Vector2(0.5f,1f); tlRT.sizeDelta = Vector2.zero;
+
+        sr.content  = tlRT;
+        sr.viewport = vpRT;
+        _timelineScroll  = sr;
+        _timelineParent  = tl.transform;
+    }
+
+    /// <summary>TimelineScroll 右端の垂直スクロールバー</summary>
+    private Scrollbar BuildVScrollbar(Transform parent, float topOffset)
+    {
+        // topOffset: タイムライン開始位置までのオフセット（負値、例 -228）
+        // スクロールバーはタイムライン領域（0:00〜24:00）のみに表示
+        var sbGO = MakeGO("VScrollbar", parent);
+        var sbRT = sbGO.GetComponent<RectTransform>();
+
+        // Y ストレッチ: anchorMin.y=0 anchorMax.y=1
+        // X ポイント: anchorMin.x=anchorMax.x=1 (右端)
+        // offsetMin/Max で位置を指定（sizeDelta との競合を避ける）
+        sbRT.anchorMin = new Vector2(1f, 0f);
+        sbRT.anchorMax = new Vector2(1f, 1f);
+        sbRT.pivot     = new Vector2(1f, 0.5f);
+        // 幅 3px: X→ offsetMin.x=-3, offsetMax.x=0
+        // 高さ: bottom から parent.top+topOffset まで（タイムライン領域）
+        sbRT.offsetMin = new Vector2(-3f, 0f);
+        sbRT.offsetMax = new Vector2(0f, topOffset); // topOffset は負値
+
+        sbGO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.06f);
+        sbGO.AddComponent<RectMask2D>(); // Handle をトラック幅内にクリップ
+        var sb = sbGO.AddComponent<Scrollbar>();
+        sb.direction = Scrollbar.Direction.BottomToTop;
+
+        // Sliding Area
+        var saGO = MakeGO("Sliding Area", sbGO.transform);
+        var saRT = saGO.GetComponent<RectTransform>();
+        saRT.anchorMin = Vector2.zero; saRT.anchorMax = Vector2.one;
+        saRT.offsetMin = new Vector2(0f, 0f); saRT.offsetMax = new Vector2(0f, 0f);
+
+        // Handle
+        var hGO  = MakeGO("Handle", saGO.transform);
+        var hImg = hGO.AddComponent<Image>();
+        hImg.color = new Color(1f, 1f, 1f, 0.32f);
+        sb.handleRect    = hGO.GetComponent<RectTransform>();
+        sb.targetGraphic = hImg;
+
+        return sb;
+    }
+
+    // ── 付箋パネル ─────────────────────────────────────────────
+    private void BuildStickyPanel(Transform parent)
+    {
+        var sp  = MakeGO("StickyPanel", parent);
+        sp.AddComponent<Image>().color = new Color(1f,1f,1f,0.015f);
+        sp.AddComponent<LayoutElement>().flexibleWidth = 2f;
+
+        var sc  = MakeGO("StickyCanvas", sp.transform);
+        _stickyCanvas = sc.GetComponent<RectTransform>();
+        _stickyCanvas.anchorMin = Vector2.zero; _stickyCanvas.anchorMax = Vector2.one;
+        _stickyCanvas.offsetMin = _stickyCanvas.offsetMax = Vector2.zero;
+        _stickyCanvas.pivot = new Vector2(0f, 1f); // 左上原点
+
+        var bgImg = sc.AddComponent<Image>(); bgImg.color = new Color(0f,0f,0f,0f); bgImg.raycastTarget = true;
+
+        // クリック → 付箋生成（PointerClick EventTrigger）
+        var et    = sc.AddComponent<EventTrigger>();
+        var entry = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
+        entry.callback.AddListener((evData) =>
+        {
+            var ped = (PointerEventData)evData;
+            if (ped.dragging) return;
+            // 空白部分のクリックのみ（付箋 GO をクリックした場合は付箋側 Button が先に消費する）
+            if (ped.rawPointerPress != sc && ped.rawPointerPress != null &&
+                ped.rawPointerPress.transform.IsChildOf(sc.transform) &&
+                ped.rawPointerPress != sc) return;
+            Vector2 localPos;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _stickyCanvas, ped.position, ped.pressEventCamera, out localPos);
+            SpawnNewNote(localPos);
+        });
+        et.triggers.Add(entry);
+    }
+
+    // =========================================================
+    // SetupButtons
+    // =========================================================
     private void SetupButtons()
     {
-        prevDayBtn?.onClick.RemoveAllListeners();
-        nextDayBtn?.onClick.RemoveAllListeners();
-        prevDayBtn?.onClick.AddListener(() => { currentDate = currentDate.AddDays(-1); Refresh(); });
-        nextDayBtn?.onClick.AddListener(() => { currentDate = currentDate.AddDays(1);  Refresh(); });
+        _prevBtn?.onClick.RemoveAllListeners();
+        _nextBtn?.onClick.RemoveAllListeners();
+        _sunBtn?.onClick.RemoveAllListeners();
+        _monBtn?.onClick.RemoveAllListeners();
+
+        _prevBtn?.onClick.AddListener(() => { _currentDate = _currentDate.AddDays(-1); Refresh(); });
+        _nextBtn?.onClick.AddListener(() => { _currentDate = _currentDate.AddDays(1);  Refresh(); });
+        _sunBtn?.onClick.AddListener(() => { _weekStartDow = 0; UpdateToggle(); });
+        _monBtn?.onClick.AddListener(() => { _weekStartDow = 1; UpdateToggle(); });
+        UpdateToggle();
     }
 
+    private void UpdateToggle()
+    {
+        ApplyToggle(_sunBtn, _weekStartDow == 0);
+        ApplyToggle(_monBtn, _weekStartDow == 1);
+    }
+
+    private static void ApplyToggle(Button btn, bool on)
+    {
+        if (!btn) return;
+        var cb = btn.colors;
+        cb.normalColor      = on ? new Color(0.06f,0.59f,0.99f,0.60f) : new Color(1f,1f,1f,0.08f);
+        cb.highlightedColor = on ? new Color(0.06f,0.59f,0.99f,0.80f) : new Color(1f,1f,1f,0.16f);
+        cb.pressedColor     = on ? new Color(0.06f,0.59f,0.99f,0.45f) : new Color(1f,1f,1f,0.05f);
+        cb.selectedColor    = cb.normalColor; cb.colorMultiplier = 1f; btn.colors = cb;
+    }
+
+    // =========================================================
+    // Refresh
+    // =========================================================
     public void Refresh()
     {
+        if (!_scaffoldBuilt) return;
+        Canvas.ForceUpdateCanvases();
         UpdateDayLabel();
-        BuildTimeline();
-        // 右パネルを空状態に戻す
-        ShowEmpty();
+        RefreshDowRow();
+        RefreshPolicyRow();
+        RefreshNoTimeRow();
+        RefreshStickyNotes();
+        StopAllCoroutines();
+        StartCoroutine(BuildTimelineCo());
     }
 
-    // ─── 日付ラベル ───────────────────────────────────────
     private void UpdateDayLabel()
     {
-        if (dayLabel == null) return;
-        var dow = (int)currentDate.DayOfWeek;
-        dayLabel.text = $"{currentDate.Year}年{currentDate.Month}月{currentDate.Day}日（{DowLabels[dow]}）";
+        if (!_dayLabel) return;
+        int dow = (int)_currentDate.DayOfWeek;
+        _dayLabel.text = $"{_currentDate:yyyy/MM/dd}（{DOW_LABELS[dow]}）";
     }
 
-    // ─── タイムライン ─────────────────────────────────────
-    private void BuildTimeline()
+    // ── DowRow ────────────────────────────────────────────────
+    private void RefreshDowRow()
     {
-        if (timelineParent == null) return;
-        foreach (Transform child in timelineParent)
-            Destroy(child.gameObject);
+        if (!_dowRow) return;
+        int  dow       = (int)_currentDate.DayOfWeek;
+        bool isHoliday = HOLIDAY_KEYS.Contains(NotebookManager.DateKey(_currentDate));
+        bool isToday   = _currentDate.Date == DateTime.Now.Date;
+        bool isSun     = dow == 0 || isHoliday;
+        bool isSat     = dow == 6;
 
-        var events = NotebookManager.Instance != null
-            ? NotebookManager.Instance.GetEventsByDate(currentDate)
-            : new List<ScheduleEvent>();
-
-        for (int h = START_HOUR; h <= END_HOUR; h++)
+        if (_dayDowTxt)
         {
-            var rowGO  = new GameObject($"Row_{h:D2}", typeof(RectTransform));
-            rowGO.transform.SetParent(timelineParent, false);
-            var rowRT  = rowGO.GetComponent<RectTransform>();
-            rowRT.sizeDelta = new Vector2(0f, ROW_HEIGHT);
-
-            var rowHLG = rowGO.AddComponent<HorizontalLayoutGroup>();
-            rowHLG.childForceExpandWidth  = true;
-            rowHLG.childForceExpandHeight = true;
-            rowHLG.spacing = 0f;
-
-            // 時間ラベル
-            var lblGO  = new GameObject("Label", typeof(RectTransform));
-            lblGO.transform.SetParent(rowGO.transform, false);
-            var lblTxt = lblGO.AddComponent<TextMeshProUGUI>();
-            lblTxt.text      = $"{h:D2}";
-            lblTxt.fontSize  = UITheme_FocusMode.FontMicro;
-            lblTxt.color     = UITheme_FocusMode.TextDisabled;
-            lblTxt.alignment = TextAlignmentOptions.TopRight;
-            var lblLE  = lblGO.AddComponent<LayoutElement>();
-            lblLE.preferredWidth = 28f;
-            lblLE.flexibleWidth  = 0f;
-
-            // スロット
-            var slotGO  = new GameObject("Slot", typeof(RectTransform));
-            slotGO.transform.SetParent(rowGO.transform, false);
-            var slotImg = slotGO.AddComponent<Image>();
-            slotImg.color = new Color(1f, 1f, 1f, 0.01f);
-
-            // 上ボーダーライン
-            var lineGO  = new GameObject("Line", typeof(RectTransform));
-            lineGO.transform.SetParent(slotGO.transform, false);
-            var lineRT  = lineGO.GetComponent<RectTransform>();
-            lineRT.anchorMin = new Vector2(0f, 1f);
-            lineRT.anchorMax = new Vector2(1f, 1f);
-            lineRT.sizeDelta = new Vector2(0f, 0.5f);
-            lineRT.anchoredPosition = Vector2.zero;
-            var lineImg = lineGO.AddComponent<Image>();
-            lineImg.color = UITheme_FocusMode.BorderSubtle;
-
-            var slotVLG = slotGO.AddComponent<VerticalLayoutGroup>();
-            slotVLG.padding = new RectOffset(4, 4, 2, 2);
-            slotVLG.spacing = 2f;
-            slotVLG.childForceExpandWidth  = true;
-            slotVLG.childForceExpandHeight = false;
-
-            // この時間帯の予定
-            var hourEvs = events.Where(e =>
-            {
-                if (string.IsNullOrEmpty(e.time)) return false;
-                if (TimeSpan.TryParse(e.time, out var t))
-                    return t.Hours == h;
-                return false;
-            }).ToList();
-
-            if (hourEvs.Count > 0)
-            {
-                foreach (var ev in hourEvs)
-                    BuildTimelineEventBlock(slotGO.transform, ev);
-            }
-            else
-            {
-                // 空きスロット → クリックで追加フォーム
-                var btn = slotGO.AddComponent<Button>();
-                btn.targetGraphic = slotImg;
-                int capturedH = h;
-                btn.onClick.AddListener(() => ShowAddForm($"{capturedH:D2}:00"));
-            }
+            _dayDowTxt.text  = DOW_LABELS[dow];
+            _dayDowTxt.color = isSun ? UITheme_FocusMode.AccentRed
+                              : isSat ? UITheme_FocusMode.AccentSatBlue
+                              : UITheme_FocusMode.TextMuted;
         }
-    }
-
-    private void BuildTimelineEventBlock(Transform parent, ScheduleEvent ev)
-    {
-        var tag     = TagConfig.GetById(ev.tagId);
-        var blockGO = new GameObject("EventBlock", typeof(RectTransform));
-        blockGO.transform.SetParent(parent, false);
-
-        var blockImg = blockGO.AddComponent<Image>();
-        blockImg.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
-
-        // 左ボーダー
-        var bdrGO  = new GameObject("Border", typeof(RectTransform));
-        bdrGO.transform.SetParent(blockGO.transform, false);
-        var bdrRT  = bdrGO.GetComponent<RectTransform>();
-        bdrRT.anchorMin = new Vector2(0f, 0f);
-        bdrRT.anchorMax = new Vector2(0f, 1f);
-        bdrRT.sizeDelta = new Vector2(2f, 0f);
-        var bdrImg = bdrGO.AddComponent<Image>();
-        bdrImg.color = tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
-
-        // コンテンツ
-        var ctnGO  = new GameObject("Content", typeof(RectTransform));
-        ctnGO.transform.SetParent(blockGO.transform, false);
-        var ctnRT  = ctnGO.GetComponent<RectTransform>();
-        ctnRT.anchorMin = new Vector2(0f, 0f);
-        ctnRT.anchorMax = new Vector2(1f, 1f);
-        ctnRT.offsetMin = new Vector2(6f, 2f);
-        ctnRT.offsetMax = new Vector2(-2f, -2f);
-        var ctnVLG = ctnGO.AddComponent<VerticalLayoutGroup>();
-        ctnVLG.childForceExpandWidth  = true;
-        ctnVLG.childForceExpandHeight = false;
-        ctnVLG.spacing = 1f;
-
-        var titleGO  = new GameObject("Title", typeof(RectTransform));
-        titleGO.transform.SetParent(ctnGO.transform, false);
-        var titleTxt = titleGO.AddComponent<TextMeshProUGUI>();
-        titleTxt.text      = ev.title;
-        titleTxt.fontSize  = UITheme_FocusMode.FontBody;
-        titleTxt.color     = Color.white;
-        titleTxt.fontStyle = FontStyles.Bold;
-        titleTxt.overflowMode = TextOverflowModes.Ellipsis;
-        titleGO.AddComponent<LayoutElement>().preferredHeight = 16f;
-
-        var timeGO  = new GameObject("Time", typeof(RectTransform));
-        timeGO.transform.SetParent(ctnGO.transform, false);
-        var timeTxt = timeGO.AddComponent<TextMeshProUGUI>();
-        timeTxt.text     = ev.time ?? "";
-        timeTxt.fontSize = UITheme_FocusMode.FontMicro;
-        timeTxt.color    = UITheme_FocusMode.WithAlpha(Color.white, 0.6f);
-        timeGO.AddComponent<LayoutElement>().preferredHeight = 13f;
-
-        var btn = blockGO.AddComponent<Button>();
-        btn.targetGraphic = blockImg;
-        var captured = ev;
-        btn.onClick.AddListener(() => ShowEventDetail(captured));
-
-        blockGO.AddComponent<LayoutElement>().preferredHeight = ROW_HEIGHT - 6f;
-    }
-
-    // ─── 右パネル：空状態 ─────────────────────────────────
-    private void ShowEmpty()
-    {
-        selectedEvent = null;
-        pendingTime   = null;
-        if (detailTitle     != null) detailTitle.text = "予定を選択";
-        if (detailEmptyText != null) detailEmptyText.gameObject.SetActive(true);
-        if (detailFooter    != null) detailFooter.SetActive(false);
-        ClearDetailContent();
-    }
-
-    // ─── 右パネル：予定詳細 ───────────────────────────────
-    private void ShowEventDetail(ScheduleEvent ev)
-    {
-        selectedEvent = ev;
-        pendingTime   = null;
-        if (detailEmptyText != null) detailEmptyText.gameObject.SetActive(false);
-        if (detailTitle     != null) detailTitle.text = ev.title;
-        ClearDetailContent();
-        BuildDetailFields(ev);
-        SetupDetailFooter(isEdit: false);
-    }
-
-    private void BuildDetailFields(ScheduleEvent ev)
-    {
-        if (detailContent == null) return;
-        var tag = TagConfig.GetById(ev.tagId);
-
-        // タグバッジ
-        if (tag != null) AppendBadge(tag);
-
-        // 時間
-        if (!string.IsNullOrEmpty(ev.time))
-            AppendField("時間", ev.time + (string.IsNullOrEmpty(ev.endTime) ? "" : $" 〜 {ev.endTime}"));
-
-        // 内容
-        if (!string.IsNullOrEmpty(ev.memo))
-            AppendField("内容", ev.memo);
-    }
-
-    // ─── 右パネル：追加フォーム ───────────────────────────
-    private void ShowAddForm(string time)
-    {
-        selectedEvent = null;
-        pendingTime   = time;
-        if (detailEmptyText != null) detailEmptyText.gameObject.SetActive(false);
-        if (detailTitle     != null) detailTitle.text = $"{time} に予定を追加";
-        ClearDetailContent();
-        BuildAddFormFields(time);
-        SetupDetailFooter(isEdit: true);
-    }
-
-    private void BuildAddFormFields(string time)
-    {
-        if (detailContent == null) return;
-
-        // タグ選択
-        var tagRow = AppendLabelRow("タグ");
-        var tagSelGO = new GameObject("TagSel", typeof(RectTransform));
-        tagSelGO.transform.SetParent(tagRow.transform, false);
-        var tagHLG = tagSelGO.AddComponent<HorizontalLayoutGroup>();
-        tagHLG.spacing = 4f;
-        tagHLG.childForceExpandWidth  = false;
-        tagHLG.childForceExpandHeight = false;
-        tagSelGO.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        string selTagId = "todo";
-        var tagBtns = new List<(Button b, Image img, string id)>();
-        foreach (var td in TagConfig.Tags)
+        if (_dayDateTxt)
         {
-            var tbGO  = new GameObject(td.id, typeof(RectTransform));
-            tbGO.transform.SetParent(tagSelGO.transform, false);
-            var tbImg = tbGO.AddComponent<Image>();
-            tbImg.color = UITheme_FocusMode.InputBG;
-            var tbBtn = tbGO.AddComponent<Button>();
-            tbGO.AddComponent<LayoutElement>().preferredHeight = 22f;
-            var tbTGO = new GameObject("Text", typeof(RectTransform));
-            tbTGO.transform.SetParent(tbGO.transform, false);
-            var tbTRT = tbTGO.GetComponent<RectTransform>();
-            tbTRT.anchorMin = Vector2.zero; tbTRT.anchorMax = Vector2.one;
-            tbTRT.offsetMin = new Vector2(8f,0f); tbTRT.offsetMax = new Vector2(-8f,0f);
-            var tbTxt = tbTGO.AddComponent<TextMeshProUGUI>();
-            tbTxt.text = td.displayName;
-            tbTxt.fontSize = UITheme_FocusMode.FontCaption;
-            tbTxt.alignment = TextAlignmentOptions.Center;
-            tagBtns.Add((tbBtn, tbImg, td.id));
+            _dayDateTxt.text  = _currentDate.Day.ToString();
+            _dayDateTxt.color = isToday ? Color.white
+                               : isSun  ? UITheme_FocusMode.AccentRed
+                               : isSat  ? UITheme_FocusMode.AccentSatBlue
+                               : UITheme_FocusMode.TextBody;
+            _dayDateTxt.fontStyle = isToday ? FontStyles.Bold : FontStyles.Normal;
         }
-        void UpdateTagBtns(string id)
-        {
-            selTagId = id;
-            foreach (var (b, img, bid) in tagBtns)
-            {
-                var td2 = TagConfig.GetById(bid);
-                img.color = bid == id ? td2.selectorBG : UITheme_FocusMode.InputBG;
-            }
-        }
-        foreach (var (b, img, id) in tagBtns)
-        { var cap = id; b.onClick.AddListener(() => UpdateTagBtns(cap)); }
-        UpdateTagBtns(selTagId);
+        if (_dayCellImg)
+            _dayCellImg.color = isToday ? UITheme_FocusMode.AccentBlueFaint : Color.clear;
 
-        // タイトル
-        var titleInput = AppendInputField("タイトル", "");
-        // 時間（自動入力済み）
-        var timeInput  = AppendInputField("時間", time);
-        // 内容
-        var memoInput  = AppendInputField("内容", "");
+        AddBorder(_dowRow, false);
+    }
 
-        // フッターに保存処理を設定
-        detailSaveBtn?.onClick.RemoveAllListeners();
-        detailSaveBtn?.onClick.AddListener(() =>
+    // ── PolicyRow ─────────────────────────────────────────────
+    private void RefreshPolicyRow()
+    {
+        if (!_policyRow) return;
+        var cell = _policyRow.Find("PolicyCell");
+        if (!cell) return;
+        var lbl  = cell.Find("Label")?.GetComponent<TextMeshProUGUI>();
+        var btn  = cell.GetComponent<Button>();
+        if (!lbl || !btn) return;
+
+        string dk   = NotebookManager.DateKey(_currentDate);
+        string cur  = NotebookManager.Instance?.GetWeeklyMemo(dk) ?? "";
+        lbl.text  = cur;
+        lbl.color = cur == "" ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextBody;
+        btn.onClick.RemoveAllListeners();
+        btn.onClick.AddListener(() =>
         {
-            var t = titleInput.text.Trim();
-            if (string.IsNullOrEmpty(t)) return;
-            var dateKey = NotebookManager.DateKey(currentDate);
-            NotebookManager.Instance?.AddEvent(selTagId, t, dateKey, timeInput.text.Trim(), memoInput.text.Trim());
-            Refresh();
+            var now = NotebookManager.Instance?.GetWeeklyMemo(dk) ?? "";
+            int idx = Array.IndexOf(POLICY_OPTIONS, now);
+            if (idx < 0) idx = 0;
+            idx = (idx + 1) % POLICY_OPTIONS.Length;
+            var next = POLICY_OPTIONS[idx];
+            NotebookManager.Instance?.SetWeeklyMemo(dk, next);
+            lbl.text  = next;
+            lbl.color = next == "" ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextBody;
+        });
+        AddBorder(_policyRow, true); AddBorder(_policyRow, false);
+        AddTimeSeparator(_policyRow);
+    }
+
+    // ── NoTimeRow ─────────────────────────────────────────────
+    private void RefreshNoTimeRow()
+    {
+        if (!_noTimeRow) return;
+        var col = _noTimeRow.Find("NoTimeCol_0");
+        if (!col) return;
+        var ct  = col.Find("Scroll/Viewport/Container");
+        if (!ct) return;
+        foreach (Transform c in ct) Destroy(c.gameObject);
+
+        string dk  = NotebookManager.DateKey(_currentDate);
+        var evs    = NotebookManager.Instance?.GetEventsByDate(_currentDate) ?? new List<ScheduleEvent>();
+        var noTime = evs.Where(e => string.IsNullOrEmpty(e.time)).ToList();
+
+        // 空白クリック → 追加フォーム
+        var colBtn = col.GetComponent<Button>() ?? col.gameObject.AddComponent<Button>();
+        colBtn.targetGraphic = col.GetComponent<Image>();
+        colBtn.onClick.RemoveAllListeners();
+        colBtn.onClick.AddListener(() => OpenAddForm(dk, null));
+
+        int show = Mathf.Min(noTime.Count, NOTIME_VISIBLE);
+        for (int i = 0; i < show; i++) AddNoTimeChip(ct, noTime[i]);
+        if (noTime.Count > show) AddMoreChip(ct, noTime.Count - show, dk, noTime);
+
+        AddBorder(_noTimeRow, true); AddBorder(_noTimeRow, false);
+    }
+
+    private void AddNoTimeChip(Transform ct, ScheduleEvent ev)
+    {
+        var tag    = TagConfig.GetById(ev.tagId);
+        var go     = MakeGO("Chip", ct);
+        go.AddComponent<LayoutElement>().preferredHeight = NOTIME_ITEM_H;
+        var img    = go.AddComponent<Image>(); img.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        var tGO    = MakeGO("Text", go.transform); StretchRT(tGO, 5f, 2f);
+        var txt    = tGO.AddComponent<TextMeshProUGUI>();
+        txt.text   = ev.title; txt.fontSize = UITheme_FocusMode.FontChipTitle;
+        txt.color  = Color.white; txt.enableWordWrapping = false;
+        txt.overflowMode = TextOverflowModes.Ellipsis;
+        txt.alignment = TextAlignmentOptions.MidlineLeft; txt.raycastTarget = false;
+        var btn    = go.AddComponent<Button>(); btn.targetGraphic = img;
+        var cap    = ev;
+        btn.onClick.AddListener(() => OpenEditForm(cap));
+    }
+
+    private void AddMoreChip(Transform ct, int extra, string dk, List<ScheduleEvent> allEvs)
+    {
+        var go   = MakeGO("MoreLabel", ct);
+        go.AddComponent<LayoutElement>().preferredHeight = NOTIME_ITEM_H;
+        var bg   = go.AddComponent<Image>(); bg.color = Color.clear;
+        var btn  = go.AddComponent<Button>(); btn.targetGraphic = bg;
+        var tGO  = MakeGO("Text", go.transform); StretchRT(tGO, 5f, 0f);
+        var txt  = tGO.AddComponent<TextMeshProUGUI>();
+        txt.text = $"他 {extra} 件"; txt.fontSize = UITheme_FocusMode.FontMoreLabel;
+        txt.color = UITheme_FocusMode.AccentSatBlue;
+        txt.alignment = TextAlignmentOptions.MidlineLeft; txt.raycastTarget = false;
+        var capRT  = go.GetComponent<RectTransform>();
+        var capEvs = new List<ScheduleEvent>(allEvs);
+        string capDk = dk;
+        btn.onClick.AddListener(() =>
+        {
+            if (!_dayEventsPopup) return;
+            var corners = new Vector3[4]; capRT.GetWorldCorners(corners);
+            var sp = new Vector2((corners[0].x + corners[2].x)*0.5f, (corners[0].y + corners[2].y)*0.5f);
+            _dayEventsPopup.Show(capDk, capEvs, OpenEditForm, sp);
         });
     }
 
-    // ─── フッター設定 ─────────────────────────────────────
-    private void SetupDetailFooter(bool isEdit)
+    // ── タイムライン ──────────────────────────────────────────
+    private IEnumerator BuildTimelineCo()
     {
-        if (detailFooter != null) detailFooter.SetActive(true);
-        if (!isEdit && selectedEvent != null)
+        var kills = new List<Transform>();
+        foreach (Transform c in _timelineParent) kills.Add(c);
+        foreach (var c in kills) Destroy(c.gameObject);
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+
+        var tlRT = _timelineParent.GetComponent<RectTransform>();
+        float w  = tlRT != null ? tlRT.rect.width : 600f;
+        if (w < 10f) w = 600f;
+
+        float totalH = HOUR_COUNT * HOUR_HEIGHT;
+        if (tlRT) tlRT.sizeDelta = new Vector2(tlRT.sizeDelta.x, totalH);
+
+        string dk  = NotebookManager.DateKey(_currentDate);
+        var evs    = NotebookManager.Instance?.GetEventsByDate(_currentDate) ?? new List<ScheduleEvent>();
+        var timed  = evs.Where(e => !string.IsNullOrEmpty(e.time)).ToList();
+        float colW = w - TIME_COL_W;
+        bool  today = _currentDate.Date == DateTime.Now.Date;
+
+        BuildTimeLabels(totalH);
+        BuildDayColumn(dk, colW, totalH, today, timed);
+        if (today) BuildNowLine(colW);
+
+        if (today)
         {
-            detailSaveBtn?.onClick.RemoveAllListeners();
-            detailDeleteBtn?.onClick.RemoveAllListeners();
-            detailSaveBtn?.onClick.AddListener(() => { /* 編集は FloatingWindow で */ });
-            detailDeleteBtn?.onClick.AddListener(() =>
-            {
-                if (selectedEvent != null)
-                    NotebookManager.Instance?.DeleteEvent(selectedEvent.id);
-                Refresh();
-            });
+            yield return null;
+            float nowH = Mathf.Clamp(DateTime.Now.Hour - 1f, 0f, HOUR_COUNT);
+            _timelineScroll.verticalNormalizedPosition = Mathf.Clamp01(1f - nowH * HOUR_HEIGHT / totalH);
         }
-        else if (!isEdit)
+    }
+
+    private void BuildTimeLabels(float totalH)
+    {
+        var go   = MakeGO("TimeLabels", _timelineParent);
+        var rt   = go.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f,1f); rt.anchorMax = new Vector2(0f,1f);
+        rt.pivot = new Vector2(0f,1f); rt.sizeDelta = new Vector2(TIME_COL_W, totalH); rt.anchoredPosition = Vector2.zero;
+
+        for (int h = 0; h <= HOUR_COUNT; h++)
         {
-            if (detailFooter != null) detailFooter.SetActive(false);
+            var lb   = MakeGO($"H{h:D2}", go.transform);
+            var lbRT = lb.GetComponent<RectTransform>();
+            lbRT.anchorMin = new Vector2(0f,1f); lbRT.anchorMax = new Vector2(1f,1f);
+            lbRT.pivot = new Vector2(0.5f,1f);
+            lbRT.sizeDelta = new Vector2(-4f, HOUR_HEIGHT);
+            lbRT.anchoredPosition = new Vector2(0f, -h * HOUR_HEIGHT);
+            var t = lb.AddComponent<TextMeshProUGUI>();
+            t.text = $"{h:D2}:00"; t.fontSize = UITheme_FocusMode.FontSectionTitle;
+            t.color = UITheme_FocusMode.TextBody; t.alignment = TextAlignmentOptions.TopRight;
         }
     }
 
-    // ─── 右パネルUIヘルパー ───────────────────────────────
-    private void ClearDetailContent()
+    private void BuildDayColumn(string dk, float colW, float totalH, bool isToday, List<ScheduleEvent> evs)
     {
-        if (detailContent == null) return;
-        foreach (Transform child in detailContent)
-            Destroy(child.gameObject);
+        var col   = MakeGO("DayCol", _timelineParent);
+        var colRT = col.GetComponent<RectTransform>();
+        colRT.anchorMin = new Vector2(0f,1f); colRT.anchorMax = new Vector2(0f,1f);
+        colRT.pivot = new Vector2(0f,1f);
+        colRT.sizeDelta = new Vector2(colW, totalH);
+        colRT.anchoredPosition = new Vector2(TIME_COL_W, 0f);
+
+        // ── ドラッグで時間範囲を選択してアイテム追加（Google Cal 風）────
+        var dragCreator = col.AddComponent<TimelineDragCreator>();
+        string dragDk   = dk;
+        dragCreator.Setup(dragDk, HOUR_COUNT, HOUR_HEIGHT,
+            (dk2, st, en) => OpenAddForm(dk2, st, en));
+
+        if (isToday)
+        {
+            var bg   = MakeGO("TodayBG", col.transform);
+            var bgRT = bg.GetComponent<RectTransform>();
+            bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one; bgRT.offsetMin = bgRT.offsetMax = Vector2.zero;
+            bg.AddComponent<Image>().color = UITheme_FocusMode.AccentBlueFaint;
+        }
+
+        for (int h = 0; h < HOUR_COUNT; h++)
+        {
+            var sl   = MakeGO($"Slot_{h:D2}", col.transform);
+            var slRT = sl.GetComponent<RectTransform>();
+            slRT.anchorMin = new Vector2(0f,1f); slRT.anchorMax = new Vector2(1f,1f);
+            slRT.pivot = new Vector2(0.5f,1f);
+            slRT.sizeDelta = new Vector2(0f, HOUR_HEIGHT);
+            slRT.anchoredPosition = new Vector2(0f, -h * HOUR_HEIGHT);
+
+            var ln   = MakeGO("HLine", sl.transform);
+            var lnRT = ln.GetComponent<RectTransform>();
+            lnRT.anchorMin = new Vector2(0f,1f); lnRT.anchorMax = new Vector2(1f,1f);
+            lnRT.pivot = new Vector2(0.5f,1f); lnRT.sizeDelta = new Vector2(0f,2f); lnRT.anchoredPosition = Vector2.zero;
+            var lnImg = ln.AddComponent<Image>();
+            lnImg.color = h % 2 == 0 ? UITheme_FocusMode.BorderDivider : UITheme_FocusMode.BorderSubtle;
+            lnImg.raycastTarget = false;
+
+            var slImg = sl.AddComponent<Image>(); slImg.color = Color.clear;
+            var btn   = sl.AddComponent<Button>(); btn.targetGraphic = slImg;
+            int   capH = h; string capDk = dk;
+            btn.onClick.AddListener(() => OpenAddForm(capDk, $"{capH:D2}:00"));
+        }
+
+        // 終端線
+        var el   = MakeGO("EndLine", col.transform);
+        var elRT = el.GetComponent<RectTransform>();
+        elRT.anchorMin = new Vector2(0f,1f); elRT.anchorMax = new Vector2(1f,1f);
+        elRT.pivot = new Vector2(0.5f,1f); elRT.sizeDelta = new Vector2(0f,2f);
+        elRT.anchoredPosition = new Vector2(0f, -HOUR_COUNT * HOUR_HEIGHT);
+        el.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
+
+        foreach (var (ev, lane, lanes) in AssignLanes(evs)) BuildBlock(col.transform, ev, colW, lane, lanes);
+
+        // 縦境界線
+        var cb   = MakeGO("ColBorder", col.transform);
+        var cbRT = cb.GetComponent<RectTransform>();
+        cbRT.anchorMin = new Vector2(0f,0f); cbRT.anchorMax = new Vector2(0f,1f);
+        cbRT.sizeDelta = new Vector2(2f,0f); cbRT.anchoredPosition = Vector2.zero;
+        cb.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
     }
 
-    private void AppendBadge(TagDefinition tag)
+    private void BuildNowLine(float colW)
     {
-        var go  = new GameObject("Badge", typeof(RectTransform));
-        go.transform.SetParent(detailContent, false);
-        var img = go.AddComponent<Image>();
-        img.color = tag.badgeBG;
-        var le  = go.AddComponent<LayoutElement>();
-        le.preferredHeight = 22f; le.preferredWidth = 60f;
-        var tGO = new GameObject("Text", typeof(RectTransform));
-        tGO.transform.SetParent(go.transform, false);
-        var tRT = tGO.GetComponent<RectTransform>();
-        tRT.anchorMin = Vector2.zero; tRT.anchorMax = Vector2.one;
-        tRT.offsetMin = new Vector2(8f,0f); tRT.offsetMax = new Vector2(-8f,0f);
-        var t   = tGO.AddComponent<TextMeshProUGUI>();
-        t.text  = tag.displayName;
-        t.fontSize = UITheme_FocusMode.FontCaption;
-        t.color = tag.badgeText;
-        t.alignment = TextAlignmentOptions.Center;
+        float nowH = DateTime.Now.Hour + DateTime.Now.Minute / 60f;
+        var ln   = MakeGO("NowLine", _timelineParent);
+        var lnRT = ln.GetComponent<RectTransform>();
+        lnRT.anchorMin = new Vector2(0f,1f); lnRT.anchorMax = new Vector2(0f,1f);
+        lnRT.pivot = new Vector2(0f,0.5f);
+        lnRT.sizeDelta = new Vector2(colW, 2f);
+        lnRT.anchoredPosition = new Vector2(TIME_COL_W, -nowH * HOUR_HEIGHT);
+        ln.AddComponent<Image>().color = UITheme_FocusMode.AccentRed;
+
+        var dt   = MakeGO("Dot", ln.transform);
+        var dtRT = dt.GetComponent<RectTransform>();
+        dtRT.anchorMin = new Vector2(0f,0.5f); dtRT.anchorMax = new Vector2(0f,0.5f);
+        dtRT.sizeDelta = new Vector2(8f,8f); dtRT.anchoredPosition = new Vector2(-4f,0f);
+        dt.AddComponent<Image>().color = UITheme_FocusMode.AccentRed;
     }
 
-    private void AppendField(string label, string value)
+    private List<(ScheduleEvent, int, int)> AssignLanes(List<ScheduleEvent> evs)
     {
-        var row = AppendLabelRow(label);
-        var valGO = new GameObject("Value", typeof(RectTransform));
-        valGO.transform.SetParent(row.transform, false);
-        var valImg = valGO.AddComponent<Image>();
-        valImg.color = UITheme_FocusMode.InputBG;
-        valGO.AddComponent<LayoutElement>().preferredHeight = 28f;
-        var tGO = new GameObject("Text", typeof(RectTransform));
-        tGO.transform.SetParent(valGO.transform, false);
-        var tRT = tGO.GetComponent<RectTransform>();
-        tRT.anchorMin = Vector2.zero; tRT.anchorMax = Vector2.one;
-        tRT.offsetMin = new Vector2(8f,0f); tRT.offsetMax = new Vector2(-8f,0f);
-        var t   = tGO.AddComponent<TextMeshProUGUI>();
-        t.text  = value;
-        t.fontSize = UITheme_FocusMode.FontBody;
-        t.color = UITheme_FocusMode.TextBody;
-        t.enableWordWrapping = true;
+        var sorted   = evs.OrderBy(e => e.time).ToList();
+        var laneEnds = new List<float>();
+        var assigned = new Dictionary<string,int>();
+        foreach (var ev in sorted)
+        {
+            float s = ParseH(ev.time); if (s < 0) continue;
+            float e = string.IsNullOrEmpty(ev.endTime) ? s + 1f : Mathf.Max(ParseH(ev.endTime), s + 0.25f);
+            int   l = -1;
+            for (int i = 0; i < laneEnds.Count; i++)
+                if (s >= laneEnds[i] - 0.01f) { l = i; laneEnds[i] = e; break; }
+            if (l < 0) { l = laneEnds.Count; laneEnds.Add(e); }
+            assigned[ev.id] = l;
+        }
+        int maxL = Mathf.Max(1, laneEnds.Count);
+        var res = new List<(ScheduleEvent,int,int)>();
+        foreach (var ev in sorted)
+            if (assigned.TryGetValue(ev.id, out int l)) res.Add((ev, l, maxL));
+        return res;
     }
 
-    private TMP_InputField AppendInputField(string label, string defaultVal)
+    private void BuildBlock(Transform parent, ScheduleEvent ev, float colW, int lane, int lanes)
     {
-        var row    = AppendLabelRow(label);
-        var fieldGO= new GameObject("Input", typeof(RectTransform));
-        fieldGO.transform.SetParent(row.transform, false);
-        var fImg   = fieldGO.AddComponent<Image>();
-        fImg.color = UITheme_FocusMode.InputBG;
-        var field  = fieldGO.AddComponent<TMP_InputField>();
-        field.text = defaultVal;
-        fieldGO.AddComponent<LayoutElement>().preferredHeight = 28f;
+        float s  = ParseH(ev.time); if (s < 0) return;
+        float e  = string.IsNullOrEmpty(ev.endTime) ? s + 1f : Mathf.Max(ParseH(ev.endTime), s + 0.25f);
+        float bH = Mathf.Max((e - s) * HOUR_HEIGHT - 2f, 16f);
+        float lW = lanes > 1 ? (colW - 2f) / lanes : colW - 2f;
+        float lX = 1f + lane * lW;
+        var   tag = TagConfig.GetById(ev.tagId);
 
-        var taGO   = new GameObject("TextArea", typeof(RectTransform));
-        taGO.transform.SetParent(fieldGO.transform, false);
-        var taRT   = taGO.GetComponent<RectTransform>();
-        taRT.anchorMin = Vector2.zero; taRT.anchorMax = Vector2.one;
-        taRT.offsetMin = new Vector2(6f,0f); taRT.offsetMax = new Vector2(-6f,0f);
-        taGO.AddComponent<RectMask2D>();
+        var bk   = MakeGO("EventBlock", parent);
+        var bkRT = bk.GetComponent<RectTransform>();
+        bkRT.anchorMin = new Vector2(0f,1f); bkRT.anchorMax = new Vector2(0f,1f);
+        bkRT.pivot = new Vector2(0f,1f);
+        bkRT.sizeDelta = new Vector2(lW - 1f, bH);
+        bkRT.anchoredPosition = new Vector2(lX, -s * HOUR_HEIGHT - 1f);
+        var bkImg = bk.AddComponent<Image>(); bkImg.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
 
-        var phGO   = new GameObject("Placeholder", typeof(RectTransform));
-        phGO.transform.SetParent(taGO.transform, false);
-        var phRT   = phGO.GetComponent<RectTransform>();
-        phRT.anchorMin = Vector2.zero; phRT.anchorMax = Vector2.one;
-        phRT.offsetMin = phRT.offsetMax = Vector2.zero;
-        var ph     = phGO.AddComponent<TextMeshProUGUI>();
-        ph.fontSize = UITheme_FocusMode.FontBody;
-        ph.color    = UITheme_FocusMode.TextPlaceholder;
+        var bd   = MakeGO("Border", bk.transform);
+        var bdRT = bd.GetComponent<RectTransform>();
+        bdRT.anchorMin = new Vector2(0f,0f); bdRT.anchorMax = new Vector2(0f,1f);
+        bdRT.sizeDelta = new Vector2(2.5f,0f); bdRT.anchoredPosition = Vector2.zero;
+        bd.AddComponent<Image>().color = tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
 
-        var txtGO  = new GameObject("Text", typeof(RectTransform));
-        txtGO.transform.SetParent(taGO.transform, false);
-        var txtRT  = txtGO.GetComponent<RectTransform>();
-        txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one;
-        txtRT.offsetMin = txtRT.offsetMax = Vector2.zero;
-        var txt    = txtGO.AddComponent<TextMeshProUGUI>();
-        txt.fontSize = UITheme_FocusMode.FontBody;
-        txt.color    = UITheme_FocusMode.TextBody;
+        var tx   = MakeGO("Title", bk.transform); StretchRT(tx, 5f, 2f);
+        var tTxt = tx.AddComponent<TextMeshProUGUI>();
+        tTxt.text = ev.title; tTxt.fontSize = UITheme_FocusMode.FontChipTitle;
+        tTxt.color = Color.white; tTxt.fontStyle = FontStyles.Bold;
+        tTxt.overflowMode = TextOverflowModes.Ellipsis; tTxt.raycastTarget = false;
 
-        field.textViewport  = taRT;
-        field.placeholder   = ph;
-        field.textComponent = txt;
-        return field;
+        var btn = bk.AddComponent<Button>(); btn.targetGraphic = bkImg;
+        var cap = ev; btn.onClick.AddListener(() => OpenEditForm(cap));
     }
 
-    private GameObject AppendLabelRow(string label)
+    // ── 付箋 ─────────────────────────────────────────────────
+    private void RefreshStickyNotes()
     {
-        var rowGO  = new GameObject(label + "Row", typeof(RectTransform));
-        rowGO.transform.SetParent(detailContent, false);
-        var rowVLG = rowGO.AddComponent<VerticalLayoutGroup>();
-        rowVLG.spacing = 3f;
-        rowVLG.childForceExpandWidth  = true;
-        rowVLG.childForceExpandHeight = false;
-        rowGO.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-        var lblGO  = new GameObject("Label", typeof(RectTransform));
-        lblGO.transform.SetParent(rowGO.transform, false);
-        var lbl    = lblGO.AddComponent<TextMeshProUGUI>();
-        lbl.text   = label;
-        lbl.fontSize = UITheme_FocusMode.FontCaption;
-        lbl.color    = UITheme_FocusMode.TextCaption;
-        lblGO.AddComponent<LayoutElement>().preferredHeight = 14f;
-        return rowGO;
+        if (!_stickyCanvas) return;
+        Canvas.ForceUpdateCanvases();
+        // 既存付箋を削除（StickyNote コンポーネントを持つ子のみ）
+        var kill = new List<GameObject>();
+        foreach (Transform c in _stickyCanvas)
+            if (c.GetComponent<StickyNote>() != null) kill.Add(c.gameObject);
+        foreach (var g in kill) Destroy(g);
+
+        string dk   = NotebookManager.DateKey(_currentDate);
+        var notes   = NotebookManager.Instance?.GetStickyNotes(dk) ?? new List<StickyNoteData>();
+        var canvas  = GetComponentInParent<Canvas>();
+        foreach (var n in notes) SpawnStickyNote(n, canvas);
+    }
+
+    private void SpawnNewNote(Vector2 localPos)
+    {
+        if (_blockNextNoteSpawn) { _blockNextNoteSpawn = false; return; }
+        Canvas.ForceUpdateCanvases();
+        string dk     = NotebookManager.DateKey(_currentDate);
+        var    canvas = GetComponentInParent<Canvas>();
+
+        var go   = new GameObject("StickyNote_new", typeof(RectTransform));
+        go.transform.SetParent(_stickyCanvas, false);
+        var note = go.AddComponent<StickyNote>();
+        note.InitNew(dk, canvas, _stickyCanvas, localPos, null);
+        note.FocusInput();
+    }
+
+    private StickyNote SpawnStickyNote(StickyNoteData data, Canvas canvas)
+    {
+        if (data == null || !_stickyCanvas) return null;
+        var go   = new GameObject($"StickyNote_{data.id}", typeof(RectTransform));
+        go.transform.SetParent(_stickyCanvas, false);
+        var note = go.AddComponent<StickyNote>();
+        note.Init(data, canvas, _stickyCanvas, null);
+        return note;
+    }
+
+    // ── モーダル ──────────────────────────────────────────────
+    private void OpenAddForm(string dk, string time, string endTime = null)
+    {
+        if (_eventModal) _eventModal.OpenAddForm(dk, Refresh, time, endTime);
+        else _floatingWindow?.OpenAddForm(dk, null, time);
+    }
+
+    private void OpenEditForm(ScheduleEvent ev)
+    {
+        if (_eventModal) _eventModal.OpenEditForm(ev, Refresh);
+        else _floatingWindow?.OpenEventDetail(ev, Refresh);
+    }
+
+    // ── ユーティリティ ─────────────────────────────────────────
+    private static float ParseH(string t)
+    {
+        if (string.IsNullOrEmpty(t)) return -1f;
+        if (!TimeSpan.TryParse(t, out var ts)) return -1f;
+        float m = ts.Hours * 60f + ts.Minutes;
+        return Mathf.Round(m / 15f) * 15f / 60f;
+    }
+
+    private static GameObject MakeGO(string name, Transform parent)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        return go;
+    }
+
+    private GameObject MakeHLGRow(string name, Transform parent, float h)
+    {
+        var go  = MakeGO(name, parent);
+        go.AddComponent<Image>().color = Color.clear;
+        var hlg = go.AddComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.UpperLeft;
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = true;
+        hlg.spacing = 0f;
+        go.AddComponent<LayoutElement>().preferredHeight = h;
+        return go;
+    }
+
+    private static GameObject MakeTimeSpacer(GameObject parent, string label)
+    {
+        var go  = MakeGO("TimeSpacer", parent.transform);
+        go.AddComponent<Image>().color = Color.clear;
+        var le  = go.AddComponent<LayoutElement>(); le.preferredWidth = TIME_COL_W; le.minWidth = TIME_COL_W;
+        if (!string.IsNullOrEmpty(label))
+        {
+            var lGO = MakeGO("RowLabel", go.transform); StretchRT(lGO);
+            var t   = lGO.AddComponent<TextMeshProUGUI>();
+            t.text  = label; t.fontSize = UITheme_FocusMode.FontSectionTitle;
+            t.color = UITheme_FocusMode.TextBody; t.alignment = TextAlignmentOptions.Center;
+        }
+        return go;
+    }
+
+    private static void StretchRT(GameObject go, float hPad = 0f, float vPad = 0f)
+    {
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = new Vector2(hPad, vPad); rt.offsetMax = new Vector2(-hPad, -vPad);
+    }
+
+    private static void AddBorder(Transform row, bool top)
+    {
+        string key = top ? "HBorder_Top" : "HBorder_Bot";
+        var ex = row.Find(key);
+        if (ex) { var ei = ex.GetComponent<Image>(); if (ei) ei.color = UITheme_FocusMode.BorderDivider; return; }
+        var go  = MakeGO(key, row);
+        var rt  = go.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, top ? 1f : 0f); rt.anchorMax = new Vector2(1f, top ? 1f : 0f);
+        rt.pivot = new Vector2(0.5f, top ? 1f : 0f); rt.sizeDelta = new Vector2(0f,2f); rt.anchoredPosition = Vector2.zero;
+        go.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
+        go.AddComponent<LayoutElement>().ignoreLayout = true;
+        rt.SetAsLastSibling();
+    }
+
+    /// <summary>TimeSpacer と PolicyCell の間に縦区切り線を追加</summary>
+    private static void AddTimeSeparator(Transform row)
+    {
+        const string key = "TimeSeparator";
+        if (row.Find(key) != null) return;
+        var go  = MakeGO(key, row);
+        var rt  = go.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot     = new Vector2(0f, 0.5f);
+        rt.sizeDelta = new Vector2(2f, 0f);
+        rt.anchoredPosition = new Vector2(TIME_COL_W, 0f); // TimeSpacer 右端
+        go.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
+        go.AddComponent<LayoutElement>().ignoreLayout = true;
+        rt.SetAsLastSibling();
     }
 }
