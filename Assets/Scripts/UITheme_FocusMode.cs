@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// フォーカスモードUI のデザイントークン定義。
@@ -184,4 +184,16 @@ public static class UITheme_FocusMode
 
     // ─── ユーティリティ ───────────────────────────────────────
     public static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, a);
+
+    /// <summary>タグ色（半透明）をダッシュボード背景にアルファ合成した不透明色。</summary>
+    /// <remarks>モーダルのカテゴリーボタンと同じ見え方を透過なしで再現する。
+    /// PanelBG は白の半透明オーバーレイ色のためブレンド元には使えない。</remarks>
+    public static Color CardBG(Color tagColor)
+    {
+        var b = DashboardBG; float a = tagColor.a;
+        return new Color(
+            tagColor.r * a + b.r * (1f - a),
+            tagColor.g * a + b.g * (1f - a),
+            tagColor.b * a + b.b * (1f - a), 1f);
+    }
 }

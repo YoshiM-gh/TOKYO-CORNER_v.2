@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -26,6 +26,10 @@ public class EventModal : MonoBehaviour
     [SerializeField] private Button          minIncBtn;
     [SerializeField] private TMP_InputField  endHourInput; // 終了 時（直接入力・ドラッグ作成で自動セット）
     [SerializeField] private TMP_InputField  endMinInput;  // 終了 分
+    [SerializeField] private Button          endHourDecBtn;
+    [SerializeField] private Button          endHourIncBtn;
+    [SerializeField] private Button          endMinDecBtn;
+    [SerializeField] private Button          endMinIncBtn;
     [SerializeField] private Button          timeClearBtn;
     [SerializeField] private TextMeshProUGUI timeClearBtnLabel;
     [Header("メモ")]
@@ -50,6 +54,10 @@ public class EventModal : MonoBehaviour
         hourIncBtn?.onClick.AddListener(() => ShiftHour(+1));
         minDecBtn?.onClick.AddListener(() => ShiftMin(-MIN_STEP));
         minIncBtn?.onClick.AddListener(() => ShiftMin(+MIN_STEP));
+        endHourDecBtn?.onClick.AddListener(() => ShiftEndHour(-1));
+        endHourIncBtn?.onClick.AddListener(() => ShiftEndHour(+1));
+        endMinDecBtn?.onClick.AddListener(() => ShiftEndMin(-MIN_STEP));
+        endMinIncBtn?.onClick.AddListener(() => ShiftEndMin(+MIN_STEP));
         timeClearBtn?.onClick.AddListener(ClearTime);
 
         // 時間の直接入力バリデーション
@@ -181,6 +189,24 @@ public class EventModal : MonoBehaviour
     private void ShiftMin(int d)
     { if (_hour < 0) _hour = 9; _minute = ((_minute + d) % 60 + 60) % 60; RefreshTimeDisplay(); }
 
+
+    /// <summary>終了時刻（時）を増減。未設定時は初回タップで「開始+1時間」に初期化のみ行う</summary>
+    private void ShiftEndHour(int d)
+    {
+        if (_hour < 0) _hour = 9;
+        if (_endHour < 0) { _endHour = Mathf.Min(_hour + 1, 24); _endMinute = _minute; RefreshTimeDisplay(); return; }
+        _endHour = (_endHour + d + 25) % 25;   // 0〜24 を循環（24:00 終了を許容）
+        RefreshTimeDisplay();
+    }
+
+    /// <summary>終了時刻（分）を増減。未設定時は初回タップで「開始+1時間」に初期化のみ行う</summary>
+    private void ShiftEndMin(int d)
+    {
+        if (_hour < 0) _hour = 9;
+        if (_endHour < 0) { _endHour = Mathf.Min(_hour + 1, 24); _endMinute = _minute; RefreshTimeDisplay(); return; }
+        _endMinute = ((_endMinute + d) % 60 + 60) % 60;
+        RefreshTimeDisplay();
+    }
     private void RefreshTimeDisplay()
     {
         bool has = _hour >= 0;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,6 +40,9 @@ public class DailyCalendarUI : MonoBehaviour
         "2026-08-11","2026-09-21","2026-09-23","2026-10-12",
         "2026-11-03","2026-11-23",
     };
+
+    // ── アセット参照 ─────────────────────────────────────────
+    [SerializeField] private Sprite cardSprite; // 角丸カード用 9-slice（Rounded Filled 32px）
 
     // ── 状態 ──────────────────────────────────────────────────
     private DateTime _currentDate;
@@ -663,13 +666,40 @@ private void BuildScaffold()
         var tag    = TagConfig.GetById(ev.tagId);
         var go     = MakeGO("Chip", ct);
         go.AddComponent<LayoutElement>().preferredHeight = NOTIME_ITEM_H;
-        var img    = go.AddComponent<Image>(); img.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
-        var tGO    = MakeGO("Text", go.transform); StretchRT(tGO, 5f, 2f);
+        var img    = go.AddComponent<Image>();
+        var chipBase = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        img.color = UITheme_FocusMode.CardBG(chipBase);
+        if (cardSprite != null)
+        {
+            img.sprite = cardSprite; img.type = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 4f);
+        }
+        // タグ色ストライプ（タイムラインのカードと同仕様）
+        var stGO = MakeGO("Stripe", go.transform);
+        var stRT = stGO.GetComponent<RectTransform>();
+        stRT.anchorMin = new Vector2(0f,0f); stRT.anchorMax = new Vector2(0f,1f);
+        stRT.pivot = new Vector2(0f,0.5f);
+        stRT.sizeDelta = new Vector2(3f,-8f); stRT.anchoredPosition = new Vector2(2f,0f);
+        var stImg = stGO.AddComponent<Image>();
+        stImg.color = tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
+        stImg.raycastTarget = false;
+        if (cardSprite != null)
+        {
+            stImg.sprite = cardSprite; stImg.type = Image.Type.Sliced;
+            stImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 1.5f);
+        }
+        var tGO    = MakeGO("Text", go.transform);
+        var tgRT   = tGO.GetComponent<RectTransform>();
+        tgRT.anchorMin = Vector2.zero; tgRT.anchorMax = Vector2.one;
+        tgRT.offsetMin = new Vector2(10f, 1f); tgRT.offsetMax = new Vector2(-4f, -1f);
         var txt    = tGO.AddComponent<TextMeshProUGUI>();
         txt.text   = ev.title; txt.fontSize = UITheme_FocusMode.FontChipTitle;
         txt.color  = Color.white; txt.enableWordWrapping = false;
-        txt.overflowMode = TextOverflowModes.Ellipsis;
+        txt.overflowMode = TextOverflowModes.Overflow; // Ellipsis は日本語で誤動作するため手動省略
         txt.alignment = TextAlignmentOptions.MidlineLeft; txt.raycastTarget = false;
+        // レイアウト確定後の実幅で手動省略（TMP Ellipsis の日本語バグ回避）
+        Canvas.ForceUpdateCanvases();
+        txt.text = UITextUtil.EllipsizeOneLine(txt, ev.title, tgRT.rect.width);
         var btn    = go.AddComponent<Button>(); btn.targetGraphic = img;
         var cap    = ev;
         btn.onClick.AddListener(() => OpenEditForm(cap));
@@ -768,13 +798,7 @@ private void BuildScaffold()
         dragCreator.Setup(dragDk, HOUR_COUNT, HOUR_HEIGHT,
             (dk2, st, en) => OpenAddForm(dk2, st, en));
 
-        if (isToday)
-        {
-            var bg   = MakeGO("TodayBG", col.transform);
-            var bgRT = bg.GetComponent<RectTransform>();
-            bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one; bgRT.offsetMin = bgRT.offsetMax = Vector2.zero;
-            bg.AddComponent<Image>().color = UITheme_FocusMode.AccentBlueFaint;
-        }
+        // 当日列の背景塗りは廃止（ヘッダーのハイライト＋現在時刻ラインで当日を表現）
 
         for (int h = 0; h < HOUR_COUNT; h++)
         {
@@ -835,26 +859,46 @@ private void BuildScaffold()
         dt.AddComponent<Image>().color = UITheme_FocusMode.AccentRed;
     }
 
+    /// <summary>
+    /// 重なりクラスタ単位でレーン割当。時間的に連結した予定グループ内だけで
+    /// totalLanes を数えるため、無関係な時間帯の予定はフル幅を維持する。
+    /// </summary>
     private List<(ScheduleEvent, int, int)> AssignLanes(List<ScheduleEvent> evs)
     {
-        var sorted   = evs.OrderBy(e => e.time).ToList();
-        var laneEnds = new List<float>();
-        var assigned = new Dictionary<string,int>();
+        var sorted = evs.Where(e => !string.IsNullOrEmpty(e.time))
+                        .OrderBy(e => e.time).ToList();
+        var result   = new List<(ScheduleEvent,int,int)>();
+        var laneEnds = new List<float>();                        // 現クラスタのレーン終端
+        var cluster  = new List<(ScheduleEvent ev, int lane)>(); // 現クラスタの予定
+        float clusterEnd = float.MinValue;
+
+        void Flush()
+        {
+            int total = Mathf.Max(1, laneEnds.Count);
+            foreach (var (ev, l) in cluster) result.Add((ev, l, total));
+            cluster.Clear(); laneEnds.Clear(); clusterEnd = float.MinValue;
+        }
+
         foreach (var ev in sorted)
         {
-            float s = ParseH(ev.time); if (s < 0) continue;
-            float e = string.IsNullOrEmpty(ev.endTime) ? s + 1f : Mathf.Max(ParseH(ev.endTime), s + 0.25f);
-            int   l = -1;
-            for (int i = 0; i < laneEnds.Count; i++)
-                if (s >= laneEnds[i] - 0.01f) { l = i; laneEnds[i] = e; break; }
-            if (l < 0) { l = laneEnds.Count; laneEnds.Add(e); }
-            assigned[ev.id] = l;
+            float sH = ParseH(ev.time);
+            if (sH < 0f) continue;
+            float eH = string.IsNullOrEmpty(ev.endTime)
+                ? sH + 1f
+                : Mathf.Max(ParseH(ev.endTime), sH + 0.25f);
+
+            // 開始がクラスタの最遠終端以降なら連結が切れた → 確定
+            if (cluster.Count > 0 && sH >= clusterEnd - 0.01f) Flush();
+
+            int lane = -1;
+            for (int l = 0; l < laneEnds.Count; l++)
+                if (sH >= laneEnds[l] - 0.01f) { lane = l; laneEnds[l] = eH; break; }
+            if (lane < 0) { lane = laneEnds.Count; laneEnds.Add(eH); }
+            cluster.Add((ev, lane));
+            clusterEnd = Mathf.Max(clusterEnd, eH);
         }
-        int maxL = Mathf.Max(1, laneEnds.Count);
-        var res = new List<(ScheduleEvent,int,int)>();
-        foreach (var ev in sorted)
-            if (assigned.TryGetValue(ev.id, out int l)) res.Add((ev, l, maxL));
-        return res;
+        Flush();
+        return result;
     }
 
     private void BuildBlock(Transform parent, ScheduleEvent ev, float colW, int lane, int lanes)
@@ -862,7 +906,9 @@ private void BuildScaffold()
         float s  = ParseH(ev.time); if (s < 0) return;
         float e  = string.IsNullOrEmpty(ev.endTime) ? s + 1f : Mathf.Max(ParseH(ev.endTime), s + 0.25f);
         float bH = Mathf.Max((e - s) * HOUR_HEIGHT - 2f, 16f);
-        float lW = lanes > 1 ? (colW - 2f) / lanes : colW - 2f;
+        // 右側に固定12pxのクリック余白（ガター）を確保し、同時間帯への追加を可能にする
+        const float GUTTER = 12f;
+        float lW = (colW - 2f - GUTTER) / Mathf.Max(1, lanes);
         float lX = 1f + lane * lW;
         var   tag = TagConfig.GetById(ev.tagId);
 
@@ -872,22 +918,51 @@ private void BuildScaffold()
         bkRT.pivot = new Vector2(0f,1f);
         bkRT.sizeDelta = new Vector2(lW - 1f, bH);
         bkRT.anchoredPosition = new Vector2(lX, -s * HOUR_HEIGHT - 1f);
-        var bkImg = bk.AddComponent<Image>(); bkImg.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        var bkImg = bk.AddComponent<Image>();
+        var baseC = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        bkImg.color = UITheme_FocusMode.CardBG(baseC); // 淡色・不透明（パネル色とブレンド）
+        if (cardSprite != null)
+        {
+            bkImg.sprite = cardSprite;
+            bkImg.type   = Image.Type.Sliced;
+            // 9-slice 角丸を 4px 相当に（CanvasScaler refPPU=100 前提）
+            bkImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 4f);
+        }
 
         var bd   = MakeGO("Border", bk.transform);
         var bdRT = bd.GetComponent<RectTransform>();
         bdRT.anchorMin = new Vector2(0f,0f); bdRT.anchorMax = new Vector2(0f,1f);
-        bdRT.sizeDelta = new Vector2(2.5f,0f); bdRT.anchoredPosition = Vector2.zero;
-        bd.AddComponent<Image>().color = tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
+        bdRT.pivot     = new Vector2(0f, 0.5f);
+        bdRT.sizeDelta = new Vector2(3f, -8f);        // 上下4pxインセット（角丸からはみ出さない）
+        bdRT.anchoredPosition = new Vector2(2f, 0f);  // 左から2px
+        var bdImg = bd.AddComponent<Image>();
+        bdImg.color = tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
+        bdImg.raycastTarget = false;
+        if (cardSprite != null)
+        {
+            bdImg.sprite = cardSprite;
+            bdImg.type   = Image.Type.Sliced;
+            bdImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 1.5f); // 半径1.5px=ピル形
+        }
 
-        var tx   = MakeGO("Title", bk.transform); StretchRT(tx, 5f, 2f);
+        var tx   = MakeGO("Title", bk.transform);
+        var txRT = tx.GetComponent<RectTransform>();
+        txRT.anchorMin = Vector2.zero; txRT.anchorMax = Vector2.one;
+        txRT.offsetMin = new Vector2(10f, 3f); txRT.offsetMax = new Vector2(-4f, -3f);
         var tTxt = tx.AddComponent<TextMeshProUGUI>();
         tTxt.text = ev.title; tTxt.fontSize = UITheme_FocusMode.FontChipTitle;
         tTxt.color = Color.white; tTxt.fontStyle = FontStyles.Bold;
         tTxt.overflowMode = TextOverflowModes.Ellipsis; tTxt.raycastTarget = false;
+        tTxt.lineSpacing = -70f; // 行間（Kotonoruは内部余白が大きいためメトリクス上は重なり気味が見た目の適正値）
 
         var btn = bk.AddComponent<Button>(); btn.targetGraphic = bkImg;
-        var cap = ev; btn.onClick.AddListener(() => OpenEditForm(cap));
+        var cap = ev;
+
+        // ドラッグ移動・上下リサイズ（15分スナップ、ドロップで即保存）
+        btn.gameObject.AddComponent<EventBlockDragger>().Init(ev, HOUR_HEIGHT,
+            () => { NotebookManager.Instance?.SaveAll(); Refresh(); },
+            () => OpenEditForm(cap),
+            cardSprite);
     }
 
     // ── 付箋 ─────────────────────────────────────────────────

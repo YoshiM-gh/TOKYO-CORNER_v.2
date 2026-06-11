@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,6 +18,7 @@ public class WeeklyCalendarUI : MonoBehaviour
 {
     [Header("ナビゲーション")]
     [SerializeField] private Button             prevWeekBtn;
+    [SerializeField] private Sprite cardSprite; // 角丸カード用 9-slice（Rounded Filled 32px）
     [SerializeField] private Button             nextWeekBtn;
     [SerializeField] private TextMeshProUGUI    weekLabel;
     [SerializeField] private Button             weekStartSunBtn;
@@ -455,20 +456,45 @@ public class WeeklyCalendarUI : MonoBehaviour
         var le = chipGO.AddComponent<LayoutElement>();
         le.preferredHeight = NOTIME_ITEM_H; le.flexibleWidth = 1f;
         var img = chipGO.AddComponent<Image>();
-        img.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        var chipBase = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        img.color = UITheme_FocusMode.CardBG(chipBase);
+        if (cardSprite != null)
+        {
+            img.sprite = cardSprite; img.type = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 4f);
+        }
+        // タグ色ストライプ（タイムラインのカードと同仕様）
+        var stGO = new GameObject("Stripe", typeof(RectTransform));
+        stGO.transform.SetParent(chipGO.transform, false);
+        var stRT = stGO.GetComponent<RectTransform>();
+        stRT.anchorMin = new Vector2(0f,0f); stRT.anchorMax = new Vector2(0f,1f);
+        stRT.pivot = new Vector2(0f,0.5f);
+        stRT.sizeDelta = new Vector2(3f,-8f); stRT.anchoredPosition = new Vector2(2f,0f);
+        var stImg = stGO.AddComponent<Image>();
+        stImg.color = tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
+        stImg.raycastTarget = false;
+        if (cardSprite != null)
+        {
+            stImg.sprite = cardSprite; stImg.type = Image.Type.Sliced;
+            stImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 1.5f);
+        }
 
         var txtGO = new GameObject("Text", typeof(RectTransform));
         txtGO.transform.SetParent(chipGO.transform, false);
         var txtRT = txtGO.GetComponent<RectTransform>();
         txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one;
-        txtRT.offsetMin = new Vector2(5f, 1f); txtRT.offsetMax = new Vector2(-2f, -1f);
+        txtRT.offsetMin = new Vector2(10f, 1f); txtRT.offsetMax = new Vector2(-4f, -1f);
         var txt = txtGO.AddComponent<TextMeshProUGUI>();
         txt.text             = ev.title;
         txt.fontSize         = UITheme_FocusMode.FontChipTitle;
         txt.color            = Color.white;
         txt.enableWordWrapping = false;
-        txt.overflowMode     = TextOverflowModes.Ellipsis;
+        txt.overflowMode     = TextOverflowModes.Overflow; // Ellipsis は日本語で誤動作するため手動省略
         txt.alignment        = TextAlignmentOptions.MidlineLeft;
+        txt.raycastTarget = false;
+        // レイアウト確定後の実幅で手動省略（TMP Ellipsis の日本語バグ回避）
+        Canvas.ForceUpdateCanvases();
+        txt.text = UITextUtil.EllipsizeOneLine(txt, ev.title, txtRT.rect.width);
 
         var btn = chipGO.AddComponent<Button>(); btn.targetGraphic = img;
         var cap = ev;
@@ -615,15 +641,7 @@ public class WeeklyCalendarUI : MonoBehaviour
         });
 
 
-        if (isToday)
-        {
-            var bg = new GameObject("TodayBG", typeof(RectTransform));
-            bg.transform.SetParent(col.transform, false);
-            var bgRT = bg.GetComponent<RectTransform>();
-            bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one;
-            bgRT.offsetMin = bgRT.offsetMax = Vector2.zero;
-            bg.AddComponent<Image>().color = UITheme_FocusMode.AccentBlueFaint;
-        }
+        // 当日列の背景塗りは廃止（ヘッダーのハイライト＋現在時刻ラインで当日を表現）
 
         // ── 整時線のみ（15分・30分線は引かない）─────────────
         for (int h = 0; h < HOUR_COUNT; h++)
@@ -689,13 +707,26 @@ public class WeeklyCalendarUI : MonoBehaviour
         img.raycastTarget = false;
     }
 
+    /// <summary>
+    /// 重なりクラスタ単位でレーン割当。時間的に連結した予定グループ内だけで
+    /// totalLanes を数えるため、無関係な時間帯の予定はフル幅を維持する。
+    /// </summary>
     private List<(ScheduleEvent ev, int lane, int totalLanes)>
         AssignLanes(List<ScheduleEvent> evs)
     {
-        var sorted   = evs.Where(e => !string.IsNullOrEmpty(e.time))
-                          .OrderBy(e => e.time).ToList();
-        var laneEnds = new List<float>();
-        var assigned = new Dictionary<string, int>();
+        var sorted = evs.Where(e => !string.IsNullOrEmpty(e.time))
+                        .OrderBy(e => e.time).ToList();
+        var result   = new List<(ScheduleEvent,int,int)>();
+        var laneEnds = new List<float>();                        // 現クラスタのレーン終端
+        var cluster  = new List<(ScheduleEvent ev, int lane)>(); // 現クラスタの予定
+        float clusterEnd = float.MinValue;
+
+        void Flush()
+        {
+            int total = Mathf.Max(1, laneEnds.Count);
+            foreach (var (ev, l) in cluster) result.Add((ev, l, total));
+            cluster.Clear(); laneEnds.Clear(); clusterEnd = float.MinValue;
+        }
 
         foreach (var ev in sorted)
         {
@@ -704,18 +735,18 @@ public class WeeklyCalendarUI : MonoBehaviour
             float eH = string.IsNullOrEmpty(ev.endTime)
                 ? sH + 1f
                 : Mathf.Max(ParseAndSnap(ev.endTime), sH + 0.25f);
+
+            // 開始がクラスタの最遠終端以降なら連結が切れた → 確定
+            if (cluster.Count > 0 && sH >= clusterEnd - 0.01f) Flush();
+
             int lane = -1;
             for (int l = 0; l < laneEnds.Count; l++)
                 if (sH >= laneEnds[l] - 0.01f) { lane = l; laneEnds[l] = eH; break; }
             if (lane < 0) { lane = laneEnds.Count; laneEnds.Add(eH); }
-            assigned[ev.id] = lane;
+            cluster.Add((ev, lane));
+            clusterEnd = Mathf.Max(clusterEnd, eH);
         }
-
-        int maxL   = Mathf.Max(1, laneEnds.Count);
-        var result = new List<(ScheduleEvent,int,int)>();
-        foreach (var ev in sorted)
-            if (assigned.TryGetValue(ev.id, out int l))
-                result.Add((ev, l, maxL));
+        Flush();
         return result;
     }
 
@@ -727,7 +758,9 @@ public class WeeklyCalendarUI : MonoBehaviour
             ? sH + 1f
             : Mathf.Max(ParseAndSnap(ev.endTime), sH + 0.25f);
         float bH = Mathf.Max((eH - sH) * HOUR_HEIGHT - 2f, 16f);
-        float lW = totalLanes > 1 ? (colW - 2f) / totalLanes : colW - 2f;
+        // 右側に固定12pxのクリック余白（ガター）を確保し、同時間帯への追加を可能にする
+        const float GUTTER = 12f;
+        float lW = (colW - 2f - GUTTER) / Mathf.Max(1, totalLanes);
         float lX = 1f + lane * lW;
         var   tag = TagConfig.GetById(ev.tagId);
 
@@ -739,17 +772,33 @@ public class WeeklyCalendarUI : MonoBehaviour
         bkRT.sizeDelta = new Vector2(lW - 1f, bH);
         bkRT.anchoredPosition = new Vector2(lX, -sH * HOUR_HEIGHT - 1f);
         var bkImg = bk.AddComponent<Image>();
-        bkImg.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        var baseC = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        bkImg.color = UITheme_FocusMode.CardBG(baseC); // 淡色・不透明（パネル色とブレンド）
+        if (cardSprite != null)
+        {
+            bkImg.sprite = cardSprite;
+            bkImg.type   = Image.Type.Sliced;
+            // 9-slice 角丸を 4px 相当に（CanvasScaler refPPU=100 前提）
+            bkImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 4f);
+        }
 
         // 左ボーダー
         var bdr   = new GameObject("Border", typeof(RectTransform));
         bdr.transform.SetParent(bk.transform, false);
         var bdrRT = bdr.GetComponent<RectTransform>();
         bdrRT.anchorMin = new Vector2(0f,0f); bdrRT.anchorMax = new Vector2(0f,1f);
-        bdrRT.sizeDelta = new Vector2(2.5f, 0f);
-        bdrRT.anchoredPosition = Vector2.zero;
-        bdr.AddComponent<Image>().color =
-            tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
+        bdrRT.pivot     = new Vector2(0f, 0.5f);
+        bdrRT.sizeDelta = new Vector2(3f, -8f);        // 上下4pxインセット（角丸からはみ出さない）
+        bdrRT.anchoredPosition = new Vector2(2f, 0f);  // 左から2px
+        var bdrImg = bdr.AddComponent<Image>();
+        bdrImg.color = tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
+        bdrImg.raycastTarget = false;
+        if (cardSprite != null)
+        {
+            bdrImg.sprite = cardSprite;
+            bdrImg.type   = Image.Type.Sliced;
+            bdrImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 1.5f); // 半径1.5px=ピル形
+        }
 
 
         // タイトル
@@ -757,22 +806,24 @@ public class WeeklyCalendarUI : MonoBehaviour
         txGO.transform.SetParent(bk.transform, false);
         var txRT = txGO.GetComponent<RectTransform>();
         txRT.anchorMin = Vector2.zero; txRT.anchorMax = Vector2.one;
-        txRT.offsetMin = new Vector2(5f, 2f);
-        txRT.offsetMax = new Vector2(-2f,-2f);
+        txRT.offsetMin = new Vector2(10f, 3f);
+        txRT.offsetMax = new Vector2(-4f, -3f);
         var txTxt = txGO.AddComponent<TextMeshProUGUI>();
         txTxt.text       = ev.title;
         txTxt.fontSize   = UITheme_FocusMode.FontChipTitle;
         txTxt.color      = Color.white;
         txTxt.fontStyle  = FontStyles.Bold;
         txTxt.overflowMode = TextOverflowModes.Ellipsis;
+        txTxt.lineSpacing = -70f; // 行間（Kotonoruは内部余白が大きいためメトリクス上は重なり気味が見た目の適正値）
 
         var btn = bk.AddComponent<Button>(); btn.targetGraphic = bkImg;
         var cap = ev;
-        btn.onClick.AddListener(() =>
-        {
-            if (eventModal != null) eventModal.OpenEditForm(cap, Refresh);
-            else floatingWindow?.OpenEventDetail(cap, Refresh);
-        });
+
+        // ドラッグ移動・上下リサイズ（15分スナップ、ドロップで即保存）
+        bk.AddComponent<EventBlockDragger>().Init(ev, HOUR_HEIGHT,
+            () => { NotebookManager.Instance?.SaveAll(); Refresh(); },
+            () => { if (eventModal != null) eventModal.OpenEditForm(cap, Refresh); },
+            cardSprite);
     }
 
     private void BuildNowLine(string today, float colW, float totalH)

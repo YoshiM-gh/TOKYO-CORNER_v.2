@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -19,9 +19,9 @@ public class StickyNote : MonoBehaviour
         ("yotei",   new Color(0.55f, 0.80f, 0.96f), "予"),
         ("mokuhyo", new Color(0.97f, 0.79f, 0.49f), "目"),
         ("todo",    new Color(0.97f, 0.95f, 0.50f), "T"),
-        ("leisure", new Color(0.87f, 0.70f, 0.97f), "遊"),
+        ("hobby",   new Color(0.87f, 0.70f, 0.97f), "遊"),
     };
-    private static readonly Color DEFAULT_BG = new Color(0.93f, 0.93f, 0.87f);
+    private static readonly Color DEFAULT_BG = Color.white; // ニュートラル＝白背景（黒文字は GetTextColor が自動選択）
 
     // ── サイズ制約 ────────────────────────────────────────
     private const float MIN_W = 160f, MIN_H = 120f;
@@ -64,6 +64,7 @@ public class StickyNote : MonoBehaviour
         NoteId     = data.id;
         _dateKey   = data.dateKey;
         _tagId     = data.tagId ?? "";
+        if (_tagId == "leisure") _tagId = "hobby";   // 旧ID互換（TagConfig の実IDは hobby）
         _onChanged = onChanged;
         _canvasRT  = canvasRT;
         _saved     = true;
@@ -235,7 +236,7 @@ public class StickyNote : MonoBehaviour
         SetStretch(txtGO);
         var txtTxt = txtGO.AddComponent<TextMeshProUGUI>();
         if (sceneFont != null) txtTxt.font = sceneFont;
-        txtTxt.fontSize = 13f;
+        txtTxt.fontSize = 15f;
         txtTxt.color    = new Color(0.08f, 0.08f, 0.14f, 1f);
         txtTxt.alignment = TextAlignmentOptions.TopLeft;
         txtTxt.enableWordWrapping = true;
@@ -247,7 +248,7 @@ public class StickyNote : MonoBehaviour
         SetStretch(phGO);
         var phTxt = phGO.AddComponent<TextMeshProUGUI>();
         if (sceneFont != null) phTxt.font = sceneFont;
-        phTxt.text = "メモ..."; phTxt.fontSize = 13f;
+        phTxt.text = "メモ..."; phTxt.fontSize = 15f;
         phTxt.color = new Color(0.08f, 0.08f, 0.14f, 0.40f);
         phTxt.alignment = TextAlignmentOptions.TopLeft;
         phTxt.enableWordWrapping = true;
@@ -361,18 +362,18 @@ public class StickyNote : MonoBehaviour
     private static Color GetTextColor(Color bg)
     {
         float lum = 0.2126f * bg.r + 0.7152f * bg.g + 0.0722f * bg.b;
-        return lum > 0.30f
+        return lum > 0.55f   // タグ色のCardBGは全て0.45未満 → 白文字。白デフォルトのみ暗文字
             ? new Color(0.08f, 0.08f, 0.14f, 1f) // 明るい背景 → 暗テキスト
             : Color.white;                        // 暗い背景 → 白テキスト
     }
 
     private static Color GetBgColor(string tagId)
     {
-        // TagConfig の chipBG を完全不透明で使用（アイテム色と統一）
+        // タグ色はアイテムカードと同じ CardBG（タグ色×背景ブレンドの不透明色）で統一
         if (!string.IsNullOrEmpty(tagId))
         {
             var tag = TagConfig.GetById(tagId);
-            if (tag != null) return new Color(tag.chipBG.r, tag.chipBG.g, tag.chipBG.b, 1f);
+            if (tag != null) return UITheme_FocusMode.CardBG(tag.chipBG); // アイテムカードと同色（落ち着いた不透明色）
         }
         // leisure など TagConfig 外のタグは TAG_COLORS を使用
         foreach (var (id, bg, _) in TAG_COLORS)
