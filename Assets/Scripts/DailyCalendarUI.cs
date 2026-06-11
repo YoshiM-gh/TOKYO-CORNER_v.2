@@ -17,6 +17,7 @@ public class DailyCalendarUI : MonoBehaviour
     private const float HOUR_HEIGHT    = 60f;
     private const float TIME_COL_W     = 72f;
     private const int   HOUR_COUNT     = 24;
+    private float _hairline = 2f;   // 物理ピクセルにスナップ済みのヘアライン太さ（Refreshで更新）
     private const float NOTIME_ITEM_H  = 28f;
     private const int   NOTIME_VISIBLE = 3;
     private const float NOTIME_ROW_H   = 92f;
@@ -390,7 +391,7 @@ private void BuildScaffold()
         var bdr   = MakeGO("ColBorder", col.transform);
         var bdrRT = bdr.GetComponent<RectTransform>();
         bdrRT.anchorMin = new Vector2(0f,0f); bdrRT.anchorMax = new Vector2(0f,1f);
-        bdrRT.sizeDelta = new Vector2(2f,0f); bdrRT.anchoredPosition = Vector2.zero;
+        bdrRT.sizeDelta = new Vector2(_hairline, 0f); bdrRT.anchoredPosition = Vector2.zero;
         bdr.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
         bdr.AddComponent<LayoutElement>().ignoreLayout = true;
 
@@ -552,8 +553,30 @@ private void BuildScaffold()
     // =========================================================
     // Refresh
     // =========================================================
+    // ── ウィンドウリサイズ対応 ─────────────────────────────
+    private Vector2Int _lastScreenSize;
+    private float _resizeRefreshAt = -1f;
+
+    private void Update()
+    {
+        // リサイズを検知し、0.25秒静止後にグリッドを再構築（ヘアラインを再スナップ）
+        if (Screen.width != _lastScreenSize.x || Screen.height != _lastScreenSize.y)
+        {
+            _lastScreenSize  = new Vector2Int(Screen.width, Screen.height);
+            _resizeRefreshAt = Time.unscaledTime + 0.25f;
+        }
+        if (_resizeRefreshAt > 0f && Time.unscaledTime >= _resizeRefreshAt)
+        {
+            _resizeRefreshAt = -1f;
+            Refresh();
+        }
+    }
+
     public void Refresh()
     {
+        var __cv = GetComponentInParent<Canvas>();
+        _hairline = UITheme_FocusMode.Hairline(__cv != null ? __cv.rootCanvas.scaleFactor : 1f);
+
         if (!_scaffoldBuilt) return;
         Canvas.ForceUpdateCanvases();
         UpdateDayLabel();
@@ -812,7 +835,7 @@ private void BuildScaffold()
             var ln   = MakeGO("HLine", sl.transform);
             var lnRT = ln.GetComponent<RectTransform>();
             lnRT.anchorMin = new Vector2(0f,1f); lnRT.anchorMax = new Vector2(1f,1f);
-            lnRT.pivot = new Vector2(0.5f,1f); lnRT.sizeDelta = new Vector2(0f,2f); lnRT.anchoredPosition = Vector2.zero;
+            lnRT.pivot = new Vector2(0.5f,1f); lnRT.sizeDelta = new Vector2(0f, _hairline); lnRT.anchoredPosition = Vector2.zero;
             var lnImg = ln.AddComponent<Image>();
             lnImg.color = h % 2 == 0 ? UITheme_FocusMode.BorderDivider : UITheme_FocusMode.BorderSubtle;
             lnImg.raycastTarget = false;
@@ -827,7 +850,7 @@ private void BuildScaffold()
         var el   = MakeGO("EndLine", col.transform);
         var elRT = el.GetComponent<RectTransform>();
         elRT.anchorMin = new Vector2(0f,1f); elRT.anchorMax = new Vector2(1f,1f);
-        elRT.pivot = new Vector2(0.5f,1f); elRT.sizeDelta = new Vector2(0f,2f);
+        elRT.pivot = new Vector2(0.5f,1f); elRT.sizeDelta = new Vector2(0f, _hairline);
         elRT.anchoredPosition = new Vector2(0f, -HOUR_COUNT * HOUR_HEIGHT);
         el.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
 
@@ -837,7 +860,7 @@ private void BuildScaffold()
         var cb   = MakeGO("ColBorder", col.transform);
         var cbRT = cb.GetComponent<RectTransform>();
         cbRT.anchorMin = new Vector2(0f,0f); cbRT.anchorMax = new Vector2(0f,1f);
-        cbRT.sizeDelta = new Vector2(2f,0f); cbRT.anchoredPosition = Vector2.zero;
+        cbRT.sizeDelta = new Vector2(_hairline, 0f); cbRT.anchoredPosition = Vector2.zero;
         cb.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
     }
 
@@ -1070,7 +1093,7 @@ private void BuildScaffold()
         rt.offsetMin = new Vector2(hPad, vPad); rt.offsetMax = new Vector2(-hPad, -vPad);
     }
 
-    private static void AddBorder(Transform row, bool top)
+    private void AddBorder(Transform row, bool top)
     {
         string key = top ? "HBorder_Top" : "HBorder_Bot";
         var ex = row.Find(key);
@@ -1078,14 +1101,14 @@ private void BuildScaffold()
         var go  = MakeGO(key, row);
         var rt  = go.GetComponent<RectTransform>();
         rt.anchorMin = new Vector2(0f, top ? 1f : 0f); rt.anchorMax = new Vector2(1f, top ? 1f : 0f);
-        rt.pivot = new Vector2(0.5f, top ? 1f : 0f); rt.sizeDelta = new Vector2(0f,2f); rt.anchoredPosition = Vector2.zero;
+        rt.pivot = new Vector2(0.5f, top ? 1f : 0f); rt.sizeDelta = new Vector2(0f, _hairline); rt.anchoredPosition = Vector2.zero;
         go.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
         go.AddComponent<LayoutElement>().ignoreLayout = true;
         rt.SetAsLastSibling();
     }
 
     /// <summary>TimeSpacer と PolicyCell の間に縦区切り線を追加</summary>
-    private static void AddTimeSeparator(Transform row)
+    private void AddTimeSeparator(Transform row)
     {
         const string key = "TimeSeparator";
         if (row.Find(key) != null) return;
@@ -1093,7 +1116,7 @@ private void BuildScaffold()
         var rt  = go.GetComponent<RectTransform>();
         rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(0f, 1f);
         rt.pivot     = new Vector2(0f, 0.5f);
-        rt.sizeDelta = new Vector2(2f, 0f);
+        rt.sizeDelta = new Vector2(_hairline, 0f);
         rt.anchoredPosition = new Vector2(TIME_COL_W, 0f); // TimeSpacer 右端
         go.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
         go.AddComponent<LayoutElement>().ignoreLayout = true;

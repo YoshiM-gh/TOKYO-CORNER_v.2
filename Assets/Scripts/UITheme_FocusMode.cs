@@ -196,4 +196,9 @@ public static class UITheme_FocusMode
             tagColor.g * a + b.g * (1f - a),
             tagColor.b * a + b.b * (1f - a), 1f);
     }
+
+    /// <summary>デザイン2pxのヘアラインを、現在のCanvasスケールで物理ピクセル整数になる太さへ丸める。
+    /// 縮小時に線が1.1pxのような非整数になり太さムラ・消失が起きる問題の対策。</summary>
+    public static float Hairline(float scaleFactor)
+        => Mathf.Max(1f, Mathf.Round(2f * scaleFactor)) / Mathf.Max(scaleFactor, 0.0001f);
 }

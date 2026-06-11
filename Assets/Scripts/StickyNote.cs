@@ -513,7 +513,7 @@ public class StickyNote : MonoBehaviour
     // カスタムカーレット実装（B案）
     // ═══════════════════════════════════════════════════════════
 
-    private void Update()
+    private void LateUpdate()   // InputField の内部更新後に caret を追従させる
     {
         if (_contentInput == null || !_contentInput.isFocused) return;
         if (_contentInput.caretPosition != _lastCaretPos)
@@ -588,8 +588,9 @@ public class StickyNote : MonoBehaviour
     {
         if (_caretRT == null || _contentInput?.textComponent == null) return;
 
+        _contentInput.ForceLabelUpdate();   // IME確定直後など、ラベル未反映の旧テキストで計算しないようにする
         var txt    = _contentInput.textComponent;
-        txt.ForceMeshUpdate(true);
+        txt.ForceMeshUpdate(true, true);   // forceTextReparsing=true: IME確定直後の古いcharacterInfoでカーレットが1文字ズレる対策
 
         var info   = txt.textInfo;
         var taRect = _caretRT.parent.GetComponent<RectTransform>().rect;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -30,6 +30,7 @@ public class MonthlyCalendarUI : MonoBehaviour
     [Header("フローティングウィンドウ参照")]
     [SerializeField] private EventModal       eventModal;
     [SerializeField] private DayEventsPopup   dayEventsPopup;
+    [SerializeField] private Sprite cardSprite; // 角丸カード用 9-slice（Rounded Filled 32px）
 
     // 内部状態
     private int currentYear;
@@ -413,7 +414,13 @@ private void SetCellEmpty(GameObject cell)
         var chipGO  = new GameObject("Chip");
         chipGO.transform.SetParent(parent, false);
         var chipImg = chipGO.AddComponent<Image>();
-        chipImg.color = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        var baseC = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
+        chipImg.color = UITheme_FocusMode.CardBG(baseC); // Weekly/Daily のカードと同色
+        if (cardSprite != null)
+        {
+            chipImg.sprite = cardSprite; chipImg.type = Image.Type.Sliced;
+            chipImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 4f); // 角丸4px
+        }
 
         var chipRT = chipGO.GetComponent<RectTransform>();
         // 幅は VLG が自動設定（sizeDelta.x は不要）
@@ -421,17 +428,33 @@ private void SetCellEmpty(GameObject cell)
         var chipLE = chipGO.AddComponent<LayoutElement>();
         chipLE.preferredHeight = 30f;
 
+        // タグ色ストライプ（タイムラインのカードと同仕様）
+        var stGO = new GameObject("Stripe", typeof(RectTransform));
+        stGO.transform.SetParent(chipGO.transform, false);
+        var stRT = stGO.GetComponent<RectTransform>();
+        stRT.anchorMin = new Vector2(0f,0f); stRT.anchorMax = new Vector2(0f,1f);
+        stRT.pivot = new Vector2(0f,0.5f);
+        stRT.sizeDelta = new Vector2(3f,-8f); stRT.anchoredPosition = new Vector2(2f,0f);
+        var stImg = stGO.AddComponent<Image>();
+        stImg.color = tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
+        stImg.raycastTarget = false;
+        if (cardSprite != null)
+        {
+            stImg.sprite = cardSprite; stImg.type = Image.Type.Sliced;
+            stImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 1.5f); // ピル形
+        }
+
         // テキスト
         var txtGO  = new GameObject("Text");
         txtGO.transform.SetParent(chipGO.transform, false);
         var txtRT  = txtGO.AddComponent<RectTransform>();
         txtRT.anchorMin = Vector2.zero;
         txtRT.anchorMax = Vector2.one;
-        txtRT.offsetMin = new Vector2(4f, 2f);
+        txtRT.offsetMin = new Vector2(10f, 2f);
         txtRT.offsetMax = new Vector2(-4f, -2f);
         var txt    = txtGO.AddComponent<TextMeshProUGUI>();
-        txt.text      = ev.title;
         txt.fontSize  = UITheme_FocusMode.FontChipTitle;
+        txt.text      = UITextUtil.EllipsizeOneLine(txt, ev.title, chipWidth - 14f); // 左10+右4を除いた幅で「…」省略
         txt.color     = Color.white;
         txt.alignment = TextAlignmentOptions.MidlineLeft;  // 縦中央
         txt.enableWordWrapping = false;

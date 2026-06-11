@@ -47,6 +47,7 @@ public class WeeklyCalendarUI : MonoBehaviour
     private const float MEMO_ROW_H     = 80f;  // 3行分の高さ (14pt対応)
     private static readonly string[] POLICY_OPTIONS = { "", "ガンガンいこうぜ", "しっかりマイペース", "いろいろやろうぜ", "ととのえていこうぜ", "かいふくゆうせん", "ともだちだいじに", "かぞくをだいじに", "じぶんをだいじに", "こいびとだいじに" };
     private const float NOTIME_ROW_H   = 92f;  // 3行分 + 余白
+    private float _hairline = 2f;   // 物理ピクセルにスナップ済みのヘアライン太さ（Refreshで更新）
 
     private static readonly string[] DowLabels =
         { "日", "月", "火", "水", "木", "金", "土" };
@@ -185,7 +186,7 @@ public class WeeklyCalendarUI : MonoBehaviour
             var rt  = bdr.GetComponent<RectTransform>();
             // 下半分（日付番号エリア）のみ縦線表示
             rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(0f, 0.5f);
-            rt.sizeDelta = new Vector2(2f, 0f); rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(_hairline, 0f); rt.anchoredPosition = Vector2.zero;
             bdr.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
             bdr.AddComponent<LayoutElement>().ignoreLayout = true;
             rt.SetAsLastSibling();
@@ -205,7 +206,7 @@ public class WeeklyCalendarUI : MonoBehaviour
             bdr.transform.SetParent(col, false);
             var rt = bdr.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0f,0f); rt.anchorMax = new Vector2(0f,1f);
-            rt.sizeDelta = new Vector2(2f,0f); rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(_hairline, 0f); rt.anchoredPosition = Vector2.zero;
             bdr.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
             rt.SetAsFirstSibling();
             bdr.AddComponent<LayoutElement>().ignoreLayout = true;
@@ -213,7 +214,7 @@ public class WeeklyCalendarUI : MonoBehaviour
     }
 
     // ── 行区切り横罫線 ──────────────────────────────────────────────────
-    private static void AddHLine(Transform row, bool atTop)
+    private void AddHLine(Transform row, bool atTop)
     {
         if (row == null) return;
         string key = atTop ? "HBorder_Top" : "HBorder_Bot";
@@ -230,7 +231,7 @@ public class WeeklyCalendarUI : MonoBehaviour
         rt.anchorMin = new Vector2(0f, atTop ? 1f : 0f);
         rt.anchorMax = new Vector2(1f, atTop ? 1f : 0f);
         rt.pivot     = new Vector2(0.5f, atTop ? 1f : 0f);
-        rt.sizeDelta = new Vector2(0f, 2f);
+        rt.sizeDelta = new Vector2(0f, _hairline);
         rt.anchoredPosition = Vector2.zero;
         var img = go.AddComponent<Image>();
         img.color         = UITheme_FocusMode.BorderDivider;
@@ -265,8 +266,30 @@ public class WeeklyCalendarUI : MonoBehaviour
     }
 
     // ── Refresh ───────────────────────────────────────────────
+    // ── ウィンドウリサイズ対応 ─────────────────────────────
+    private Vector2Int _lastScreenSize;
+    private float _resizeRefreshAt = -1f;
+
+    private void Update()
+    {
+        // リサイズを検知し、0.25秒静止後にグリッドを再構築（ヘアラインを再スナップ）
+        if (Screen.width != _lastScreenSize.x || Screen.height != _lastScreenSize.y)
+        {
+            _lastScreenSize  = new Vector2Int(Screen.width, Screen.height);
+            _resizeRefreshAt = Time.unscaledTime + 0.25f;
+        }
+        if (_resizeRefreshAt > 0f && Time.unscaledTime >= _resizeRefreshAt)
+        {
+            _resizeRefreshAt = -1f;
+            Refresh();
+        }
+    }
+
     public void Refresh()
     {
+        var __cv = GetComponentInParent<Canvas>();
+        _hairline = UITheme_FocusMode.Hairline(__cv != null ? __cv.rootCanvas.scaleFactor : 1f);
+
         var weekEnd = weekStart.AddDays(6);
         if (weekLabel != null)
             weekLabel.text = $"{weekStart:yyyy/MM/dd}〜{weekEnd:MM/dd}";
@@ -324,7 +347,7 @@ public class WeeklyCalendarUI : MonoBehaviour
                 bdr.transform.SetParent(colGO.transform, false);
                 var bRT = bdr.GetComponent<RectTransform>();
                 bRT.anchorMin = new Vector2(0f,0f); bRT.anchorMax = new Vector2(0f,1f);
-                bRT.sizeDelta = new Vector2(2f,0f); bRT.anchoredPosition = Vector2.zero;
+                bRT.sizeDelta = new Vector2(_hairline, 0f); bRT.anchoredPosition = Vector2.zero;
                 bdr.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
                 bdr.AddComponent<LayoutElement>().ignoreLayout = true;
 
@@ -674,7 +697,7 @@ public class WeeklyCalendarUI : MonoBehaviour
         var endLineRT = endLine.GetComponent<RectTransform>();
         endLineRT.anchorMin = new Vector2(0f,1f); endLineRT.anchorMax = new Vector2(1f,1f);
         endLineRT.pivot     = new Vector2(0.5f,1f);
-        endLineRT.sizeDelta = new Vector2(0f,2f);
+        endLineRT.sizeDelta = new Vector2(0f, _hairline);
         endLineRT.anchoredPosition = new Vector2(0f, -HOUR_COUNT * HOUR_HEIGHT);
         endLine.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
 
@@ -686,21 +709,21 @@ public class WeeklyCalendarUI : MonoBehaviour
         colBdrEnd.transform.SetParent(col.transform, false);
         var colBdrEndRT = colBdrEnd.GetComponent<RectTransform>();
         colBdrEndRT.anchorMin = new Vector2(0f,0f); colBdrEndRT.anchorMax = new Vector2(0f,1f);
-        colBdrEndRT.sizeDelta = new Vector2(2f,0f); colBdrEndRT.anchoredPosition = Vector2.zero;
+        colBdrEndRT.sizeDelta = new Vector2(_hairline, 0f); colBdrEndRT.anchoredPosition = Vector2.zero;
         var colBdrImg = colBdrEnd.AddComponent<Image>();
         colBdrImg.color = UITheme_FocusMode.BorderDivider;
         colBdrImg.raycastTarget = false;
     }
 
     /// <summary>整時線を1本だけ引く（15分・30分線なし）</summary>
-    private static void AddHourLine(Transform parent, bool isEven)
+    private void AddHourLine(Transform parent, bool isEven)
     {
         var go = new GameObject("HourLine", typeof(RectTransform));
         go.transform.SetParent(parent, false);
         var rt = go.GetComponent<RectTransform>();
         rt.anchorMin = new Vector2(0f,1f); rt.anchorMax = new Vector2(1f,1f);
         rt.pivot     = new Vector2(0.5f,1f);
-        rt.sizeDelta = new Vector2(0f, 2f);
+        rt.sizeDelta = new Vector2(0f, _hairline);
         rt.anchoredPosition = Vector2.zero;
         var img = go.AddComponent<Image>();
         img.color = UITheme_FocusMode.BorderDivider;
