@@ -1,15 +1,16 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// タスクタブUI
-/// - 上部バー: 完了済み表示トグル + 追加ボタン
-/// - リスト: 未完了(優先度高→sortOrder→作成順) / 完了済みセクション(トグルON時のみ)
-/// - 行: チェック円 / タイトル / 「高」チップ / 日付時刻チップ
-/// - 行クリックで編集モーダル(モーダル実装後に接続)
+/// タスクタブ左ペイン(リスト)
+/// - 日付セクション固定: 期限切れ / 今日 / 今後 / 日付なし / 完了済み(トグルON時)
+/// - 各セクション内: 優先度高→sortOrder→作成順(今後のみ日付昇順が最優先)
+/// - 日付チップ色: 期限切れ=赤 / 今日=青 / それ以外=グレー
+/// - 行クリックで選択→右ペイン(TodoDetailUI)で編集、チェック円で完了トグル
 /// </summary>
 public class TodoListUI : MonoBehaviour
 {
@@ -17,11 +18,19 @@ public class TodoListUI : MonoBehaviour
     [SerializeField] private Button addButton;
     [SerializeField] private Transform listContent;
     [SerializeField] private TMP_FontAsset font;
+    [SerializeField] private TodoDetailUI detail;
+
+    private string _selectedId;
 
     private void OnEnable()
     {
         if (showDoneToggle != null) showDoneToggle.onValueChanged.AddListener(OnShowDoneChanged);
         if (addButton != null) addButton.onClick.AddListener(OnAddClicked);
+        if (detail != null)
+        {
+            detail.OnChanged += Rebuild;
+            detail.OnDeleted += OnItemDeleted;
+        }
         UITheme_FocusMode.OnThemeChanged += Rebuild;
         Rebuild();
     }
@@ -30,6 +39,11 @@ public class TodoListUI : MonoBehaviour
     {
         if (showDoneToggle != null) showDoneToggle.onValueChanged.RemoveListener(OnShowDoneChanged);
         if (addButton != null) addButton.onClick.RemoveListener(OnAddClicked);
+        if (detail != null)
+        {
+            detail.OnChanged -= Rebuild;
+            detail.OnDeleted -= OnItemDeleted;
+        }
         UITheme_FocusMode.OnThemeChanged -= Rebuild;
     }
 
@@ -37,18 +51,27 @@ public class TodoListUI : MonoBehaviour
 
     private void OnAddClicked()
     {
-        // TODO: 編集モーダル(新規)を開く。モーダル実装までの暫定動作
         var nm = NotebookManager.Instance;
         if (nm == null) return;
-        nm.AddTodo("新しいタスク");
+        var item = nm.AddTodo("新しいタスク");
+        Select(item);
+        Rebuild();
+        if (detail != null) detail.FocusTitle();
+    }
+
+    private void OnItemDeleted(string id)
+    {
+        if (_selectedId == id) _selectedId = null;
         Rebuild();
     }
 
-    private void OpenEditModal(TodoItem item)
+    private void Select(TodoItem item)
     {
-        // TODO: モーダル実装後に接続
-        Debug.Log($"[TodoListUI] OpenEditModal: {item.title}");
+        _selectedId = item?.id;
+        if (detail != null && item != null) detail.Open(item);
     }
+
+    // ── リスト構築 ────────────────────────────
 
     public void Rebuild()
     {
@@ -60,12 +83,23 @@ public class TodoListUI : MonoBehaviour
         if (nm == null) return;
 
         var all = nm.GetTodos(true);
-        var open = all.Where(t => !t.isCompleted)
-                      .OrderByDescending(t => t.priorityHigh)
-                      .ThenBy(t => t.sortOrder)
-                      .ThenBy(t => t.createdAt)
-                      .ToList();
-        foreach (var item in open) BuildRow(item);
+        var today = DateTime.Now.Date;
+
+        var open = all.Where(t => !t.isCompleted).ToList();
+        var overdue = SortDefault(open.Where(t => HasDateBefore(t, today)));
+        var todays  = SortDefault(open.Where(t => IsOnDate(t, today)));
+        var future  = open.Where(t => HasDateAfter(t, today))
+                          .OrderBy(t => t.dateKey)
+                          .ThenByDescending(t => t.priorityHigh)
+                          .ThenBy(t => t.sortOrder)
+                          .ThenBy(t => t.createdAt)
+                          .ToList();
+        var noDate  = SortDefault(open.Where(t => string.IsNullOrEmpty(t.dateKey)));
+
+        BuildSection("期限切れ", overdue, today, UITheme_FocusMode.AccentRed);
+        BuildSection("今日", todays, today, UITheme_FocusMode.AccentSatBlue);
+        BuildSection("今後", future, today, UITheme_FocusMode.TextCaption);
+        BuildSection("日付なし", noDate, today, UITheme_FocusMode.TextCaption);
 
         bool showDone = showDoneToggle != null && showDoneToggle.isOn;
         if (showDone)
@@ -75,23 +109,51 @@ public class TodoListUI : MonoBehaviour
                           .ToList();
             if (done.Count > 0)
             {
-                BuildSectionHeader($"完了済み · {done.Count}件");
-                foreach (var item in done) BuildRow(item);
+                BuildSectionHeader($"完了済み · {done.Count}件", UITheme_FocusMode.TextCaption);
+                foreach (var item in done) BuildRow(item, today);
             }
         }
 
         if (open.Count == 0 && !showDone) BuildEmptyLabel();
     }
 
+    private void BuildSection(string label, List<TodoItem> items, DateTime today, Color labelColor)
+    {
+        if (items.Count == 0) return;
+        BuildSectionHeader($"{label} · {items.Count}件", labelColor);
+        foreach (var item in items) BuildRow(item, today);
+    }
+
+    private static List<TodoItem> SortDefault(IEnumerable<TodoItem> src) =>
+        src.OrderByDescending(t => t.priorityHigh)
+           .ThenBy(t => t.sortOrder)
+           .ThenBy(t => t.createdAt)
+           .ToList();
+
+    private static bool TryDate(TodoItem t, out DateTime d)
+    {
+        d = default;
+        return !string.IsNullOrEmpty(t.dateKey) &&
+               DateTime.TryParseExact(t.dateKey, "yyyy-MM-dd",
+                   System.Globalization.CultureInfo.InvariantCulture,
+                   System.Globalization.DateTimeStyles.None, out d);
+    }
+
+    private static bool HasDateBefore(TodoItem t, DateTime today) => TryDate(t, out var d) && d.Date < today;
+    private static bool IsOnDate(TodoItem t, DateTime today) => TryDate(t, out var d) && d.Date == today;
+    private static bool HasDateAfter(TodoItem t, DateTime today) => TryDate(t, out var d) && d.Date > today;
+
     // ── 行の生成 ──────────────────────────────
 
-    private void BuildRow(TodoItem item)
+    private void BuildRow(TodoItem item, DateTime today)
     {
         bool done = item.isCompleted;
+        bool selected = item.id == _selectedId;
 
         var row = NewUI("Row_" + item.id, listContent);
         var rowImg = row.AddComponent<Image>();
-        rowImg.color = done ? UITheme_FocusMode.DoneBG : UITheme_FocusMode.PanelBG;
+        rowImg.color = selected ? UITheme_FocusMode.SelectedBG
+                     : done ? UITheme_FocusMode.DoneBG : UITheme_FocusMode.PanelBG;
         UIStyleKit.ApplyRounded(rowImg, 10f);
         var rowLE = row.AddComponent<LayoutElement>();
         rowLE.minHeight = 56; rowLE.preferredHeight = 56;
@@ -104,7 +166,8 @@ public class TodoListUI : MonoBehaviour
 
         var rowBtn = row.AddComponent<Button>();
         rowBtn.targetGraphic = rowImg;
-        rowBtn.onClick.AddListener(() => OpenEditModal(item));
+        var captured = item;
+        rowBtn.onClick.AddListener(() => { Select(captured); Rebuild(); });
 
         // チェック円
         var check = NewUI("Check", row.transform);
@@ -124,14 +187,13 @@ public class TodoListUI : MonoBehaviour
         checkLE.preferredWidth = 26; checkLE.preferredHeight = 26;
         var checkBtn = check.AddComponent<Button>();
         checkBtn.targetGraphic = checkImg;
-        var captured = item;
         checkBtn.onClick.AddListener(() =>
         {
             NotebookManager.Instance.SetTodoCompleted(captured.id, !captured.isCompleted);
             Rebuild();
         });
 
-        // タイトル(クリップ枠 + Overflow、Ellipsis不使用)
+        // タイトル(クリップ枠 + Overflow)
         var titleClip = NewUI("TitleClip", row.transform);
         titleClip.AddComponent<RectMask2D>();
         var clipLE = titleClip.AddComponent<LayoutElement>();
@@ -149,10 +211,21 @@ public class TodoListUI : MonoBehaviour
                 done ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.AccentRed,
                 UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentRed, 0.16f));
 
-        // 日付時刻チップ
+        // 日付時刻チップ(期限切れ=赤 / 今日=青)
         var dateLabel = FormatDateChip(item);
         if (dateLabel != null)
-            BuildChip(row.transform, dateLabel, UITheme_FocusMode.TextMuted, UITheme_FocusMode.InputBG);
+        {
+            Color chipText = UITheme_FocusMode.TextMuted;
+            Color chipBG = UITheme_FocusMode.InputBG;
+            if (!done && TryDate(item, out var d))
+            {
+                if (d.Date < today)
+                { chipText = UITheme_FocusMode.AccentRed; chipBG = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentRed, 0.14f); }
+                else if (d.Date == today)
+                { chipText = UITheme_FocusMode.AccentSatBlue; chipBG = UITheme_FocusMode.AccentBlueFaint; }
+            }
+            BuildChip(row.transform, dateLabel, chipText, chipBG);
+        }
     }
 
     private void BuildChip(Transform parent, string text, Color textColor, Color bg)
@@ -171,7 +244,7 @@ public class TodoListUI : MonoBehaviour
         label.alignment = TextAlignmentOptions.Center;
     }
 
-    private void BuildSectionHeader(string text)
+    private void BuildSectionHeader(string text, Color labelColor)
     {
         var sec = NewUI("Section", listContent);
         var le = sec.AddComponent<LayoutElement>();
@@ -182,7 +255,7 @@ public class TodoListUI : MonoBehaviour
         hlg.childControlWidth = true; hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
         hlg.childAlignment = TextAnchor.MiddleLeft;
-        NewText("Label", sec.transform, text, UITheme_FocusMode.FontCaption, UITheme_FocusMode.TextCaption);
+        NewText("Label", sec.transform, text, UITheme_FocusMode.FontCaption, labelColor);
         var line = NewUI("Line", sec.transform);
         var lineImg = line.AddComponent<Image>();
         lineImg.color = UITheme_FocusMode.BorderDivider;
@@ -231,10 +304,7 @@ public class TodoListUI : MonoBehaviour
 
     private static string FormatDateChip(TodoItem item)
     {
-        if (string.IsNullOrEmpty(item.dateKey)) return null;
-        if (!DateTime.TryParseExact(item.dateKey, "yyyy-MM-dd",
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var d)) return null;
+        if (!TryDate(item, out var d)) return null;
         var s = $"{d.Month}/{d.Day}";
         if (!string.IsNullOrEmpty(item.time)) s += " " + item.time;
         return s;
