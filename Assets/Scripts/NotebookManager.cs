@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -31,6 +31,7 @@ public class NotebookManager : MonoBehaviour
     private string PathWeeklyMemo  => Path.Combine(Application.persistentDataPath, "notebook_weekly_memo.json");
     private string PathStickyNotes => Path.Combine(Application.persistentDataPath, "notebook_sticky.json");
     private string PathTodo      => Path.Combine(Application.persistentDataPath, "notebook_todo.json");
+    private string PathTodoArchive => Path.Combine(Application.persistentDataPath, "notebook_todo_archive.json");
     private string PathRoutine   => Path.Combine(Application.persistentDataPath, "notebook_routine.json");
     private string PathMemoNotes => Path.Combine(Application.persistentDataPath, "notebook_memo_notes.json");
 
@@ -70,6 +71,7 @@ public class NotebookManager : MonoBehaviour
         memoNotes   = ReadJson<MemoNotesData>(PathMemoNotes)   ?? new MemoNotesData();
         EnsureDefaultMemoFolder();
         PruneOldEvents();
+        ArchiveOldTodos();
     }
 
     private static void WriteJson<T>(string path, T data)
@@ -329,6 +331,33 @@ public class NotebookManager : MonoBehaviour
 
     // ─── Todo CRUD ────────────────────────────────────────
     /// <summary>優先度高→sortOrder→作成順。includeCompleted=false で未完了のみ</summary>
+    // ─── Todoアーカイブ ───────────────────────────────────
+    // 完了後30日経過したTodoを本体から外し、アーカイブファイルへ追記する(起動時に1回)。
+    // アーカイブは追記専用で、ランタイムでは読み込まない(将来の振り返り・統計用)。
+    private const int TODO_ARCHIVE_DAYS = 30;
+
+    private void ArchiveOldTodos()
+    {
+        if (todoData == null || todoData.items == null || todoData.items.Count == 0) return;
+        var threshold = DateTime.Now.Date.AddDays(-TODO_ARCHIVE_DAYS);
+        var old = todoData.items.Where(t =>
+            t.isCompleted &&
+            !string.IsNullOrEmpty(t.completedAt) &&
+            DateTime.TryParseExact(t.completedAt, "yyyy-MM-dd HH:mm",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var dt) &&
+            dt.Date < threshold).ToList();
+        if (old.Count == 0) return;
+
+        var archive = ReadJson<TodoListData>(PathTodoArchive) ?? new TodoListData();
+        archive.items.AddRange(old);
+        WriteJson(PathTodoArchive, archive);
+
+        foreach (var t in old) todoData.items.Remove(t);
+        WriteJson(PathTodo, todoData);
+        Debug.Log("[NotebookManager] Todoアーカイブ: " + old.Count + "件を notebook_todo_archive.json へ移動");
+    }
+
     public List<TodoItem> GetTodos(bool includeCompleted = true)
     {
         var list = includeCompleted ? new List<TodoItem>(todoData.items)
