@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -53,6 +53,15 @@ public class MonthlyCalendarUI : MonoBehaviour
 
     private static readonly string[] DowLabels = {"日","月","火","水","木","金","土"};
     private const int MAX_CHIPS = 3; // 1セルに表示する最大件数
+
+    private int _lastDataVersion = -1;
+
+    private void Update()
+    {
+        // データ変更検知 → 自動Refresh（他タブでの done 切替などを即反映）
+        var nm = NotebookManager.Instance;
+        if (nm != null && nm.DataVersion != _lastDataVersion) Refresh();
+    }
 
     private void OnEnable()
     {
@@ -118,6 +127,7 @@ public class MonthlyCalendarUI : MonoBehaviour
 
     public void Refresh()
     {
+        _lastDataVersion = NotebookManager.Instance != null ? NotebookManager.Instance.DataVersion : -1;
         if (monthLabel != null)
             monthLabel.text = $"{currentYear} / {currentMonth:D2}";
         RefreshDowHeader();
@@ -291,6 +301,7 @@ public class MonthlyCalendarUI : MonoBehaviour
 
 private void SetCellEmpty(GameObject cell)
     {
+        CalendarDayIndicators.Clear(cell.transform);
         var img = cell.GetComponent<Image>();
         if (img != null) img.color = Color.clear;
         var btn = cell.GetComponent<Button>();
@@ -397,6 +408,12 @@ private void SetCellEmpty(GameObject cell)
                 moreLE.preferredHeight = 13f;
             }
         }
+
+        // Todo/Routine インジケータ（セル右上）
+        if (System.DateTime.TryParseExact(dateKey, "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var cellDate))
+            CalendarDayIndicators.Build(cell.transform, cellDate);
 
         // クリック
         var btn = cell.GetComponent<Button>();

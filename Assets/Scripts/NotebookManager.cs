@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -12,6 +12,9 @@ using UnityEngine;
 public class NotebookManager : MonoBehaviour
 {
     public static NotebookManager Instance { get; private set; }
+
+    /// <summary>データ変更カウンタ（SaveAll ごとに増加。UI 側の変更検知用）</summary>
+    public int DataVersion { get; private set; }
 
     private ScheduleData  scheduleData  = new ScheduleData();
     private MemoData      memoData      = new MemoData();
@@ -49,6 +52,7 @@ public class NotebookManager : MonoBehaviour
     // ─── Save / Load ──────────────────────────────────────
     public void SaveAll()
     {
+        DataVersion++;
         WriteJson(PathSchedule, scheduleData);
         WriteJson(PathMemo,     memoData);
         WriteJson(PathLifetime, lifetimeStats);

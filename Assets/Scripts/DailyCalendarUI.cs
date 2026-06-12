@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -557,8 +557,13 @@ private void BuildScaffold()
     private Vector2Int _lastScreenSize;
     private float _resizeRefreshAt = -1f;
 
+    private int _lastDataVersion = -1;
+
     private void Update()
     {
+        // データ変更検知 → 自動Refresh
+        var __nm = NotebookManager.Instance;
+        if (__nm != null && __nm.DataVersion != _lastDataVersion) { Refresh(); return; }
         // リサイズを検知し、0.25秒静止後にグリッドを再構築（ヘアラインを再スナップ）
         if (Screen.width != _lastScreenSize.x || Screen.height != _lastScreenSize.y)
         {
@@ -574,6 +579,7 @@ private void BuildScaffold()
 
     public void Refresh()
     {
+        _lastDataVersion = NotebookManager.Instance != null ? NotebookManager.Instance.DataVersion : -1;
         var __cv = GetComponentInParent<Canvas>();
         _hairline = UITheme_FocusMode.Hairline(__cv != null ? __cv.rootCanvas.scaleFactor : 1f);
 
