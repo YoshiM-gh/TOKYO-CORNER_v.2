@@ -64,6 +64,7 @@ public class DailyCalendarUI : MonoBehaviour
     private ScrollRect       _timelineScroll;
     private Transform        _timelineParent;
     private RectTransform    _stickyCanvas;
+    private RectTransform _todoPanel;   // 中央Todo列のルート
 
     // DowRow 内の直接 TMP 参照
     private TextMeshProUGUI  _dayDowTxt;
@@ -255,6 +256,14 @@ private void BuildScaffold()
         div.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
         var divLE = div.AddComponent<LayoutElement>(); divLE.preferredWidth = 2f; divLE.minWidth = 2f;
 
+        // 中央 Todo 列（時間の有無を問わずTodoを集約。日付なし=上/当日=下）
+        BuildTodoPanel(go.transform);
+
+        // 縦境界線（Todo列 ↔ 付箋）
+        var div2  = MakeGO("BodyDivider2", go.transform);
+        div2.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
+        var div2LE = div2.AddComponent<LayoutElement>(); div2LE.preferredWidth = 2f; div2LE.minWidth = 2f;
+
         BuildStickyPanel(go.transform);
         return go;
 }
@@ -263,7 +272,7 @@ private void BuildScaffold()
     {
         var go  = MakeGO("LeftPanel", parent);
         go.AddComponent<Image>().color = Color.clear;
-        go.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        go.AddComponent<LayoutElement>().flexibleWidth = 2f; // 2:2:3 のうち Left=2
         // VLG を使わずアンカー直指定で各行を配置
         const float hDow    = 56f;
         const float hPolicy = 80f;
@@ -505,11 +514,22 @@ private void BuildScaffold()
     }
 
     // ── 付箋パネル ─────────────────────────────────────────────
+    private void BuildTodoPanel(Transform parent)
+    {
+        // 中央Todo列の「枠」。中身（リスト・トップバー・編集）は
+        // フェーズ4で TodoListUI(displayMode=DailyToday) をアタッチして構築する。
+        // ここでは flexW=2 の空コンテナとして、2:2:3 レイアウトの器だけを用意する。
+        var go = MakeGO("TodoPanel", parent);
+        go.AddComponent<Image>().color = Color.clear;
+        go.AddComponent<LayoutElement>().flexibleWidth = 2f; // 2:2:3 のうち Todo=2（Leftと同幅）
+        _todoPanel = go.GetComponent<RectTransform>();
+    }
+
     private void BuildStickyPanel(Transform parent)
     {
         var sp  = MakeGO("StickyPanel", parent);
         sp.AddComponent<Image>().color = new Color(1f,1f,1f,0.015f);
-        sp.AddComponent<LayoutElement>().flexibleWidth = 2f;
+        sp.AddComponent<LayoutElement>().flexibleWidth = 3f; // 2:2:3 のうち Sticky=3
 
         var sc  = MakeGO("StickyCanvas", sp.transform);
         _stickyCanvas = sc.GetComponent<RectTransform>();
