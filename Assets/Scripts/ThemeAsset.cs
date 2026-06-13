@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -49,6 +49,10 @@ public class ThemeAsset : ScriptableObject
     public Color hoverBG;
     public Color selectedBG;
     public Color doneBG;
+
+    // ─── スクロールバー ───
+    public Color scrollTrack;   // 20px常時表示バーのトラック（背景）
+    public Color scrollHandle;  // つまみ（D&Dする部分）
 
     [Header("影")]
     public Color   shadowColor  = new Color(0f, 0f, 0f, 0.60f);

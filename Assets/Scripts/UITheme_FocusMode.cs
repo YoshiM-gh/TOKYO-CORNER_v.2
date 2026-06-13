@@ -182,6 +182,10 @@ public static class UITheme_FocusMode
     // ─── ボーダー幅 ───────────────────────────────────────────
     public const float BorderWidth = 0.5f;
 
+    // ─── スクロールバー ───────────────────────────────────────
+    public static Color ScrollTrack  => ThemeManager.Current.scrollTrack;
+    public static Color ScrollHandle => ThemeManager.Current.scrollHandle;
+
     // ─── ユーティリティ ───────────────────────────────────────
     public static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, a);
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +16,7 @@ public class DailyCalendarUI : MonoBehaviour
     // ── 定数 ──────────────────────────────────────────────────
     private const float HOUR_HEIGHT    = 60f;
     private const float TIME_COL_W     = 72f;
+    private const float SCROLLBAR_W    = 20f;  // D&Dしやすい幅・常時表示
     private const int   HOUR_COUNT     = 24;
     private float _hairline = 2f;   // 物理ピクセルにスナップ済みのヘアライン太さ（Refreshで更新）
     private const float NOTIME_ITEM_H  = 28f;
@@ -311,7 +312,7 @@ private void BuildScaffold()
                 if (sr != null)
                 {
                     sr.verticalScrollbar = vSb;
-                    sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+                    sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
                 }
             }
         }
@@ -403,7 +404,8 @@ private void BuildScaffold()
 
         var vp   = MakeGO("Viewport", sr.transform);
         var vpRT = vp.GetComponent<RectTransform>();
-        vpRT.anchorMin = Vector2.zero; vpRT.anchorMax = Vector2.one; vpRT.offsetMin = vpRT.offsetMax = Vector2.zero;
+        vpRT.anchorMin = Vector2.zero; vpRT.anchorMax = Vector2.one;
+        vpRT.offsetMin = Vector2.zero; vpRT.offsetMax = new Vector2(-SCROLLBAR_W, 0f); // 右端をスクロールバー幅ぶん空ける（重ねない）
         vp.AddComponent<RectMask2D>();
 
         var ct   = MakeGO("Container", vp.transform);
@@ -429,7 +431,8 @@ private void BuildScaffold()
 
         var vp  = MakeGO("Viewport", go.transform);
         var vpRT = vp.GetComponent<RectTransform>();
-        vpRT.anchorMin = Vector2.zero; vpRT.anchorMax = Vector2.one; vpRT.offsetMin = vpRT.offsetMax = Vector2.zero;
+        vpRT.anchorMin = Vector2.zero; vpRT.anchorMax = Vector2.one;
+        vpRT.offsetMin = Vector2.zero; vpRT.offsetMax = new Vector2(-SCROLLBAR_W, 0f); // 右端をスクロールバー幅ぶん空ける（重ねない）
         vp.AddComponent<RectMask2D>();
 
         var tl   = MakeGO("TimelineParent", vp.transform);
@@ -457,12 +460,14 @@ private void BuildScaffold()
         sbRT.anchorMin = new Vector2(1f, 0f);
         sbRT.anchorMax = new Vector2(1f, 1f);
         sbRT.pivot     = new Vector2(1f, 0.5f);
-        // 幅 3px: X→ offsetMin.x=-3, offsetMax.x=0
+        // 幅 20px: X→ offsetMin.x=-SCROLLBAR_W, offsetMax.x=0（ビューポートは別途20px narrow済みなので重ならない）
         // 高さ: bottom から parent.top+topOffset まで（タイムライン領域）
-        sbRT.offsetMin = new Vector2(-3f, 0f);
+        sbRT.offsetMin = new Vector2(-SCROLLBAR_W, 0f);
         sbRT.offsetMax = new Vector2(0f, topOffset); // topOffset は負値
 
-        sbGO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.06f);
+        var trackImg = sbGO.AddComponent<Image>();
+        trackImg.color = UITheme_FocusMode.ScrollTrack;
+        ApplyRoundedSprite(trackImg, 10f); // トラック: 半径10px（はっきり角丸）
         sbGO.AddComponent<RectMask2D>(); // Handle をトラック幅内にクリップ
         var sb = sbGO.AddComponent<Scrollbar>();
         sb.direction = Scrollbar.Direction.BottomToTop;
@@ -476,11 +481,27 @@ private void BuildScaffold()
         // Handle
         var hGO  = MakeGO("Handle", saGO.transform);
         var hImg = hGO.AddComponent<Image>();
-        hImg.color = new Color(1f, 1f, 1f, 0.32f);
-        sb.handleRect    = hGO.GetComponent<RectTransform>();
+        hImg.color = UITheme_FocusMode.ScrollHandle;
+        ApplyRoundedSprite(hImg, 10f); // つまみ: 半径10px（幅20pxの上限＝完全ピル）
+        // つまみを左右2px内側に寄せる（トラックの縁との間に余白を作り、はみ出し防止＋見栄え）
+        var hRT = hGO.GetComponent<RectTransform>();
+        hRT.offsetMin = new Vector2(0f, hRT.offsetMin.y); // パディング0：つまみ幅をトラック一杯(20px)にして半径上限を10pxへ
+        hRT.offsetMax = new Vector2(0f, hRT.offsetMax.y);
+        sb.handleRect    = hRT;
         sb.targetGraphic = hImg;
 
         return sb;
+    }
+
+    /// <summary>cardSprite(角丸9-slice)を指定半径(px)で当てる。
+    /// ppuMultiplier = border.x * 100 / (pixelsPerUnit * radiusPx) で半径を逆算。
+    /// 細い要素(スクロールバー等)でも角丸が潰れないよう半径ベースで指定する。</summary>
+    private void ApplyRoundedSprite(Image img, float radiusPx)
+    {
+        if (img == null || cardSprite == null || radiusPx <= 0f) return;
+        img.sprite = cardSprite;
+        img.type = Image.Type.Sliced;
+        img.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * radiusPx);
     }
 
     // ── 付箋パネル ─────────────────────────────────────────────
