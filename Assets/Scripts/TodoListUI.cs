@@ -192,20 +192,18 @@ public class TodoListUI : MonoBehaviour
         var today = DateTime.Now.Date;
 
         var open = all.Where(t => !t.isCompleted).ToList();
-        var overdue = SortDefault(open.Where(t => HasDateBefore(t, today)));
-        var todays  = SortDefault(open.Where(t => IsOnDate(t, today)));
-        var future  = open.Where(t => HasDateAfter(t, today))
-                          .OrderBy(t => t.dateKey)
-                          .ThenByDescending(t => t.priorityHigh)
-                          .ThenBy(t => t.sortOrder)
-                          .ThenBy(t => t.createdAt)
-                          .ToList();
+        // 各グループ内は「追加順」（sortOrder → createdAt）。優先度・時間は並びに影響させない。
+        // 日付ありは日付昇順（期限切れ=過去日が自然に上位、今日、未来…の順）。
         var noDate  = SortDefault(open.Where(t => string.IsNullOrEmpty(t.dateKey)));
+        var overdue = open.Where(t => HasDateBefore(t, today)).OrderBy(t => t.dateKey).ThenBy(t => t.sortOrder).ThenBy(t => t.createdAt).ToList();
+        var todays  = SortDefault(open.Where(t => IsOnDate(t, today)));
+        var future  = open.Where(t => HasDateAfter(t, today)).OrderBy(t => t.dateKey).ThenBy(t => t.sortOrder).ThenBy(t => t.createdAt).ToList();
 
+        // グループ順: 日付なし → 期限切れ → 今日 → 今後 →（完了済み）
+        BuildSection("日付なし", noDate, today, UITheme_FocusMode.TextCaption);
         BuildSection("期限切れ", overdue, today, UITheme_FocusMode.AccentRed);
         BuildSection("今日", todays, today, UITheme_FocusMode.AccentSatBlue);
         BuildSection("今後", future, today, UITheme_FocusMode.TextCaption);
-        BuildSection("日付なし", noDate, today, UITheme_FocusMode.TextCaption);
 
         bool showDone = showDoneToggle != null && showDoneToggle.isOn;
         if (showDone)
@@ -230,9 +228,10 @@ public class TodoListUI : MonoBehaviour
         foreach (var item in items) BuildRow(item, today);
     }
 
+    // 各グループ内の既定の並び = 追加順（sortOrder → createdAt）。
+    // 優先度・時間は並びに影響させない（フェーズ2確定仕様）。
     private static List<TodoItem> SortDefault(IEnumerable<TodoItem> src) =>
-        src.OrderByDescending(t => t.priorityHigh)
-           .ThenBy(t => t.sortOrder)
+        src.OrderBy(t => t.sortOrder)
            .ThenBy(t => t.createdAt)
            .ToList();
 
@@ -248,6 +247,12 @@ public class TodoListUI : MonoBehaviour
     private static bool HasDateBefore(TodoItem t, DateTime today) => TryDate(t, out var d) && d.Date < today;
     private static bool IsOnDate(TodoItem t, DateTime today) => TryDate(t, out var d) && d.Date == today;
     private static bool HasDateAfter(TodoItem t, DateTime today) => TryDate(t, out var d) && d.Date > today;
+    // 期限切れ日数 = 今日 - 期限日（最低1日）。過去日でない場合は0。
+    private static int DaysOverdue(TodoItem t, DateTime today)
+    {
+        if (!TryDate(t, out var d) || d.Date >= today) return 0;
+        return Mathf.Max(1, (int)(today - d.Date).TotalDays);
+    }
 
     // ── 行の生成 ──────────────────────────────
 
@@ -308,20 +313,26 @@ public class TodoListUI : MonoBehaviour
                 done ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.AccentRed,
                 UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentRed, 0.16f));
 
-        // 日付時刻チップ(期限切れ=赤 / 今日=青)
-        var dateLabel = FormatDateChip(item);
-        if (dateLabel != null)
+        // チップ: 期限切れ(過去日)は「○日経過」、それ以外は日付/時刻チップ。
+        // 「○日経過」は日付チップとは別軸の“放置度”情報（Daily でも表示し積み残しを可視化）。
+        if (!done && HasDateBefore(item, today))
         {
-            Color chipText = UITheme_FocusMode.TextMuted;
-            Color chipBG = UITheme_FocusMode.InputBG;
-            if (!done && TryDate(item, out var d))
+            int days = DaysOverdue(item, today);
+            BuildChip(row.transform, days + "日経過",
+                UITheme_FocusMode.AccentRed,
+                UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentRed, 0.14f));
+        }
+        else
+        {
+            var dateLabel = FormatDateChip(item);
+            if (dateLabel != null)
             {
-                if (d.Date < today)
-                { chipText = UITheme_FocusMode.AccentRed; chipBG = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentRed, 0.14f); }
-                else if (d.Date == today)
+                Color chipText = UITheme_FocusMode.TextMuted;
+                Color chipBG = UITheme_FocusMode.InputBG;
+                if (!done && IsOnDate(item, today))
                 { chipText = UITheme_FocusMode.AccentSatBlue; chipBG = UITheme_FocusMode.AccentBlueFaint; }
+                BuildChip(row.transform, dateLabel, chipText, chipBG);
             }
-            BuildChip(row.transform, dateLabel, chipText, chipBG);
         }
 
         // 「…」詳細を開くアイコン（右端）
