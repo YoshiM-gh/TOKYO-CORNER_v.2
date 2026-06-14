@@ -50,6 +50,17 @@ public class TodoDetailUI : MonoBehaviour
 
     public string CurrentId => _target?.id;
 
+    /// <summary>外部（リストのインライン編集）からタイトルだけを同期する。
+    /// 指定idが今開いている対象と一致する時のみ、タイトル欄を更新（他フィールドは触らない）。</summary>
+    public void RefreshTitleIfOpen(string id, string newTitle)
+    {
+        if (_target == null || _target.id != id) return;
+        if (titleInput == null) return;
+        _loading = true;                       // この更新で onValueChanged/onEndEdit を誤発火させない
+        titleInput.text = newTitle ?? "";
+        _loading = false;
+    }
+
     private void Start()
     {
         dateTriggerBtn?.onClick.AddListener(TogglePicker);

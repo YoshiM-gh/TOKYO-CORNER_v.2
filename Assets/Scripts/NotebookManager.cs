@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -387,8 +387,23 @@ public class NotebookManager : MonoBehaviour
 
     public void UpdateTodo(TodoItem item)
     {
-        var idx = todoData.items.FindIndex(t => t.id == item.id);
-        if (idx >= 0) todoData.items[idx] = item;
+        if (item == null) return;
+        var existing = todoData.items.Find(t => t.id == item.id);
+        if (existing == null) return;
+        // 【重要】インスタンスを差し替えず、既存インスタンスへ全フィールドをコピーする。
+        // これにより todoData.items 内のインスタンス同一性が保たれ、
+        // リストの行・詳細ペイン・カレンダー等が同じ参照を共有し続ける（双方向同期の前提）。
+        // 差し替え方式だと、別箇所が古いインスタンスを保持して上書き事故が起きる。
+        if (ReferenceEquals(existing, item)) { SaveAll(); return; } // 同一なら何もしない
+        existing.title        = item.title;
+        existing.memo         = item.memo;
+        existing.dateKey      = item.dateKey;
+        existing.time         = item.time;
+        existing.priorityHigh = item.priorityHigh;
+        existing.isCompleted  = item.isCompleted;
+        existing.completedAt  = item.completedAt;
+        existing.createdAt    = item.createdAt;
+        existing.sortOrder    = item.sortOrder;
         SaveAll();
     }
 
