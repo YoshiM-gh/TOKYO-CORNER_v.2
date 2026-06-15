@@ -404,6 +404,21 @@ public class NotebookManager : MonoBehaviour
         SaveAll();
     }
 
+    /// <summary>当日タスクを翌日へ送る（Daily の「→」翌日送り）。
+    /// 日付を変えるグループ移動なので sortOrder は破棄（0）する（フェーズ3の大原則）。</summary>
+    public void MoveTodoToNextDay(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+        var t = todoData.items.Find(x => x.id == id);
+        if (t == null) return;
+        DateTime baseDate;
+        if (!DateTime.TryParse(t.dateKey, out baseDate)) baseDate = DateTime.Now.Date;
+        t.dateKey = DateKey(baseDate.AddDays(1)); // 翌日
+        t.sortOrder = 0;                          // 別の日付塊へ移るので並び順は破棄
+        SaveAll();
+    }
+
+
     public void UpdateTodo(TodoItem item)
     {
         if (item == null) return;

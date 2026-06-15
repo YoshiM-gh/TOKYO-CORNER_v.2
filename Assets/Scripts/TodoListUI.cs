@@ -397,6 +397,16 @@ public class TodoListUI : MonoBehaviour
             });
         }
 
+        // 「→」翌日送り（Daily の当日タスクのみ）。押すと即・翌日へ（確認なし）。
+        if (displayMode == TodoDisplayMode.DailyToday && !done && IsOnDate(item, today))
+        {
+            BuildReorderButton(row.transform, "\u2192", true, () => // →
+            {
+                NotebookManager.Instance?.MoveTodoToNextDay(item.id);
+                Rebuild();
+            });
+        }
+
         // 「…」詳細を開くアイコン（右端）
         var more = NewUI("MoreBtn", row.transform);
         var moreImg = more.AddComponent<Image>();
