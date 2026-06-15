@@ -16,6 +16,7 @@ public class TodoModal : MonoBehaviour
 {
     [SerializeField] private Michsky.MUIP.ModalWindowManager modal;
     [SerializeField] private GameObject deleteBtnGO;
+    [SerializeField] private Button deleteBtn;
 
     [SerializeField] private TMP_InputField titleInput;
     [SerializeField] private TMP_InputField memoInput;
@@ -48,6 +49,7 @@ public class TodoModal : MonoBehaviour
     private void Start()
     {
         modal?.onConfirm.AddListener(OnSave);
+        deleteBtn?.onClick.AddListener(OnDeleteTask);
         dateTriggerBtn?.onClick.AddListener(TogglePicker);
         hourDecBtn?.onClick.AddListener(() => ShiftHour(-1));
         hourIncBtn?.onClick.AddListener(() => ShiftHour(+1));
