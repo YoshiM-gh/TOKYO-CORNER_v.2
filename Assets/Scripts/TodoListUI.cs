@@ -22,6 +22,8 @@ public class TodoListUI : MonoBehaviour
 
     private string _selectedId;
     private bool _suppressInline; // インライン編集の同期更新中、value/endEditの誤発火を抑制
+    private string _flashTodoId; // 並べ替え直後に一瞬ハイライトする行のid（クリック結果のフィードバック）
+    private Coroutine _flashCo;     // フラッシュは常に1本だけ（多重起動による色の揺れを防ぐ）
 
     // ── インラインタイトル編集のカスタムキャレット（一元管理: 編集中の1行だけ追従） ──
     // 標準キャレットは動的生成InputFieldで見えないため、Imageで自前描画する（StickyNote方式）。
@@ -201,14 +203,14 @@ public class TodoListUI : MonoBehaviour
 
         // グループ順: 日付なし → 期限切れ → 今日 → 未来日ごと →（完了済み）
         // 日付ありは「実日付の見出し」で区切る（行からは日付チップを廃止＝見出しが日付を持つ）。
-        BuildSection("日付なし", noDate, today, UITheme_FocusMode.TextCaption);
-        BuildSection("期限切れ", overdue, today, UITheme_FocusMode.AccentRed); // 過去日は一塊（各行は「○日経過」）
-        BuildSection("今日", todays, today, UITheme_FocusMode.AccentSatBlue);
-        // 未来日: dateKey ごとにグループ化し、各日付を見出し「M/d（曜）」で出す（昇順）
+        BuildSection("日付なし", noDate, today, UITheme_FocusMode.TextCaption, canReorder: true);
+        BuildSection("期限切れ", overdue, today, UITheme_FocusMode.AccentRed, canReorder: false); // 期限切れは並べ替えなし
+        BuildSection("今日", todays, today, UITheme_FocusMode.AccentSatBlue, canReorder: true);
+        // 未来日: dateKey ごとにグループ化し、各日付を見出し「M/d（曜）」で出す（昇順）。各日付内は並べ替え可。
         foreach (var g in future.GroupBy(t => t.dateKey).OrderBy(g => g.Key))
         {
             var items = g.OrderBy(t => t.sortOrder).ThenBy(t => t.createdAt).ToList();
-            BuildSection(FormatDateHeader(g.Key), items, today, UITheme_FocusMode.TextCaption);
+            BuildSection(FormatDateHeader(g.Key), items, today, UITheme_FocusMode.TextCaption, canReorder: true);
         }
 
         bool showDone = showDoneToggle != null && showDoneToggle.isOn;
@@ -220,18 +222,24 @@ public class TodoListUI : MonoBehaviour
             if (done.Count > 0)
             {
                 BuildSectionHeader($"完了済み · {done.Count}件", UITheme_FocusMode.TextCaption);
-                foreach (var item in done) BuildRow(item, today);
+                foreach (var item in done) BuildRow(item, today, false, null, null); // 完了済みは並べ替え不可
             }
         }
 
         if (open.Count == 0 && !showDone) BuildEmptyLabel();
     }
 
-    private void BuildSection(string label, List<TodoItem> items, DateTime today, Color labelColor)
+    private void BuildSection(string label, List<TodoItem> items, DateTime today, Color labelColor, bool canReorder = false)
     {
         if (items.Count == 0) return;
         BuildSectionHeader($"{label} · {items.Count}件", labelColor);
-        foreach (var item in items) BuildRow(item, today);
+        // 同一グループ内の前後関係を渡す。先頭/末尾は prev/next が null（矢印グレーアウト）。
+        for (int i = 0; i < items.Count; i++)
+        {
+            var prev = (i > 0) ? items[i - 1] : null;
+            var next = (i < items.Count - 1) ? items[i + 1] : null;
+            BuildRow(items[i], today, canReorder, prev, next);
+        }
     }
 
     // 各グループ内の既定の並び = 追加順（sortOrder → createdAt）。
@@ -262,7 +270,7 @@ public class TodoListUI : MonoBehaviour
 
     // ── 行の生成 ──────────────────────────────
 
-    private void BuildRow(TodoItem item, DateTime today)
+    private void BuildRow(TodoItem item, DateTime today, bool canReorder = false, TodoItem prevItem = null, TodoItem nextItem = null)
     {
         bool done = item.isCompleted;
         bool selected = item.id == _selectedId;
@@ -272,6 +280,13 @@ public class TodoListUI : MonoBehaviour
         rowImg.color = selected ? UITheme_FocusMode.SelectedBG
                      : done ? UITheme_FocusMode.DoneBG : UITheme_FocusMode.PanelBG;
         UIStyleKit.ApplyRounded(rowImg, 10f);
+        // 並べ替え直後の行なら一瞬ハイライト（クリック結果のフィードバック）
+        if (_flashTodoId == item.id)
+        {
+            _flashTodoId = null;
+            if (_flashCo != null) StopCoroutine(_flashCo); // 前のフラッシュを止めて1本に保つ
+            _flashCo = StartCoroutine(FlashRow(rowImg, selected, done));
+        }
         var rowLE = row.AddComponent<LayoutElement>();
         rowLE.minHeight = 56; rowLE.preferredHeight = 56;
         var hlg = row.AddComponent<HorizontalLayoutGroup>();
@@ -337,6 +352,20 @@ public class TodoListUI : MonoBehaviour
             BuildChip(row.transform, item.time, chipText, chipBG);
         }
 
+        // ↑↓ 並べ替えボタン（同一日付グループ内のみ・「…」の手前）。
+        // canReorder=false のグループ（期限切れ・完了済み）には出さない。
+        if (canReorder)
+        {
+            BuildReorderButton(row.transform, "\u25B2", prevItem != null, () => // ▲
+            {
+                if (prevItem != null) { _flashTodoId = item.id; NotebookManager.Instance?.SwapTodoOrder(item.id, prevItem.id); Rebuild(); }
+            });
+            BuildReorderButton(row.transform, "\u25BC", nextItem != null, () => // ▼
+            {
+                if (nextItem != null) { _flashTodoId = item.id; NotebookManager.Instance?.SwapTodoOrder(item.id, nextItem.id); Rebuild(); }
+            });
+        }
+
         // 「…」詳細を開くアイコン（右端）
         var more = NewUI("MoreBtn", row.transform);
         var moreImg = more.AddComponent<Image>();
@@ -352,6 +381,94 @@ public class TodoListUI : MonoBehaviour
         var moreBtn = more.AddComponent<Button>();
         moreBtn.targetGraphic = moreImg;
         moreBtn.onClick.AddListener(() => { Select(captured); Rebuild(); });
+    }
+
+    // 並べ替え用の小さな矢印ボタン。enabled=false なら押せずグレーアウト表示。
+    // 並べ替え直後の行を一瞬ハイライトしてフェードで戻す（クリックの結果が目で追える）。
+    private System.Collections.IEnumerator FlashRow(Image rowImg, bool selected, bool done)
+    {
+        if (rowImg == null) yield break;
+        Color baseColor = selected ? UITheme_FocusMode.SelectedBG
+                        : done ? UITheme_FocusMode.DoneBG : UITheme_FocusMode.PanelBG;
+        Color flashColor = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.32f);
+
+        // 移動をしっかり見せてから光らせる開始ディレイ。
+        float e = 0f, delay = 0.30f;
+        while (e < delay) { if (rowImg == null) yield break; e += Time.unscaledDeltaTime; yield return null; }
+
+        // 点灯した瞬間が最大、そこから単調に減衰するだけのカーブ（山を1つにして二峰感を排除）。
+        //   強さ k = (1-progress)^2 … progress 0 で最大、なめらかに 0 へ。
+        float dur = 0.9f; e = 0f; // フェードアウトの余韻を少し長く
+        while (e < dur)
+        {
+            if (rowImg == null) yield break;
+            e += Time.unscaledDeltaTime;
+            float p = Mathf.Clamp01(e / dur);
+            float k = (1f - p) * (1f - p);              // 先頭が最大→なめらかに0へ減衰（山は1つ）
+            rowImg.color = Color.Lerp(baseColor, flashColor, k);
+            yield return null;
+        }
+        if (rowImg != null) rowImg.color = baseColor;
+        _flashCo = null;
+    }
+
+    private const float REORDER_GLYPH_SIZE = 14f; // ▲▼の固定サイズ
+    private void BuildReorderButton(Transform parent, string glyph, bool enabled, UnityEngine.Events.UnityAction onClick)
+    {
+        var go = NewUI("ReorderBtn", parent);
+        var le = go.AddComponent<LayoutElement>();
+        le.minWidth = 26; le.preferredWidth = 26; le.minHeight = 30;
+
+        // 背景（当たり判定＆ホバー/押下の色遷移面）。type=Simple かつ sprite=null だと
+        // Unity 既定の白テクスチャで矩形が描画されるので、ColorTint の色変化が見える。
+        var bg = go.AddComponent<Image>();
+        bg.sprite = null;
+        bg.type = Image.Type.Simple;
+        bg.color = Color.clear; // 通常は透明（ColorTintのnormal=clearと一致）
+
+        // ▲▼ グリフ。Kotonoruは▲(U+25B2)グリフを持たずNotoSansJPにフォールバックして
+        // ▲と▼でサイズが食い違う。→ 両方のグリフを持つ日本語フォールバックフォントに固定して揃える。
+        var txt = NewText("Arrow", go.transform, glyph, UITheme_FocusMode.FontCaption,
+            enabled ? UITheme_FocusMode.TextSecondary : UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextMuted, 0.28f));
+        var jp = GetJpFallbackFont();
+        if (jp != null) txt.font = jp;             // ▲▼を同一フォントで描画＝サイズ統一
+        txt.fontSize = REORDER_GLYPH_SIZE;
+        txt.enableAutoSizing = false;
+        txt.alignment = TextAlignmentOptions.Center;
+        txt.raycastTarget = false;
+        var trt = txt.GetComponent<RectTransform>();
+        trt.anchorMin = Vector2.zero; trt.anchorMax = Vector2.one;
+        trt.offsetMin = Vector2.zero; trt.offsetMax = Vector2.zero;
+
+        if (enabled)
+        {
+            var btn = go.AddComponent<Button>();
+            btn.transition = Selectable.Transition.ColorTint;
+            btn.targetGraphic = bg;
+            var cb = btn.colors;
+            cb.normalColor      = Color.clear;
+            cb.highlightedColor = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextSecondary, 0.22f); // ホバーで薄グレー
+            cb.pressedColor     = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.55f); // 押下で青
+            cb.selectedColor    = Color.clear;
+            cb.disabledColor    = Color.clear;
+            cb.colorMultiplier  = 1f;
+            cb.fadeDuration     = 0.08f;
+            btn.colors = cb;
+            btn.onClick.AddListener(onClick);
+        }
+    }
+
+    // ▲▼ を同一フォントで揃えるための日本語フォールバックフォント取得（NotoSansJP想定）。
+    private TMP_FontAsset _jpFallbackCache;
+    private TMP_FontAsset GetJpFallbackFont()
+    {
+        if (_jpFallbackCache != null) return _jpFallbackCache;
+        // TMPの設定にあるフォールバックの先頭（日本語）を使う。無ければResourcesから探す。
+        var settings = TMPro.TMP_Settings.fallbackFontAssets;
+        if (settings != null && settings.Count > 0) _jpFallbackCache = settings[0];
+        if (_jpFallbackCache == null)
+            _jpFallbackCache = Resources.Load<TMP_FontAsset>("Fonts & Materials/NotoSansJP-Regular SDF");
+        return _jpFallbackCache;
     }
 
     private void BuildChip(Transform parent, string text, Color textColor, Color bg)

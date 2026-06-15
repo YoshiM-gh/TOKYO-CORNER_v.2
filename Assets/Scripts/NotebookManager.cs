@@ -379,10 +379,29 @@ public class NotebookManager : MonoBehaviour
 
     public TodoItem AddTodo(string title)
     {
-        var t = new TodoItem { id = Guid.NewGuid().ToString(), title = title, createdAt = NowKey() };
+        // sortOrder は既存最大+1 を採番（各タスクが一意の並び順を持つ＝並べ替えの前提）。
+        int nextOrder = (todoData.items.Count > 0) ? todoData.items.Max(x => x.sortOrder) + 1 : 0;
+        var t = new TodoItem { id = Guid.NewGuid().ToString(), title = title, createdAt = NowKey(), sortOrder = nextOrder };
         todoData.items.Add(t);
         SaveAll();
         return t;
+    }
+
+    /// <summary>2つのTodoのsortOrderを入れ替えて保存する（同一日付グループ内の上下並べ替え用）。</summary>
+    public void SwapTodoOrder(string idA, string idB)
+    {
+        if (string.IsNullOrEmpty(idA) || string.IsNullOrEmpty(idB) || idA == idB) return;
+        var a = todoData.items.Find(t => t.id == idA);
+        var b = todoData.items.Find(t => t.id == idB);
+        if (a == null || b == null) return;
+        // sortOrderが同値（未採番=0同士など）だと交換しても順序が変わらない。
+        // その場合は現在のリスト内の相対位置から一意な値を一旦焼き付けてから交換する。
+        if (a.sortOrder == b.sortOrder)
+        {
+            for (int i = 0; i < todoData.items.Count; i++) todoData.items[i].sortOrder = i;
+        }
+        int tmp = a.sortOrder; a.sortOrder = b.sortOrder; b.sortOrder = tmp;
+        SaveAll();
     }
 
     public void UpdateTodo(TodoItem item)
