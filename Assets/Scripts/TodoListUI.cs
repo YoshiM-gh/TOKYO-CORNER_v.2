@@ -199,11 +199,17 @@ public class TodoListUI : MonoBehaviour
         var todays  = SortDefault(open.Where(t => IsOnDate(t, today)));
         var future  = open.Where(t => HasDateAfter(t, today)).OrderBy(t => t.dateKey).ThenBy(t => t.sortOrder).ThenBy(t => t.createdAt).ToList();
 
-        // グループ順: 日付なし → 期限切れ → 今日 → 今後 →（完了済み）
+        // グループ順: 日付なし → 期限切れ → 今日 → 未来日ごと →（完了済み）
+        // 日付ありは「実日付の見出し」で区切る（行からは日付チップを廃止＝見出しが日付を持つ）。
         BuildSection("日付なし", noDate, today, UITheme_FocusMode.TextCaption);
-        BuildSection("期限切れ", overdue, today, UITheme_FocusMode.AccentRed);
+        BuildSection("期限切れ", overdue, today, UITheme_FocusMode.AccentRed); // 過去日は一塊（各行は「○日経過」）
         BuildSection("今日", todays, today, UITheme_FocusMode.AccentSatBlue);
-        BuildSection("今後", future, today, UITheme_FocusMode.TextCaption);
+        // 未来日: dateKey ごとにグループ化し、各日付を見出し「M/d（曜）」で出す（昇順）
+        foreach (var g in future.GroupBy(t => t.dateKey).OrderBy(g => g.Key))
+        {
+            var items = g.OrderBy(t => t.sortOrder).ThenBy(t => t.createdAt).ToList();
+            BuildSection(FormatDateHeader(g.Key), items, today, UITheme_FocusMode.TextCaption);
+        }
 
         bool showDone = showDoneToggle != null && showDoneToggle.isOn;
         if (showDone)
@@ -322,17 +328,13 @@ public class TodoListUI : MonoBehaviour
                 UITheme_FocusMode.AccentRed,
                 UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentRed, 0.14f));
         }
-        else
+        else if (!string.IsNullOrEmpty(item.time))
         {
-            var dateLabel = FormatDateChip(item);
-            if (dateLabel != null)
-            {
-                Color chipText = UITheme_FocusMode.TextMuted;
-                Color chipBG = UITheme_FocusMode.InputBG;
-                if (!done && IsOnDate(item, today))
-                { chipText = UITheme_FocusMode.AccentSatBlue; chipBG = UITheme_FocusMode.AccentBlueFaint; }
-                BuildChip(row.transform, dateLabel, chipText, chipBG);
-            }
+            // 日付は見出し（実日付セクション）が持つので、行には時刻のみ表示する。
+            // 時刻が無いタスクはチップ自体を出さない。
+            Color chipText = (!done && IsOnDate(item, today)) ? UITheme_FocusMode.AccentSatBlue : UITheme_FocusMode.TextMuted;
+            Color chipBG   = (!done && IsOnDate(item, today)) ? UITheme_FocusMode.AccentBlueFaint : UITheme_FocusMode.InputBG;
+            BuildChip(row.transform, item.time, chipText, chipBG);
         }
 
         // 「…」詳細を開くアイコン（右端）
@@ -519,6 +521,15 @@ public class TodoListUI : MonoBehaviour
         tmp.enableWordWrapping = false;
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
         return tmp;
+    }
+
+    // 未来日セクションの見出し用: "M/d（曜）"。dateKey は "yyyy-MM-dd"。
+    private static readonly string[] _jpDow = { "日", "月", "火", "水", "木", "金", "土" };
+    private static string FormatDateHeader(string dateKey)
+    {
+        if (DateTime.TryParse(dateKey, out var d))
+            return $"{d.Month}/{d.Day}（{_jpDow[(int)d.DayOfWeek]}）";
+        return dateKey;
     }
 
     private static string FormatDateChip(TodoItem item)
