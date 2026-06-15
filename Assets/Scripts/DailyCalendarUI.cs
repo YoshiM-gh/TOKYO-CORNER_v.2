@@ -577,6 +577,9 @@ private void BuildScaffold()
         _todoList = go.AddComponent<TodoListUI>();
         _todoList.InitForDaily(content.transform, showDoneToggle, addBtn, null); // font=null→TMP既定にフォールバック
         _todoList.SetViewDate(_currentDate); // 初期表示日を反映
+        // Daily編集モーダル（Canvas直下にシーン配置・1個）を探して紐づける。
+        var todoModal = UnityEngine.Object.FindObjectOfType<TodoModal>(true);
+        if (todoModal != null) _todoList.SetTodoModal(todoModal);
     }
 
     // Daily の TopBar 用「完了済みを表示」トグル。Todoタブと同一寸法（全体150x24/Box24x24/Check14x14/fontSize18）。

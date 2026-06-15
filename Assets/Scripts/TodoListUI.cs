@@ -24,6 +24,7 @@ public class TodoListUI : MonoBehaviour
     [SerializeField] private TodoDetailUI detail;
     [SerializeField] private TodoDisplayMode displayMode = TodoDisplayMode.FullList; // 既定はTodoタブ用
     private DateTime _viewDate = DateTime.Now.Date; // DailyToday時の表示日（Dailyの<>で動く）。FullListでは未使用
+    private TodoModal _todoModal; // Daily編集モーダル（DailyTodayのとき「⋯」で開く）
 
     private string _selectedId;
     private bool _suppressInline; // インライン編集の同期更新中、value/endEditの誤発火を抑制
@@ -81,6 +82,27 @@ public class TodoListUI : MonoBehaviour
         _viewDate = date.Date;
         if (_wired) Rebuild();
     }
+
+    /// <summary>Daily 編集モーダルを紐づける（DailyCalendarUI から渡す）。
+    /// モーダルでの保存・削除後は Rebuild してリストに反映。</summary>
+    public void SetTodoModal(TodoModal m)
+    {
+        if (_todoModal == m) return;
+        if (_todoModal != null)
+        {
+            _todoModal.OnChanged -= Rebuild;
+            _todoModal.OnDeleted -= OnModalDeleted;
+        }
+        _todoModal = m;
+        if (_todoModal != null)
+        {
+            _todoModal.OnChanged += Rebuild;
+            _todoModal.OnDeleted += OnModalDeleted;
+        }
+    }
+
+    private void OnModalDeleted(string id) => Rebuild();
+
 
 
     // ── カスタムキャレット制御（一元管理）────────────────────────
@@ -448,7 +470,12 @@ public class TodoListUI : MonoBehaviour
         moreTxtRT.offsetMin = Vector2.zero; moreTxtRT.offsetMax = Vector2.zero;
         var moreBtn = more.AddComponent<Button>();
         moreBtn.targetGraphic = moreImg;
-        moreBtn.onClick.AddListener(() => { Select(captured); Rebuild(); });
+        moreBtn.onClick.AddListener(() =>
+        {
+            if (displayMode == TodoDisplayMode.DailyToday && _todoModal != null)
+                _todoModal.OpenEdit(captured); // Dailyはモーダルで編集
+            else { Select(captured); Rebuild(); } // Todoタブは従来どおり右ペイン
+        });
     }
 
     // 並べ替え用の小さな矢印ボタン。enabled=false なら押せずグレーアウト表示。
