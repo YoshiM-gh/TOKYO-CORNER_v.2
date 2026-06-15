@@ -48,6 +48,8 @@ public class DailyCalendarUI : MonoBehaviour
 
     // ── 状態 ──────────────────────────────────────────────────
     private DateTime _currentDate;
+    private TodoListUI _todoList; // 中央Todo列（Daily表示日と連動させる）
+    private Button _todayBtn; private Image _todayBtnImg; private TextMeshProUGUI _todayBtnTxt; // 「今日に戻る」ボタン（今日以外でアクティブ）
     private int      _weekStartDow = 0; // 0=日、1=月
     private bool     _blockNextNoteSpawn;  // 空ノート削除直後のスポーン抑制
 
@@ -537,7 +539,8 @@ private void BuildScaffold()
         var tbLE = topBar.AddComponent<LayoutElement>();
         tbLE.minHeight = 40f; tbLE.preferredHeight = 40f; tbLE.flexibleHeight = 0f;
 
-        // 左端のSpacerで右寄せ（Dailyはタイトル不要なので、トグル＋追加を右に寄せる）
+        // 左端に「今日に戻る」ボタン → Spacer → 右側にトグル＋追加。
+        BuildDailyTodayButton(topBar.transform);
         var spacer = MakeGO("Spacer", topBar.transform);
         spacer.AddComponent<LayoutElement>().flexibleWidth = 1f;
         var showDoneToggle = BuildDailyDoneToggle(topBar.transform);
@@ -571,8 +574,9 @@ private void BuildScaffold()
         sr.content = cRT;
 
         // --- TodoListUI をアタッチして Daily 用に初期化 ---
-        var todo = go.AddComponent<TodoListUI>();
-        todo.InitForDaily(content.transform, showDoneToggle, addBtn, null); // font=null→TMP既定にフォールバック
+        _todoList = go.AddComponent<TodoListUI>();
+        _todoList.InitForDaily(content.transform, showDoneToggle, addBtn, null); // font=null→TMP既定にフォールバック
+        _todoList.SetViewDate(_currentDate); // 初期表示日を反映
     }
 
     // Daily の TopBar 用「完了済みを表示」トグル。Todoタブと同一寸法（全体150x24/Box24x24/Check14x14/fontSize18）。
@@ -732,6 +736,8 @@ private void BuildScaffold()
         if (!_scaffoldBuilt) return;
         Canvas.ForceUpdateCanvases();
         UpdateDayLabel();
+        if (_todoList != null) _todoList.SetViewDate(_currentDate); // Daily表示日とTodoリストを連動
+        UpdateTodayButton(); // 「今日」ボタンの有効/グレーアウトを更新
         RefreshDowRow();
         RefreshPolicyRow();
         RefreshNoTimeRow();
@@ -739,6 +745,48 @@ private void BuildScaffold()
         StopAllCoroutines();
         StartCoroutine(BuildTimelineCo());
     }
+
+    /// <summary>Daily を現実の今日に戻す（カレンダー・付箋・Todoリストすべて）。「今日に戻る」ボタンから呼ぶ。</summary>
+    public void GoToToday()
+    {
+        _currentDate = DateTime.Now.Date;
+        Refresh();
+    }
+
+    // 「今日に戻る」ボタン（TopBar左端）。今日以外を表示中のみアクティブ、今日ならグレーアウト。
+    private Button BuildDailyTodayButton(Transform parent)
+    {
+        var go = MakeGO("TodayBtn", parent);
+        var le = go.AddComponent<LayoutElement>();
+        le.minWidth = 132f; le.preferredWidth = 132f; le.minHeight = 40f; le.preferredHeight = 40f; le.flexibleHeight = 0f;
+        _todayBtnImg = go.AddComponent<Image>();
+        _todayBtnImg.color = new Color(1f, 1f, 1f, 0.08f);
+        ApplyRoundedSprite(_todayBtnImg, 8f);
+        _todayBtn = go.AddComponent<Button>(); _todayBtn.targetGraphic = _todayBtnImg;
+        _todayBtn.onClick.AddListener(GoToToday);
+        var tGO = MakeGO("Text", go.transform);
+        StretchRT(tGO);
+        _todayBtnTxt = tGO.AddComponent<TextMeshProUGUI>();
+        _todayBtnTxt.text = "今日の日付に戻る"; _todayBtnTxt.fontSize = 14f;
+        _todayBtnTxt.color = UITheme_FocusMode.TextBody; _todayBtnTxt.alignment = TextAlignmentOptions.Center;
+        _todayBtnTxt.raycastTarget = false;
+        return _todayBtn;
+    }
+
+    // 「今日」ボタンの有効・グレーアウトを現在の表示日に合わせて更新する。
+    private void UpdateTodayButton()
+    {
+        if (_todayBtn == null) return;
+        bool isToday = (_currentDate == DateTime.Now.Date);
+        _todayBtn.interactable = !isToday;
+        if (_todayBtnImg != null)
+            _todayBtnImg.color = isToday ? new Color(1f,1f,1f,0.03f) : new Color(1f,1f,1f,0.10f);
+        if (_todayBtnTxt != null)
+            _todayBtnTxt.color = isToday
+                ? UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextMuted, 0.35f)
+                : UITheme_FocusMode.TextBody;
+    }
+
 
     private void UpdateDayLabel()
     {

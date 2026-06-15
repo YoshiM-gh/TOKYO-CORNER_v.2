@@ -23,6 +23,7 @@ public class TodoListUI : MonoBehaviour
     [SerializeField] private TMP_FontAsset font;
     [SerializeField] private TodoDetailUI detail;
     [SerializeField] private TodoDisplayMode displayMode = TodoDisplayMode.FullList; // 既定はTodoタブ用
+    private DateTime _viewDate = DateTime.Now.Date; // DailyToday時の表示日（Dailyの<>で動く）。FullListでは未使用
 
     private string _selectedId;
     private bool _suppressInline; // インライン編集の同期更新中、value/endEditの誤発火を抑制
@@ -73,6 +74,14 @@ public class TodoListUI : MonoBehaviour
         Wire(); // まだ未登録ならここで登録＋Rebuild。登録済みなら明示Rebuildのみ。
         if (_wired) Rebuild();
     }
+
+    /// <summary>Daily の表示日を変更して再描画（DailyCalendarUI の <> から呼ぶ）。</summary>
+    public void SetViewDate(System.DateTime date)
+    {
+        _viewDate = date.Date;
+        if (_wired) Rebuild();
+    }
+
 
     // ── カスタムキャレット制御（一元管理）────────────────────────
     private void LateUpdate()
@@ -218,21 +227,28 @@ public class TodoListUI : MonoBehaviour
         if (nm == null) return;
 
         var all = nm.GetTodos(true);
-        var today = DateTime.Now.Date;
+        var today = DateTime.Now.Date;                 // 現実の今日（期限切れ判定に使う・常に固定）
+        // 表示日: Daily(DailyToday)は _viewDate（<>で動く）、Todoタブ(FullList)は常に今日。
+        var view = (displayMode == TodoDisplayMode.DailyToday) ? _viewDate : today;
 
         var open = all.Where(t => !t.isCompleted).ToList();
         // 各グループ内は「追加順」（sortOrder → createdAt）。優先度・時間は並びに影響させない。
         // 日付ありは日付昇順（期限切れ=過去日が自然に上位、今日、未来…の順）。
         var noDate  = SortDefault(open.Where(t => string.IsNullOrEmpty(t.dateKey)));
+        // 期限切れは「現実の今日」基準（Dailyで未来日を見ていても、今日より前なら期限切れ）。
         var overdue = open.Where(t => HasDateBefore(t, today)).OrderBy(t => t.dateKey).ThenBy(t => t.sortOrder).ThenBy(t => t.createdAt).ToList();
-        var todays  = SortDefault(open.Where(t => IsOnDate(t, today)));
+        // 「その日のタスク」は表示日(view)基準。
+        var todays  = SortDefault(open.Where(t => IsOnDate(t, view)));
+        // 未来日セクション(FullListのみ)は今日より後。
         var future  = open.Where(t => HasDateAfter(t, today)).OrderBy(t => t.dateKey).ThenBy(t => t.sortOrder).ThenBy(t => t.createdAt).ToList();
 
-        // グループ順: 日付なし → 期限切れ → 今日 → 未来日ごと →（完了済み）
-        // 日付ありは「実日付の見出し」で区切る（行からは日付チップを廃止＝見出しが日付を持つ）。
+        // 見出し: 表示日が今日なら「今日」、それ以外は実日付「M/d（曜）」。
+        string todayHeader = (view == today) ? "今日" : FormatDateHeader(NotebookManager.DateKey(view));
+
+        // グループ順: 日付なし → 期限切れ → その日のタスク → 未来日ごと →（完了済み）
         BuildSection("日付なし", noDate, today, UITheme_FocusMode.TextCaption, canReorder: true);
         BuildSection("期限切れ", overdue, today, UITheme_FocusMode.AccentRed, canReorder: false); // 期限切れは並べ替えなし
-        BuildSection("今日", todays, today, UITheme_FocusMode.AccentSatBlue, canReorder: true);
+        BuildSection(todayHeader, todays, view, UITheme_FocusMode.AccentSatBlue, canReorder: true);
         // 未来日: Todoタブ(FullList)のみ。Daily(DailyToday)は当日のための画面なので未来日セクションは出さない。
         if (displayMode == TodoDisplayMode.FullList)
         {
@@ -247,9 +263,12 @@ public class TodoListUI : MonoBehaviour
         bool showDone = showDoneToggle != null && showDoneToggle.isOn;
         if (showDone)
         {
-            var done = all.Where(t => t.isCompleted)
-                          .OrderByDescending(t => t.completedAt)
-                          .ToList();
+            // Daily(DailyToday)は「その日に完了したタスク」だけ（completedAtの日付==view）。
+            // 過去の完了が延々と積もらないようにする。FullList(Todoタブ)は従来どおり全件。
+            var doneQuery = all.Where(t => t.isCompleted);
+            if (displayMode == TodoDisplayMode.DailyToday)
+                doneQuery = doneQuery.Where(t => IsCompletedOn(t, view));
+            var done = doneQuery.OrderByDescending(t => t.completedAt).ToList();
             if (done.Count > 0)
             {
                 BuildSectionHeader($"完了済み · {done.Count}件", UITheme_FocusMode.TextCaption);
@@ -291,6 +310,14 @@ public class TodoListUI : MonoBehaviour
 
     private static bool HasDateBefore(TodoItem t, DateTime today) => TryDate(t, out var d) && d.Date < today;
     private static bool IsOnDate(TodoItem t, DateTime today) => TryDate(t, out var d) && d.Date == today;
+
+    // 完了日が指定日と一致するか（completedAt は "yyyy-MM-dd HH:mm" 形式、先頭10文字が日付）。
+    private static bool IsCompletedOn(TodoItem t, System.DateTime day)
+    {
+        if (string.IsNullOrEmpty(t.completedAt) || t.completedAt.Length < 10) return false;
+        return t.completedAt.Substring(0, 10) == NotebookManager.DateKey(day);
+    }
+
     private static bool HasDateAfter(TodoItem t, DateTime today) => TryDate(t, out var d) && d.Date > today;
     // 期限切れ日数 = 今日 - 期限日（最低1日）。過去日でない場合は0。
     private static int DaysOverdue(TodoItem t, DateTime today)
