@@ -516,13 +516,118 @@ private void BuildScaffold()
     // ── 付箋パネル ─────────────────────────────────────────────
     private void BuildTodoPanel(Transform parent)
     {
-        // 中央Todo列の「枠」。中身（リスト・トップバー・編集）は
-        // フェーズ4で TodoListUI(displayMode=DailyToday) をアタッチして構築する。
-        // ここでは flexW=2 の空コンテナとして、2:2:3 レイアウトの器だけを用意する。
+        // 中央Todo列。flexW=2 の枠の中に、縦並びで TopBar＋スクロールリストを生成し、
+        // TodoListUI(displayMode=DailyToday) をアタッチして構築する（慎重案：UIはこちらで作って渡す）。
         var go = MakeGO("TodoPanel", parent);
         go.AddComponent<Image>().color = Color.clear;
         go.AddComponent<LayoutElement>().flexibleWidth = 2f; // 2:2:3 のうち Todo=2（Leftと同幅）
         _todoPanel = go.GetComponent<RectTransform>();
+        var col = go.AddComponent<VerticalLayoutGroup>();
+        col.childControlWidth = true; col.childControlHeight = true;
+        col.childForceExpandWidth = true; col.childForceExpandHeight = false;
+        col.spacing = 8f; col.padding = new RectOffset(12, 12, 10, 10);
+
+        // --- TopBar（完了済み表示トグル ＋ 「+追加」）。Todoタブと同一スタイル・寸法に揃える。 ---
+        var topBar = MakeGO("TopBar", go.transform);
+        topBar.AddComponent<Image>().color = Color.clear;
+        var tbHlg = topBar.AddComponent<HorizontalLayoutGroup>();
+        tbHlg.childControlWidth = true; tbHlg.childControlHeight = true;
+        tbHlg.childForceExpandWidth = false; tbHlg.childForceExpandHeight = false;
+        tbHlg.childAlignment = TextAnchor.MiddleLeft; tbHlg.spacing = 16f; // Todoタブと同じ
+        var tbLE = topBar.AddComponent<LayoutElement>();
+        tbLE.minHeight = 40f; tbLE.preferredHeight = 40f; tbLE.flexibleHeight = 0f;
+
+        // 左端のSpacerで右寄せ（Dailyはタイトル不要なので、トグル＋追加を右に寄せる）
+        var spacer = MakeGO("Spacer", topBar.transform);
+        spacer.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        var showDoneToggle = BuildDailyDoneToggle(topBar.transform);
+        var addBtn = BuildDailyAddButton(topBar.transform);
+
+        // --- ListScroll（ScrollRect → Viewport → ListContent） ---
+        var listScroll = MakeGO("ListScroll", go.transform);
+        var lsLE = listScroll.AddComponent<LayoutElement>();
+        lsLE.flexibleHeight = 1f; // 残り全体を占有
+        var sr = listScroll.AddComponent<ScrollRect>();
+        sr.horizontal = false; sr.vertical = true; sr.movementType = ScrollRect.MovementType.Clamped;
+        sr.scrollSensitivity = 20f;
+
+        var viewport = MakeGO("Viewport", listScroll.transform);
+        StretchRT(viewport);
+        var vpImg = viewport.AddComponent<Image>(); vpImg.color = Color.clear;
+        viewport.AddComponent<RectMask2D>();
+        sr.viewport = viewport.GetComponent<RectTransform>();
+
+        var content = MakeGO("ListContent", viewport.transform);
+        var cRT = content.GetComponent<RectTransform>();
+        cRT.anchorMin = new Vector2(0f, 1f); cRT.anchorMax = new Vector2(1f, 1f);
+        cRT.pivot = new Vector2(0.5f, 1f); cRT.sizeDelta = Vector2.zero;
+        var cVlg = content.AddComponent<VerticalLayoutGroup>();
+        cVlg.childControlWidth = true; cVlg.childControlHeight = true;
+        cVlg.childForceExpandWidth = true; cVlg.childForceExpandHeight = false;
+        cVlg.childAlignment = TextAnchor.UpperCenter; cVlg.spacing = 8f;
+        var cCsf = content.AddComponent<ContentSizeFitter>();
+        cCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        cCsf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        sr.content = cRT;
+
+        // --- TodoListUI をアタッチして Daily 用に初期化 ---
+        var todo = go.AddComponent<TodoListUI>();
+        todo.InitForDaily(content.transform, showDoneToggle, addBtn, null); // font=null→TMP既定にフォールバック
+    }
+
+    // Daily の TopBar 用「完了済みを表示」トグル。Todoタブと同一寸法（全体150x24/Box24x24/Check14x14/fontSize18）。
+    private Toggle BuildDailyDoneToggle(Transform parent)
+    {
+        var go = MakeGO("ShowDoneToggle", parent);
+        var hlg = go.AddComponent<HorizontalLayoutGroup>();
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        hlg.childAlignment = TextAnchor.MiddleLeft; hlg.spacing = 8f;
+        var togLE = go.AddComponent<LayoutElement>();
+        togLE.minHeight = 24f; togLE.preferredHeight = 24f; togLE.flexibleHeight = 0f;
+        var toggle = go.AddComponent<Toggle>();
+        toggle.isOn = false;
+
+        // チェックの四角（24x24正方形）
+        var box = MakeGO("Box", go.transform);
+        var boxLE = box.AddComponent<LayoutElement>();
+        boxLE.preferredWidth = 24f; boxLE.minWidth = 24f;
+        boxLE.preferredHeight = 24f; boxLE.minHeight = 24f; boxLE.flexibleHeight = 0f;
+        var boxImg = box.AddComponent<Image>(); boxImg.color = new Color(1f,1f,1f,0.12f);
+        ApplyRoundedSprite(boxImg, 4f);
+        var check = MakeGO("Check", box.transform);
+        var checkLE = check.AddComponent<LayoutElement>(); checkLE.preferredWidth = 14f; checkLE.preferredHeight = 14f;
+        StretchRT(check, 5f, 5f);
+        var checkImg = check.AddComponent<Image>(); checkImg.color = UITheme_FocusMode.AccentSatBlue;
+        ApplyRoundedSprite(checkImg, 3f);
+        toggle.targetGraphic = boxImg;
+        toggle.graphic = checkImg;
+
+        // ラベル「完了済みを表示」 fontSize18・白0.35（Todoタブと同じ）
+        var lblGO = MakeGO("Label", go.transform);
+        var lbl = lblGO.AddComponent<TextMeshProUGUI>();
+        lbl.text = "完了済みを表示"; lbl.fontSize = 18f;
+        lbl.color = new Color(1f, 1f, 1f, 0.35f); lbl.alignment = TextAlignmentOptions.MidlineLeft;
+        lbl.raycastTarget = false;
+        return toggle;
+    }
+
+    // Daily の TopBar 用「+ 追加」ボタン。Todoタブと同一（110x40/青0.18背景/fontSize19・青0.9・中央）。
+    private Button BuildDailyAddButton(Transform parent)
+    {
+        var go = MakeGO("AddButton", parent);
+        var le = go.AddComponent<LayoutElement>();
+        le.minWidth = 110f; le.preferredWidth = 110f; le.minHeight = 40f; le.preferredHeight = 40f; le.flexibleHeight = 0f;
+        var img = go.AddComponent<Image>(); img.color = new Color(0.314f, 0.549f, 1f, 0.18f);
+        ApplyRoundedSprite(img, 8f);
+        var btn = go.AddComponent<Button>(); btn.targetGraphic = img;
+        var tGO = MakeGO("Text", go.transform);
+        StretchRT(tGO);
+        var t = tGO.AddComponent<TextMeshProUGUI>();
+        t.text = "+ 追加"; t.fontSize = 19f;
+        t.color = new Color(0.431f, 0.608f, 1f, 0.9f); t.alignment = TextAlignmentOptions.Center;
+        t.raycastTarget = false;
+        return btn;
     }
 
     private void BuildStickyPanel(Transform parent)

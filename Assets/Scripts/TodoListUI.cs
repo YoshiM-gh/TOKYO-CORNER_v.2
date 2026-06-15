@@ -12,6 +12,9 @@ using TMPro;
 /// - 日付チップ色: 期限切れ=赤 / 今日=青 / それ以外=グレー
 /// - 行クリックで選択→右ペイン(TodoDetailUI)で編集、チェック円で完了トグル
 /// </summary>
+// 表示モード: Todoタブ用(全グループ) と Daily中央列用(日付なし＋期限切れ＋当日＋完了済み)
+public enum TodoDisplayMode { FullList, DailyToday }
+
 public class TodoListUI : MonoBehaviour
 {
     [SerializeField] private Toggle showDoneToggle;
@@ -19,6 +22,7 @@ public class TodoListUI : MonoBehaviour
     [SerializeField] private Transform listContent;
     [SerializeField] private TMP_FontAsset font;
     [SerializeField] private TodoDetailUI detail;
+    [SerializeField] private TodoDisplayMode displayMode = TodoDisplayMode.FullList; // 既定はTodoタブ用
 
     private string _selectedId;
     private bool _suppressInline; // インライン編集の同期更新中、value/endEditの誤発火を抑制
@@ -36,8 +40,16 @@ public class TodoListUI : MonoBehaviour
     private static readonly Color CaretColor = new Color(0.85f, 0.85f, 0.88f, 1f);
     private const float CARET_X_PAD = 3f; // 全角文字に密着しないようキャレットを右に少し寄せる
 
-    private void OnEnable()
+    private bool _wired;
+
+    private void OnEnable() => Wire();
+
+    // listeners 登録は二重防止しつつ1回だけ。Todoタブは OnEnable から、
+    // Daily は InitForDaily から呼ぶ（どちらの経路でも確実に1回登録される）。
+    private void Wire()
     {
+        if (_wired) return;
+        _wired = true;
         if (showDoneToggle != null) showDoneToggle.onValueChanged.AddListener(OnShowDoneChanged);
         if (addButton != null) addButton.onClick.AddListener(OnAddClicked);
         if (detail != null)
@@ -47,6 +59,19 @@ public class TodoListUI : MonoBehaviour
         }
         UITheme_FocusMode.OnThemeChanged += Rebuild;
         Rebuild();
+    }
+
+    /// <summary>Daily 中央列用の初期化。listContent/トップバーを外部（DailyCalendarUI）が生成して渡す。
+    /// detail（右ペイン）は Daily には無いので渡さない（編集モーダルは別途）。</summary>
+    public void InitForDaily(Transform content, Toggle showDone, Button add, TMP_FontAsset fontAsset)
+    {
+        listContent = content;
+        showDoneToggle = showDone;
+        addButton = add;
+        if (fontAsset != null) font = fontAsset;
+        displayMode = TodoDisplayMode.DailyToday;
+        Wire(); // まだ未登録ならここで登録＋Rebuild。登録済みなら明示Rebuildのみ。
+        if (_wired) Rebuild();
     }
 
     // ── カスタムキャレット制御（一元管理）────────────────────────
@@ -145,6 +170,8 @@ public class TodoListUI : MonoBehaviour
 
     private void OnDisable()
     {
+        if (!_wired) return;
+        _wired = false;
         if (showDoneToggle != null) showDoneToggle.onValueChanged.RemoveListener(OnShowDoneChanged);
         if (addButton != null) addButton.onClick.RemoveListener(OnAddClicked);
         if (detail != null)
@@ -206,11 +233,15 @@ public class TodoListUI : MonoBehaviour
         BuildSection("日付なし", noDate, today, UITheme_FocusMode.TextCaption, canReorder: true);
         BuildSection("期限切れ", overdue, today, UITheme_FocusMode.AccentRed, canReorder: false); // 期限切れは並べ替えなし
         BuildSection("今日", todays, today, UITheme_FocusMode.AccentSatBlue, canReorder: true);
-        // 未来日: dateKey ごとにグループ化し、各日付を見出し「M/d（曜）」で出す（昇順）。各日付内は並べ替え可。
-        foreach (var g in future.GroupBy(t => t.dateKey).OrderBy(g => g.Key))
+        // 未来日: Todoタブ(FullList)のみ。Daily(DailyToday)は当日のための画面なので未来日セクションは出さない。
+        if (displayMode == TodoDisplayMode.FullList)
         {
-            var items = g.OrderBy(t => t.sortOrder).ThenBy(t => t.createdAt).ToList();
-            BuildSection(FormatDateHeader(g.Key), items, today, UITheme_FocusMode.TextCaption, canReorder: true);
+            // dateKey ごとにグループ化し、各日付を見出し「M/d（曜）」で出す（昇順）。各日付内は並べ替え可。
+            foreach (var g in future.GroupBy(t => t.dateKey).OrderBy(g => g.Key))
+            {
+                var items = g.OrderBy(t => t.sortOrder).ThenBy(t => t.createdAt).ToList();
+                BuildSection(FormatDateHeader(g.Key), items, today, UITheme_FocusMode.TextCaption, canReorder: true);
+            }
         }
 
         bool showDone = showDoneToggle != null && showDoneToggle.isOn;
@@ -629,7 +660,8 @@ public class TodoListUI : MonoBehaviour
     {
         var go = NewUI(name, parent);
         var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.font = font;
+        // font未設定（Daily用にAddComponentした場合など）はTMP既定フォントにフォールバック
+        tmp.font = font != null ? font : TMP_Settings.defaultFontAsset;
         tmp.text = text;
         tmp.fontSize = size;
         tmp.color = color;
