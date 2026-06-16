@@ -1233,14 +1233,24 @@ private void BuildScaffold()
     }
 
     // ── モーダル ──────────────────────────────────────────────
+    // EventModal は Awake 時点ではまだ FindObjectOfType で拾えないことがある
+    // （Canvas直下の非アクティブなモーダルが初期化順で見つからない）。
+    // 実際に使う瞬間に取得し直して補完する（遅延取得）。
+    private void EnsureEventModal()
+    {
+        if (_eventModal == null) _eventModal = FindObjectOfType<EventModal>(true);
+    }
+
     private void OpenAddForm(string dk, string time, string endTime = null)
     {
+        EnsureEventModal();
         if (_eventModal) _eventModal.OpenAddForm(dk, Refresh, time, endTime);
         else _floatingWindow?.OpenAddForm(dk, null, time);
     }
 
     private void OpenEditForm(ScheduleEvent ev)
     {
+        EnsureEventModal();
         if (_eventModal) _eventModal.OpenEditForm(ev, Refresh);
         else _floatingWindow?.OpenEventDetail(ev, Refresh);
     }
