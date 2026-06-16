@@ -527,14 +527,14 @@ public class NotebookManager : MonoBehaviour
         SaveAll();
     }
 
-    /// <summary>ピン留め→更新日降順。folderId=null で全フォルダ。ゴミ箱は除外</summary>
+    /// <summary>ピン留め→作成日降順。folderId=null で全フォルダ。ゴミ箱は除外</summary>
     public List<MemoNote> GetMemoNotes(string folderId = null)
     {
         var list = memoNotes.notes.FindAll(m =>
             !m.IsTrashed && (folderId == null || m.folderId == folderId));
         list.Sort((a, b) => {
             if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
-            return string.Compare(b.updatedAt, a.updatedAt, StringComparison.Ordinal);
+            return string.Compare(b.createdAt, a.createdAt, StringComparison.Ordinal);
         });
         return list;
     }

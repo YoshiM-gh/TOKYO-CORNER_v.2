@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -203,19 +203,10 @@ public class RoutineListData
 }
 
 // ─────────────────────────────────────────────────────────
-// MemoBlock / MemoFolder / MemoNote / MemoNotesData
-// 新メモ仕様（ブロック型本文・フラット1段フォルダ・ピン留め・ゴミ箱）
+// MemoFolder / MemoNote / MemoNotesData
+// 新メモ仕様（プレーンテキスト本文・フラット1段フォルダ・ピン留め・ゴミ箱）
 // ※ 旧 MemoEntry/MemoData は Memo タブ実装時に移行のうえ撤去予定
 // ─────────────────────────────────────────────────────────
-[Serializable]
-public class MemoBlock
-{
-    public string type = "paragraph";  // "paragraph" | "check" | "image"
-    public string text = "";            // paragraph/check の本文
-    public bool   isChecked;             // check 用
-    public string imageFile;             // image 用（persistentDataPath/memo_images/ 内のファイル名）
-}
-
 [Serializable]
 public class MemoFolder
 {
@@ -230,7 +221,7 @@ public class MemoNote
     public string id;          // GUID
     public string folderId;    // MemoFolder.id
     public string title;
-    public List<MemoBlock> blocks = new List<MemoBlock>();
+    public string body = "";          // プレーンテキスト本文（M-1：ブロック型を廃止）
     public string dateKey;     // "yyyy-MM-dd"（null可＝カレンダー紐づけなし）
     public string createdAt;   // "yyyy-MM-dd HH:mm"
     public string updatedAt;
