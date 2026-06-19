@@ -3,36 +3,58 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// メモタブ 左ペイン（ノート一覧）。M-1 コア + M-2a ピン。
-/// - GetMemoNotes() を ピン優先 → 作成日降順 で表示。M-1 は単一フォルダ前提（フォルダUIは M-2b）。
-/// - 行クリックで選択 → 右ペイン(MemoDetailUI)で編集。行は表示専用（インライン編集なし）。
-/// - 行右端の星ボタンでピンの掛け外し。押すと①その場で星の色が変わり→②ひと呼吸おいて上へ移動→③移動先で一瞬フラッシュ。
-/// - 「+ 追加」で新規ノート作成 → 選択しタイトルにフォーカス。
-/// - メモ変更は本タブ内で完結するため Rebuild は操作時に直接呼ぶ（CanvasGroupフェードでOnEnableが
-///   再発火しない問題があるが、外部からメモが変わることはないので DataVersion監視は不要）。
-/// - 保存時はリスト全体を作り直さず「選択行のタイトル/メタだけその場更新」する。
-///   全Rebuildだと、入力欄から別行クリックへ移る瞬間にクリック対象が破棄され選択が移らない事故が起きるため。
+/// メモタブ 左ペイン。M-1 コア + M-2a ピン + M-2b フォルダ（ドリルダウン式・iOSメモ流）。
+/// 2つのビューを行き来する：
+///   Notes   … ノート一覧（対象フォルダ _viewFolderId、null=すべて）。行クリックで右ペイン編集。
+///   Folders … フォルダ一覧（すべて / メモ(既定) / 各フォルダ）。行クリックでそのフォルダの Notes へ潜る。
+/// ヘッダー：[戻る「‹」(Notesのみ表示) / タイトル / AddButton]。AddButton はビューで「＋追加」/「＋フォルダ」を切替。
+/// フォルダのリネーム/削除：各フォルダ行右端の「⋯」→ その行だけインライン編集（名前が入力欄＋削除ボタン）。
+///   トグルもポップアップも使わない。「すべて」は⋯なし、「メモ」はリネーム可・削除不可。
+/// リネーム入力はシーン配置の単一 InputField(folderRenameInput) を編集中の行へ寄せて使う（動的InputFieldの
+///   キャレット問題を避けるため）。Rebuild の度に安全な親へ待避してから行へ再アタッチする。
+/// 保存時はリスト全体を作り直さず「選択行のタイトル/メタだけその場更新」する（M-1 と同様）。
 /// </summary>
 public class MemoListUI : MonoBehaviour
 {
-    [SerializeField] private Button addButton;
+    [Header("ヘッダー")]
+    [SerializeField] private Button addButton;          // ＋追加 / ＋フォルダ（ビューで切替）
+    [SerializeField] private Button backButton;         // 「‹」 Notes→Folders へ上がる
+    [SerializeField] private TextMeshProUGUI titleText; // 「メモ」 or フォルダ名/「すべて」
+
     [SerializeField] private Transform listContent;
     [SerializeField] private TMP_FontAsset font;
     [SerializeField] private MemoDetailUI detail;
+
+    [Header("フォルダ リネーム入力（シーン配置・編集行へ寄せる）")]
+    [SerializeField] private TMP_InputField folderRenameInput;
 
     [Header("ピン")]
     [SerializeField] private Sprite pinOnSprite;   // 塗りつぶし星（ピン時）
     [SerializeField] private Sprite pinOffSprite;  // 線の星（未ピン）
 
+    [Header("アイコン")]
+    [SerializeField] private Sprite folderIcon;  // フォルダ行の左アイコン（MUIP Folder）
+    [SerializeField] private Sprite noteIcon;    // メモ行の左アイコン（MUIP Document）
+
+    private enum LeftView { Folders, Notes }
+    private LeftView _view = LeftView.Notes;   // 起動時は「すべて」ノート一覧
+    private string _viewFolderId;              // null = すべて（Notesビューの対象）
+    private string _editingFolderId;           // インラインリネーム中のフォルダid（null=なし）
+    private Transform _renameParkParent;       // folderRenameInput の待避先（初期親）
+    private Coroutine _renameExitCo;           // リネーム確定後の編集解除（次フレーム）
+
+    private const int MaxFolders = 10;         // フォルダ上限（既定「メモ」含む）
+    private const int MaxNotesPerFolder = 10;  // 1フォルダのメモ上限
+    private const int MaxTotalNotes = 99;      // メモ総数の上限（全フォルダ合計・ゴミ箱除く）
+
     private string _selectedId;
     private bool _wired;
 
-    private string _flashNoteId;   // ピン操作直後に一瞬ハイライトする行のid（クリック結果のフィードバック）
-    private Coroutine _flashCo;    // フラッシュは常に1本だけ（多重起動による色の揺れを防ぐ）
-    private float     _flashDelay = 0.30f; // フラッシュ開始までの間（ピンは①で星を先に光らせるので移動後は短め）
-    private Coroutine _pinCo;      // ピン演出（星を変える→ひと呼吸→移動）の進行
+    private string _flashNoteId;
+    private Coroutine _flashCo;
+    private float     _flashDelay = 0.30f;
+    private Coroutine _pinCo;
 
-    // 選択行のテキスト参照（保存時にその場更新する対象）
     private TextMeshProUGUI _selTitleTmp;
     private TextMeshProUGUI _selMetaTmp;
 
@@ -44,6 +66,13 @@ public class MemoListUI : MonoBehaviour
         if (_wired) return;
         _wired = true;
         if (addButton != null) addButton.onClick.AddListener(OnAddClicked);
+        if (backButton != null) backButton.onClick.AddListener(GoToFolderList);
+        if (folderRenameInput != null)
+        {
+            _renameParkParent = folderRenameInput.transform.parent;
+            folderRenameInput.onEndEdit.AddListener(OnRenameEndEdit);
+            folderRenameInput.gameObject.SetActive(false);
+        }
         if (detail != null)
         {
             detail.OnChanged += OnDetailChanged;
@@ -57,6 +86,8 @@ public class MemoListUI : MonoBehaviour
         if (!_wired) return;
         _wired = false;
         if (addButton != null) addButton.onClick.RemoveListener(OnAddClicked);
+        if (backButton != null) backButton.onClick.RemoveListener(GoToFolderList);
+        if (folderRenameInput != null) folderRenameInput.onEndEdit.RemoveListener(OnRenameEndEdit);
         if (detail != null)
         {
             detail.OnChanged -= OnDetailChanged;
@@ -64,14 +95,34 @@ public class MemoListUI : MonoBehaviour
         }
     }
 
+    // ── 追加（ビューで分岐） ────────────────────────────
     private void OnAddClicked()
+    {
+        if (_view == LeftView.Folders) AddFolder();
+        else AddNote();
+    }
+
+    private void AddNote()
     {
         var nm = NotebookManager.Instance;
         if (nm == null) return;
-        var note = nm.AddMemoNote();   // 既定フォルダに空ノート作成
+        string targetFolder = _viewFolderId ?? NotebookManager.DefaultMemoFolderId;
+        if (nm.GetMemoNotes(null).Count >= MaxTotalNotes) return;               // メモ総数の上限
+        if (nm.GetMemoNotes(targetFolder).Count >= MaxNotesPerFolder) return;   // 1フォルダのメモ上限
+        var note = nm.AddMemoNote(_viewFolderId);   // 対象フォルダ（すべて時はnull→既定）に空ノート
         Select(note);
         Rebuild();
         if (detail != null) detail.FocusTitle();
+    }
+
+    private void AddFolder()
+    {
+        var nm = NotebookManager.Instance;
+        if (nm == null) return;
+        if (nm.GetMemoFolders().Count >= MaxFolders) return;   // 上限
+        var f = nm.AddMemoFolder(NextFolderName(nm));
+        _editingFolderId = f.id;   // 追加直後にその行をリネーム編集に（すぐ命名できる）
+        Rebuild();
     }
 
     private void OnItemDeleted(string id)
@@ -102,10 +153,71 @@ public class MemoListUI : MonoBehaviour
         if (_selMetaTmp != null) _selMetaTmp.text = FormatMeta(note);
     }
 
-    // ── リスト構築 ────────────────────────────
+    // ── ナビゲーション ────────────────────────────
+    private void GoToFolderList()
+    {
+        CancelFolderEdit();
+        _view = LeftView.Folders;
+        Rebuild();
+    }
 
+    private void EnterFolder(string folderId)
+    {
+        CancelFolderEdit();
+        _view = LeftView.Notes;
+        _viewFolderId = folderId;
+        _selectedId = null;
+        Rebuild();
+    }
+
+    private void CancelFolderEdit()
+    {
+        _editingFolderId = null;
+        if (_renameExitCo != null) { StopCoroutine(_renameExitCo); _renameExitCo = null; }
+    }
+
+    private string FolderName(string folderId)
+    {
+        if (folderId == null) return "すべて";
+        var nm = NotebookManager.Instance;
+        var f = nm != null ? nm.GetMemoFolders().Find(x => x.id == folderId) : null;
+        return f != null ? f.name : "すべて";
+    }
+
+    private int CountOf(string folderId)
+    {
+        var nm = NotebookManager.Instance;
+        return nm != null ? nm.GetMemoNotes(folderId).Count : 0;
+    }
+
+    // ── ヘッダー更新 ────────────────────────────
+    private void UpdateHeader()
+    {
+        if (backButton != null) backButton.gameObject.SetActive(_view == LeftView.Notes);
+        if (titleText != null) titleText.text = _view == LeftView.Folders ? "メモ" : FolderName(_viewFolderId);
+
+        var addLbl = addButton != null ? addButton.GetComponentInChildren<TextMeshProUGUI>(true) : null;
+        if (_view == LeftView.Folders)
+        {
+            var nm = NotebookManager.Instance;
+            bool canAdd = nm != null && nm.GetMemoFolders().Count < MaxFolders;
+            if (addButton != null) addButton.gameObject.SetActive(canAdd);
+            if (addLbl != null) addLbl.text = "＋ フォルダ";
+        }
+        else
+        {
+            string targetFolder = _viewFolderId ?? NotebookManager.DefaultMemoFolderId;
+            bool canAddNote = CountOf(null) < MaxTotalNotes && CountOf(targetFolder) < MaxNotesPerFolder;
+            if (addButton != null) addButton.gameObject.SetActive(canAddNote);
+            if (addLbl != null) addLbl.text = "＋ 追加";
+        }
+    }
+
+    // ── リスト構築 ────────────────────────────
     public void Rebuild()
     {
+        ParkRenameInput();   // 共有リネーム入力を安全な親へ退避（行破棄で巻き添えにしない）
+        UpdateHeader();
         if (listContent == null) return;
         _selTitleTmp = null; _selMetaTmp = null;
         for (int i = listContent.childCount - 1; i >= 0; i--)
@@ -114,12 +226,208 @@ public class MemoListUI : MonoBehaviour
         var nm = NotebookManager.Instance;
         if (nm == null) return;
 
-        var notes = nm.GetMemoNotes();   // 全フォルダ・ゴミ箱除外・ピン優先→作成日降順
-        if (notes.Count == 0) { BuildEmptyLabel(); return; }
+        if (_view == LeftView.Folders) BuildFolderList(nm);
+        else BuildNoteList(nm);
+    }
 
+    private void BuildNoteList(NotebookManager nm)
+    {
+        var notes = nm.GetMemoNotes(_viewFolderId);   // null=すべて・ゴミ箱除外・ピン優先→作成日降順
+        if (notes.Count == 0) { BuildEmptyLabel(); return; }
         foreach (var note in notes) BuildRow(note);
     }
 
+    // ── フォルダ一覧（ドリルダウン） ────────────────────────────
+    private void BuildFolderList(NotebookManager nm)
+    {
+        BuildFolderRow("すべて", null, editable: false, canDelete: false);                                 // 横断
+        BuildFolderRow("メモ", NotebookManager.DefaultMemoFolderId, editable: true, canDelete: false);       // 既定（リネーム可・削除不可）
+        foreach (var f in nm.GetMemoFolders())
+        {
+            if (f.id == NotebookManager.DefaultMemoFolderId) continue;   // 既定は上で出した
+            BuildFolderRow(f.name, f.id, editable: true, canDelete: true);
+        }
+    }
+
+    private void BuildFolderRow(string label, string folderId, bool editable, bool canDelete)
+    {
+        bool editing = editable && folderId == _editingFolderId;
+
+        var row = NewUI("Folder_" + (folderId ?? "all"), listContent);
+        var rowImg = row.AddComponent<Image>();
+        rowImg.color = UITheme_FocusMode.PanelBG;
+        UIStyleKit.ApplyRounded(rowImg, 10f);
+
+        var rowLE = row.AddComponent<LayoutElement>();
+        rowLE.minHeight = 52; rowLE.preferredHeight = 52;
+
+        var hlg = row.AddComponent<HorizontalLayoutGroup>();
+        hlg.padding = new RectOffset(14, 10, 8, 8);
+        hlg.spacing = 14;
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        hlg.childAlignment = TextAnchor.MiddleLeft;
+
+        AddIcon(row.transform, folderIcon, UITheme_FocusMode.AccentBlueSolid);
+
+        if (editing)
+        {
+            // 名前スロット（ここへ共有 InputField を寄せる）
+            var slot = NewUI("NameSlot", row.transform);
+            var slotLE = slot.AddComponent<LayoutElement>();
+            slotLE.minWidth = 0; slotLE.flexibleWidth = 1;
+
+            // 削除ボタン（ユーザーフォルダのみ）
+            if (canDelete)
+            {
+                var del = NewUI("Delete", row.transform);
+                var delLE = del.AddComponent<LayoutElement>();
+                delLE.minWidth = 44; delLE.preferredWidth = 44;
+                delLE.minHeight = 32; delLE.preferredHeight = 32;
+                var delImg = del.AddComponent<Image>();
+                UIStyleKit.ApplyControl(delImg);
+                delImg.color = new Color(0.85f, 0.30f, 0.30f, 0.16f);
+                var delLbl = NewText("Label", del.transform, "削除",
+                    UITheme_FocusMode.FontCaption, new Color(0.86f, 0.34f, 0.34f, 1f));
+                delLbl.alignment = TextAlignmentOptions.Center;
+                var delRt = delLbl.GetComponent<RectTransform>();
+                delRt.anchorMin = Vector2.zero; delRt.anchorMax = Vector2.one;
+                delRt.offsetMin = Vector2.zero; delRt.offsetMax = Vector2.zero;
+                var delBtn = del.AddComponent<Button>();
+                delBtn.transition = Selectable.Transition.None;
+                delBtn.targetGraphic = delImg;
+                string capDel = folderId;
+                delBtn.onClick.AddListener(() => DeleteFolderRow(capDel));
+            }
+
+            AttachRenameInput(slot.transform, folderId);
+            return;
+        }
+
+        // 通常表示：[名前(flex)] [件数] [⋯(編集可のみ)]
+        var name = NewText("Name", row.transform, label,
+            UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
+        name.alignment = TextAlignmentOptions.MidlineLeft;
+        var nameLE = name.gameObject.AddComponent<LayoutElement>();
+        nameLE.minWidth = 0; nameLE.flexibleWidth = 1;
+
+        var count = NewText("Count", row.transform, CountOf(folderId).ToString(),
+            UITheme_FocusMode.FontCaption, UITheme_FocusMode.TextMuted);
+        count.alignment = TextAlignmentOptions.MidlineRight;
+        var countLE = count.gameObject.AddComponent<LayoutElement>();
+        countLE.minWidth = 22;
+
+        if (editable)
+        {
+            var more = NewUI("More", row.transform);
+            var moreLE = more.AddComponent<LayoutElement>();
+            moreLE.minWidth = 30; moreLE.preferredWidth = 30;
+            moreLE.minHeight = 30; moreLE.preferredHeight = 30;
+            var moreTmp = NewText("Glyph", more.transform, "…",
+                UITheme_FocusMode.FontBody, UITheme_FocusMode.TextSecondary);
+            moreTmp.alignment = TextAlignmentOptions.Center;
+            moreTmp.raycastTarget = true;
+            var moreRt = moreTmp.GetComponent<RectTransform>();
+            moreRt.anchorMin = Vector2.zero; moreRt.anchorMax = Vector2.one;
+            moreRt.offsetMin = Vector2.zero; moreRt.offsetMax = Vector2.zero;
+            var moreBtn = more.AddComponent<Button>();
+            moreBtn.transition = Selectable.Transition.None;
+            moreBtn.targetGraphic = moreTmp;
+            string capMore = folderId;
+            moreBtn.onClick.AddListener(() => StartFolderRename(capMore));
+        }
+
+        // 行本体クリック → そのフォルダへ潜る（⋯は子なので競合しない）
+        var btn = row.AddComponent<Button>();
+        btn.transition = Selectable.Transition.None;
+        btn.targetGraphic = rowImg;
+        string capRow = folderId;
+        btn.onClick.AddListener(() => EnterFolder(capRow));
+    }
+
+    private void StartFolderRename(string folderId)
+    {
+        _editingFolderId = folderId;
+        Rebuild();
+    }
+
+    private void OnRenameEndEdit(string text)
+    {
+        if (_editingFolderId == null) return;
+        var nm = NotebookManager.Instance;
+        if (nm != null && !string.IsNullOrWhiteSpace(text)) nm.RenameMemoFolder(_editingFolderId, text.Trim());
+        // 編集解除は次フレームに遅延（削除ボタンの同フレーム破棄を避ける）
+        if (_renameExitCo != null) StopCoroutine(_renameExitCo);
+        _renameExitCo = StartCoroutine(ExitFolderEditNextFrame(_editingFolderId));
+    }
+
+    private System.Collections.IEnumerator ExitFolderEditNextFrame(string folderId)
+    {
+        yield return null;
+        _renameExitCo = null;
+        if (_editingFolderId == folderId)
+        {
+            _editingFolderId = null;
+            Rebuild();
+        }
+    }
+
+    private void DeleteFolderRow(string folderId)
+    {
+        var nm = NotebookManager.Instance;
+        if (nm == null) return;
+        CancelFolderEdit();
+        ParkRenameInput();
+        nm.DeleteMemoFolder(folderId);   // ノートは既定へ退避（NotebookManager側）
+        if (_viewFolderId == folderId) _viewFolderId = null;
+        Rebuild();
+    }
+
+    private void AttachRenameInput(Transform slot, string folderId)
+    {
+        if (folderRenameInput == null) return;
+        var nm = NotebookManager.Instance;
+        var f = nm != null ? nm.GetMemoFolders().Find(x => x.id == folderId) : null;
+        string current = f != null ? f.name : "";
+
+        var t = folderRenameInput.transform;
+        t.SetParent(slot, false);
+        var rt = folderRenameInput.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+
+        folderRenameInput.gameObject.SetActive(true);
+        folderRenameInput.SetTextWithoutNotify(current);
+        folderRenameInput.ActivateInputField();
+        folderRenameInput.Select();
+        int caret = current != null ? current.Length : 0;
+        folderRenameInput.caretPosition = caret;
+        folderRenameInput.selectionAnchorPosition = caret;
+        folderRenameInput.selectionFocusPosition = caret;
+    }
+
+    private void ParkRenameInput()
+    {
+        if (folderRenameInput == null) return;
+        folderRenameInput.DeactivateInputField();
+        folderRenameInput.gameObject.SetActive(false);
+        if (_renameParkParent != null && folderRenameInput.transform.parent != _renameParkParent)
+            folderRenameInput.transform.SetParent(_renameParkParent, false);
+    }
+
+    private string NextFolderName(NotebookManager nm)
+    {
+        var folders = nm.GetMemoFolders();
+        System.Func<string,bool> exists = (s) => { foreach (var f in folders) if (f.name == s) return true; return false; };
+        string baseName = "新規フォルダ";
+        if (!exists(baseName)) return baseName;
+        int n = 2;
+        while (exists(baseName + " " + n)) n++;
+        return baseName + " " + n;
+    }
+
+    // ── ノート行（M-1/M-2a・無改変） ────────────────────────────
     private void BuildRow(MemoNote note)
     {
         bool selected = note.id == _selectedId;
@@ -143,10 +451,12 @@ public class MemoListUI : MonoBehaviour
         // 行は横並び：[テキスト列(残り幅)] [星ボタン(固定28)]
         var hlg = row.AddComponent<HorizontalLayoutGroup>();
         hlg.padding = new RectOffset(14, 14, 9, 9);
-        hlg.spacing = 8;
+        hlg.spacing = 14;
         hlg.childControlWidth = true; hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
         hlg.childAlignment = TextAnchor.MiddleLeft;
+
+        AddIcon(row.transform, noteIcon, UITheme_FocusMode.TextMuted);
 
         // テキスト列（タイトル＋メタ）
         var textCol = NewUI("TextCol", row.transform);
@@ -163,7 +473,7 @@ public class MemoListUI : MonoBehaviour
         bool untitled = string.IsNullOrWhiteSpace(note.title);
         var title = NewText("Title", textCol.transform,
             untitled ? "（無題）" : note.title,
-            UITheme_FocusMode.FontBody,
+            UITheme_FocusMode.FontChipTitle,
             untitled ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextPrimary);
         title.alignment = TextAlignmentOptions.MidlineLeft;
 
@@ -277,6 +587,21 @@ public class MemoListUI : MonoBehaviour
         }
         if (rowImg != null) rowImg.color = baseColor;
         _flashCo = null;
+    }
+
+    // 行頭アイコン（フォルダ/メモの識別）。スプライト未配線なら何もしない＝レイアウト不変。
+    private void AddIcon(Transform row, Sprite sprite, Color tint)
+    {
+        if (sprite == null) return;
+        var go = NewUI("Icon", row);
+        var le = go.AddComponent<LayoutElement>();
+        le.minWidth = 20; le.preferredWidth = 20;
+        le.minHeight = 20; le.preferredHeight = 20;
+        var img = go.AddComponent<Image>();
+        img.sprite = sprite;
+        img.preserveAspect = true;
+        img.color = tint;
+        img.raycastTarget = false;
     }
 
     // ── ヘルパー（TodoListUI と同方式） ──

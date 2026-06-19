@@ -527,6 +527,26 @@ public class NotebookManager : MonoBehaviour
         SaveAll();
     }
 
+    /// <summary>フォルダ名の変更。空名は無視。デフォルトフォルダも改名可（idは固定なので安全）。</summary>
+    public void RenameMemoFolder(string folderId, string newName)
+    {
+        if (string.IsNullOrWhiteSpace(newName)) return;
+        var f = memoNotes.folders.Find(x => x.id == folderId);
+        if (f == null) return;
+        f.name = newName.Trim();
+        SaveAll();
+    }
+
+    /// <summary>ノートを別フォルダへ移動。存在しないフォルダ指定はデフォルトへ丸める。</summary>
+    public void MoveMemoNoteToFolder(string noteId, string folderId)
+    {
+        var m = memoNotes.notes.Find(x => x.id == noteId);
+        if (m == null) return;
+        bool valid = !string.IsNullOrEmpty(folderId) && memoNotes.folders.Exists(f => f.id == folderId);
+        m.folderId = valid ? folderId : DefaultMemoFolderId;
+        SaveAll();
+    }
+
     /// <summary>ピン留め→作成日降順。folderId=null で全フォルダ。ゴミ箱は除外</summary>
     public List<MemoNote> GetMemoNotes(string folderId = null)
     {
