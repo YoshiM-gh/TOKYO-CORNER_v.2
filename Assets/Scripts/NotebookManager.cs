@@ -565,6 +565,15 @@ public class NotebookManager : MonoBehaviour
         SaveAll();
     }
 
+    /// <summary>ピン留めの掛け外し。updatedAt は更新しない（ピンは内容編集ではないため）。</summary>
+    public void SetMemoNotePinned(string id, bool pinned)
+    {
+        var m = memoNotes.notes.Find(x => x.id == id);
+        if (m == null || m.isPinned == pinned) return;
+        m.isPinned = pinned;
+        SaveAll();
+    }
+
     public void TrashMemoNote(string id)
     {
         var m = memoNotes.notes.Find(x => x.id == id);
