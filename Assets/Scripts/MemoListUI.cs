@@ -41,6 +41,7 @@ public class MemoListUI : MonoBehaviour
     private LeftView _view = LeftView.Notes;   // 起動時は「すべて」ノート一覧
     private string _viewFolderId;              // null = すべて（Notesビューの対象）
     private string _editingFolderId;           // インラインリネーム中のフォルダid（null=なし）
+    private string _confirmDeleteFolderId;     // 削除確認中のフォルダid（null=なし）
     private Transform _renameParkParent;       // folderRenameInput の待避先（初期親）
     private Coroutine _renameExitCo;           // リネーム確定後の編集解除（次フレーム）
 
@@ -57,7 +58,16 @@ public class MemoListUI : MonoBehaviour
     private float     _flashDelay = 0.30f;
     private Coroutine _pinCo;
 
-    private TextMeshProUGUI _selTitleTmp;
+    private TMP_InputField _selTitleInput;   // 選択行のタイトル入力（右ペイン編集→ここへライブ反映）
+    private bool _suppressInline;            // インライン同期更新中の onSelect/onEndEdit 誤発火抑制
+    private Image _selectedRowImg;           // フォーカス＝選択を即ハイライトするための現在行Image
+    private TMP_InputField _activeInput;
+    private RectTransform  _activeCaretRT;
+    private Image          _activeCaretImg;
+    private int            _lastCaretPos = -1;
+    private Coroutine      _caretCo;
+    private static readonly Color CaretColor = new Color(0.85f, 0.85f, 0.88f, 1f);
+    private const float CARET_X_PAD = 3f;
     private TextMeshProUGUI _selMetaTmp;
 
     private void OnEnable() => Wire();
@@ -146,11 +156,11 @@ public class MemoListUI : MonoBehaviour
         if (nm == null || string.IsNullOrEmpty(_selectedId)) return;
         var note = nm.GetMemoNotes().Find(m => m.id == _selectedId);
         if (note == null) return;
-        if (_selTitleTmp != null)
+        if (_selTitleInput != null)
         {
-            bool untitled = string.IsNullOrWhiteSpace(note.title);
-            _selTitleTmp.text = untitled ? "（無題）" : note.title;
-            _selTitleTmp.color = untitled ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextPrimary;
+            _suppressInline = true;
+            _selTitleInput.text = note.title ?? "";   // 空ならプレースホルダ「（無題）」が出る
+            _suppressInline = false;
         }
         if (_selMetaTmp != null) _selMetaTmp.text = FormatMeta(note);
     }
@@ -175,6 +185,7 @@ public class MemoListUI : MonoBehaviour
     private void CancelFolderEdit()
     {
         _editingFolderId = null;
+        _confirmDeleteFolderId = null;
         if (_renameExitCo != null) { StopCoroutine(_renameExitCo); _renameExitCo = null; }
     }
 
@@ -225,7 +236,7 @@ public class MemoListUI : MonoBehaviour
         ParkRenameInput();   // 共有リネーム入力を安全な親へ退避（行破棄で巻き添えにしない）
         UpdateHeader();
         if (listContent == null) return;
-        _selTitleTmp = null; _selMetaTmp = null;
+        _selTitleInput = null; _selMetaTmp = null; _selectedRowImg = null;
         for (int i = listContent.childCount - 1; i >= 0; i--)
             Destroy(listContent.GetChild(i).gameObject);
 
@@ -269,7 +280,8 @@ public class MemoListUI : MonoBehaviour
 
     private void BuildFolderRow(string label, string folderId, bool editable, bool canDelete, bool canReorder, string prevId, string nextId)
     {
-        bool editing = editable && folderId == _editingFolderId;
+        bool confirming = (folderId != null && folderId == _confirmDeleteFolderId);
+        bool editing = !confirming && editable && folderId == _editingFolderId;
 
         var row = NewUI("Folder_" + (folderId ?? "all"), listContent);
         var rowImg = row.AddComponent<Image>();
@@ -295,12 +307,64 @@ public class MemoListUI : MonoBehaviour
 
         AddIcon(row.transform, folderIcon, UITheme_FocusMode.AccentBlueSolid);
 
+        if (confirming)
+        {
+            int n = CountOf(folderId);
+            // 確認テキスト列：[削除しますか？][メモN件は「メモ」に移動します]
+            var col = NewUI("ConfirmText", row.transform);
+            var colLE = col.AddComponent<LayoutElement>();
+            colLE.minWidth = 0; colLE.flexibleWidth = 1;
+            var colVlg = col.AddComponent<VerticalLayoutGroup>();
+            colVlg.padding = new RectOffset(0, 0, 0, 0); colVlg.spacing = 1;
+            colVlg.childControlWidth = true; colVlg.childControlHeight = true;
+            colVlg.childForceExpandWidth = true; colVlg.childForceExpandHeight = false;
+            colVlg.childAlignment = TextAnchor.MiddleLeft;
+            var q = NewText("Q", col.transform, "削除しますか？", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
+            q.alignment = TextAlignmentOptions.MidlineLeft;
+            if (n > 0)
+            {
+                var sub = NewText("Sub", col.transform, "メモ" + n + "件は「メモ」に移動します", UITheme_FocusMode.FontCaption, UITheme_FocusMode.TextMuted);
+                sub.alignment = TextAlignmentOptions.MidlineLeft;
+            }
+            string capId = folderId;
+            // やめる（控えめ）
+            var cancel = NewUI("Cancel", row.transform);
+            var cancelLE = cancel.AddComponent<LayoutElement>();
+            cancelLE.minWidth = 56; cancelLE.preferredWidth = 56; cancelLE.minHeight = 32; cancelLE.preferredHeight = 32;
+            var cancelImg = cancel.AddComponent<Image>();
+            UIStyleKit.ApplyControl(cancelImg);
+            cancelImg.color = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextMuted, 0.18f);
+            var cancelLbl = NewText("Label", cancel.transform, "やめる", UITheme_FocusMode.FontCaption, UITheme_FocusMode.TextSecondary);
+            cancelLbl.alignment = TextAlignmentOptions.Center;
+            var cancelRt = cancelLbl.GetComponent<RectTransform>();
+            cancelRt.anchorMin = Vector2.zero; cancelRt.anchorMax = Vector2.one; cancelRt.offsetMin = Vector2.zero; cancelRt.offsetMax = Vector2.zero;
+            var cancelBtn = cancel.AddComponent<Button>();
+            cancelBtn.transition = Selectable.Transition.None; cancelBtn.targetGraphic = cancelImg;
+            cancelBtn.onClick.AddListener(() => { CancelFolderEdit(); Rebuild(); });
+            // 削除する（濃い赤・白文字）
+            var del = NewUI("ConfirmDelete", row.transform);
+            var delLE = del.AddComponent<LayoutElement>();
+            delLE.minWidth = 72; delLE.preferredWidth = 72; delLE.minHeight = 32; delLE.preferredHeight = 32;
+            var delImg = del.AddComponent<Image>();
+            UIStyleKit.ApplyControl(delImg);
+            delImg.color = new Color(0.80f, 0.29f, 0.29f, 1f);
+            var delLbl = NewText("Label", del.transform, "削除する", UITheme_FocusMode.FontCaption, Color.white);
+            delLbl.alignment = TextAlignmentOptions.Center;
+            var delRt = delLbl.GetComponent<RectTransform>();
+            delRt.anchorMin = Vector2.zero; delRt.anchorMax = Vector2.one; delRt.offsetMin = Vector2.zero; delRt.offsetMax = Vector2.zero;
+            var delBtn = del.AddComponent<Button>();
+            delBtn.transition = Selectable.Transition.None; delBtn.targetGraphic = delImg;
+            delBtn.onClick.AddListener(() => DeleteFolderRow(capId));
+            return;
+        }
+
         if (editing)
         {
             // 名前スロット（ここへ共有 InputField を寄せる）
             var slot = NewUI("NameSlot", row.transform);
             var slotLE = slot.AddComponent<LayoutElement>();
             slotLE.minWidth = 0; slotLE.flexibleWidth = 1;
+            slotLE.minHeight = 26; slotLE.preferredHeight = 26;   // 自前InputFieldは高さを報告しないため明示（高さ0潰れ防止）
 
             // 削除ボタン（ユーザーフォルダのみ）
             if (canDelete)
@@ -323,7 +387,7 @@ public class MemoListUI : MonoBehaviour
                 // クリックが発火しない。PointerDown で確定的に削除する（EventSystemの処理順に依存しない）。
                 var delTrigger = del.AddComponent<UnityEngine.EventSystems.EventTrigger>();
                 var delEntry = new UnityEngine.EventSystems.EventTrigger.Entry { eventID = UnityEngine.EventSystems.EventTriggerType.PointerDown };
-                delEntry.callback.AddListener((_) => DeleteFolderRow(capDel));
+                delEntry.callback.AddListener((_) => EnterConfirmDelete(capDel));
                 delTrigger.triggers.Add(delEntry);
             }
 
@@ -389,6 +453,16 @@ public class MemoListUI : MonoBehaviour
         Rebuild();
     }
 
+    // 自前インライン入力からのフォルダ名確定（空は据え置き・削除で解除済みなら無視・編集解除は次フレーム）
+    private void CommitFolderRename(string folderId, string newName)
+    {
+        if (_editingFolderId != folderId) return;   // 削除等で編集解除済みなら誤Renameしない
+        var nm = NotebookManager.Instance;
+        if (nm != null && !string.IsNullOrWhiteSpace(newName)) nm.RenameMemoFolder(folderId, newName.Trim());
+        if (_renameExitCo != null) StopCoroutine(_renameExitCo);
+        _renameExitCo = StartCoroutine(ExitFolderEditNextFrame(folderId));
+    }
+
     private void OnRenameEndEdit(string text)
     {
         if (_editingFolderId == null) return;
@@ -410,6 +484,14 @@ public class MemoListUI : MonoBehaviour
         }
     }
 
+    // 編集モードの「削除」→ まず確認状態へ（1撃削除を防ぐ・モーダルなし）
+    private void EnterConfirmDelete(string folderId)
+    {
+        CancelFolderEdit();               // 編集解除（_confirmも一旦クリアされる）
+        _confirmDeleteFolderId = folderId;
+        Rebuild();
+    }
+
     private void DeleteFolderRow(string folderId)
     {
         var nm = NotebookManager.Instance;
@@ -423,26 +505,34 @@ public class MemoListUI : MonoBehaviour
 
     private void AttachRenameInput(Transform slot, string folderId)
     {
-        if (folderRenameInput == null) return;
         var nm = NotebookManager.Instance;
         var f = nm != null ? nm.GetMemoFolders().Find(x => x.id == folderId) : null;
         string current = f != null ? f.name : "";
+        string capId = folderId;
 
-        var t = folderRenameInput.transform;
-        t.SetParent(slot, false);
-        var rt = folderRenameInput.GetComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
-        rt.pivot = new Vector2(0.5f, 0.5f);
+        // メモのタイトルと同じ自前InputField＋自前キャレット（共有InputFieldは廃止）
+        RectTransform caretRT; Image caretImg;
+        var input = BuildInlineFieldCore(slot, current, "フォルダ名", out caretRT, out caretImg);
+        input.onSelect.AddListener(_ =>
+        {
+            if (_suppressInline) return;
+            ActivateCaret(input, caretRT, caretImg);
+        });
+        input.onDeselect.AddListener(_ => DeactivateCaret(input));
+        input.onEndEdit.AddListener(v =>
+        {
+            if (_suppressInline) return;
+            CommitFolderRename(capId, v);
+        });
 
-        folderRenameInput.gameObject.SetActive(true);
-        folderRenameInput.SetTextWithoutNotify(current);
-        folderRenameInput.ActivateInputField();
-        folderRenameInput.Select();
+        // 「…」で編集に入った直後に自動フォーカス（カーソルは末尾）
+        input.Select();
+        input.ActivateInputField();
         int caret = current != null ? current.Length : 0;
-        folderRenameInput.caretPosition = caret;
-        folderRenameInput.selectionAnchorPosition = caret;
-        folderRenameInput.selectionFocusPosition = caret;
+        input.caretPosition = caret;
+        input.selectionAnchorPosition = caret;
+        input.selectionFocusPosition = caret;
+        ActivateCaret(input, caretRT, caretImg);
     }
 
     private void ParkRenameInput()
@@ -507,13 +597,11 @@ public class MemoListUI : MonoBehaviour
         colVlg.childForceExpandWidth = true; colVlg.childForceExpandHeight = false;
         colVlg.childAlignment = TextAnchor.MiddleLeft;
 
-        // タイトル（空は「（無題）」）。長いタイトルは Viewport の RectMask2D で右端クリップ。
-        bool untitled = string.IsNullOrWhiteSpace(note.title);
-        var title = NewText("Title", textCol.transform,
-            untitled ? "（無題）" : note.title,
-            UITheme_FocusMode.FontChipTitle,
-            untitled ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextPrimary);
-        title.alignment = TextAlignmentOptions.MidlineLeft;
+        // タイトル（インライン編集InputField・クリックで直接打てる。Todo/Routineと同方式。空はプレースホルダ「（無題）」）
+        var titleHost = NewUI("TitleHost", textCol.transform);
+        var thLE = titleHost.AddComponent<LayoutElement>();
+        thLE.minHeight = 26; thLE.preferredHeight = 26; thLE.flexibleWidth = 1;
+        var titleInput = BuildInlineTitleInput(titleHost.transform, note);
 
         // メタ（更新日時）
         var meta = NewText("Meta", textCol.transform,
@@ -522,7 +610,13 @@ public class MemoListUI : MonoBehaviour
             UITheme_FocusMode.TextMuted);
         meta.alignment = TextAlignmentOptions.MidlineLeft;
 
-        if (selected) { _selTitleTmp = title; _selMetaTmp = meta; }
+        // 選択行のタイトル入力/メタ参照（右ペイン編集→リストのライブ更新先）。フォーカス時にも張り替える。
+        if (selected) { _selTitleInput = titleInput; _selMetaTmp = meta; _selectedRowImg = rowImg; }
+        titleInput.onSelect.AddListener(_ =>
+        {
+            _selTitleInput = titleInput; _selMetaTmp = meta;
+            HighlightRowImmediate(rowImg);
+        });
 
         // ▲▼ 手動並べ替え（同ピングループ内のみ・端では無効）
         var capPrev = prevInGroup; var capNext = nextInGroup;
@@ -668,6 +762,218 @@ public class MemoListUI : MonoBehaviour
         btn.transition = Selectable.Transition.None;
         btn.targetGraphic = img;
         btn.onClick.AddListener(onClick);
+    }
+
+    // ── インライン編集タイトル入力（Memo版：空タイトル許可・確定で右ペイン同期）──
+    private TMP_InputField BuildInlineTitleInput(Transform parent, MemoNote note)
+    {
+        var captured = note;
+        var fieldGO = NewUI("TitleInput", parent);
+        var fieldRT = fieldGO.GetComponent<RectTransform>();
+        fieldRT.anchorMin = Vector2.zero; fieldRT.anchorMax = Vector2.one;
+        fieldRT.offsetMin = Vector2.zero; fieldRT.offsetMax = Vector2.zero;
+        var fieldImg = fieldGO.AddComponent<Image>();
+        fieldImg.color = Color.clear;
+        var taGO = NewUI("TextArea", fieldGO.transform);
+        var taRT = taGO.GetComponent<RectTransform>();
+        taRT.anchorMin = Vector2.zero; taRT.anchorMax = Vector2.one;
+        taRT.offsetMin = new Vector2(2f, 0f); taRT.offsetMax = new Vector2(-2f, 0f);
+        taGO.AddComponent<RectMask2D>();
+        var txtTMP = NewText("Text", taGO.transform, note.title ?? "", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
+        var txtRT = txtTMP.GetComponent<RectTransform>();
+        txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one;
+        txtRT.offsetMin = Vector2.zero; txtRT.offsetMax = Vector2.zero;
+        var phTMP = NewText("Placeholder", taGO.transform, "（無題）", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextMuted);
+        var phRT = phTMP.GetComponent<RectTransform>();
+        phRT.anchorMin = Vector2.zero; phRT.anchorMax = Vector2.one;
+        phRT.offsetMin = Vector2.zero; phRT.offsetMax = Vector2.zero;
+        var caretGO = NewUI("CustomCaret", taGO.transform);
+        var caretRT = caretGO.GetComponent<RectTransform>();
+        caretRT.anchorMin = new Vector2(0f, 1f); caretRT.anchorMax = new Vector2(0f, 1f);
+        caretRT.pivot = new Vector2(0f, 1f);
+        caretRT.sizeDelta = new Vector2(2f, 16f);
+        caretRT.anchoredPosition = Vector2.zero;
+        var caretImg = caretGO.AddComponent<Image>();
+        caretImg.color = Color.clear;
+        caretImg.raycastTarget = false;
+        var input = fieldGO.AddComponent<TMP_InputField>();
+        input.targetGraphic = fieldImg;
+        input.textViewport  = taRT;
+        input.textComponent = txtTMP;
+        input.placeholder   = phTMP;
+        input.lineType      = TMP_InputField.LineType.SingleLine;
+        input.text          = note.title ?? "";
+        input.customCaretColor = true;
+        input.caretColor       = Color.clear;
+        input.caretWidth       = 2;
+        input.selectionColor   = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        input.onSelect.AddListener(_ =>
+        {
+            if (_suppressInline) return;
+            Select(captured);
+            ActivateCaret(input, caretRT, caretImg);
+        });
+        input.onDeselect.AddListener(_ => DeactivateCaret(input));
+        input.onEndEdit.AddListener(v =>
+        {
+            if (_suppressInline) return;
+            if (captured.title == v) return;
+            captured.title = v;                       // 空タイトルも許可
+            NotebookManager.Instance?.UpdateMemoNote(captured);
+            if (_selMetaTmp != null && captured.id == _selectedId) _selMetaTmp.text = FormatMeta(captured);
+            if (detail != null) detail.RefreshTitleIfOpen(captured.id, v);
+        });
+        return input;
+    }
+
+    // フォーカス＝選択を即ハイライト（Rebuildすると入力欄が破棄されるため色だけ直接更新）。
+    private void HighlightRowImmediate(Image rowImg)
+    {
+        if (_selectedRowImg != null && _selectedRowImg != rowImg) _selectedRowImg.color = UITheme_FocusMode.PanelBG;
+        if (rowImg != null) rowImg.color = UITheme_FocusMode.SelectedBG;
+        _selectedRowImg = rowImg;
+    }
+
+    private void LateUpdate()
+    {
+        if (_activeInput == null || !_activeInput.isFocused) return;
+        if (_activeInput.caretPosition != _lastCaretPos)
+        {
+            _lastCaretPos = _activeInput.caretPosition;
+            UpdateActiveCaret();
+            RestartCaretBlink();
+        }
+    }
+
+    private void ActivateCaret(TMP_InputField input, RectTransform caretRT, Image caretImg)
+    {
+        _activeInput = input; _activeCaretRT = caretRT; _activeCaretImg = caretImg;
+        _lastCaretPos = -1;
+        UpdateActiveCaret();
+        RestartCaretBlink();
+    }
+
+    private void DeactivateCaret(TMP_InputField input)
+    {
+        if (_activeInput != input) { if (input == null) return; }
+        if (_caretCo != null) { StopCoroutine(_caretCo); _caretCo = null; }
+        if (_activeCaretImg != null) _activeCaretImg.color = Color.clear;
+        if (_activeInput == input)
+        {
+            _activeInput = null; _activeCaretRT = null; _activeCaretImg = null; _lastCaretPos = -1;
+        }
+    }
+
+    private void RestartCaretBlink()
+    {
+        if (_caretCo != null) StopCoroutine(_caretCo);
+        _caretCo = StartCoroutine(CaretBlinkCo());
+    }
+
+    private System.Collections.IEnumerator CaretBlinkCo()
+    {
+        bool visible = true;
+        var wfs = new WaitForSeconds(0.53f);
+        do
+        {
+            if (_activeCaretImg != null) _activeCaretImg.color = visible ? CaretColor : Color.clear;
+            visible = !visible;
+            yield return wfs;
+        } while (_activeInput != null && _activeInput.isFocused);
+        if (_activeCaretImg != null) _activeCaretImg.color = Color.clear;
+    }
+
+    private void UpdateActiveCaret()
+    {
+        if (_activeCaretRT == null || _activeInput?.textComponent == null) return;
+        _activeInput.ForceLabelUpdate();
+        var txt = _activeInput.textComponent;
+        txt.ForceMeshUpdate(true, true);
+        var info = txt.textInfo;
+        var taRect = _activeCaretRT.parent.GetComponent<RectTransform>().rect;
+        int cp = _activeInput.caretPosition;
+        float caretX, caretY, caretH;
+        float caretPad = 0f;
+        if (info == null || info.characterCount == 0 || cp <= 0 || info.lineCount == 0)
+        {
+            // 空（プレースホルダ表示中）：実際に見えているプレースホルダの行に合わせる
+            // （空テキストの行は垂直アライメントの都合で上にズレるため、それは使わない）
+            var ph = _activeInput.placeholder as TMP_Text;
+            TMP_TextInfo phi = null;
+            if (ph != null) { ph.ForceMeshUpdate(); phi = ph.textInfo; }
+            if (phi != null && phi.lineCount > 0)
+            {
+                var pl0 = phi.lineInfo[0];
+                caretY = pl0.ascender; caretH = Mathf.Max(pl0.ascender - pl0.descender, 1f);
+                caretX = (phi.characterCount > 0) ? phi.characterInfo[0].origin : taRect.xMin;
+            }
+            else if (info != null && info.lineCount > 0)
+            {
+                var li0 = info.lineInfo[0];
+                caretY = li0.ascender; caretH = Mathf.Max(li0.ascender - li0.descender, 1f);
+                caretX = taRect.xMin;
+            }
+            else { caretY = taRect.yMax; caretH = txt.fontSize * 1.15f; caretX = taRect.xMin; }
+            caretPad = 0f;
+        }
+        else
+        {
+            int idx = Mathf.Clamp(cp - 1, 0, info.characterCount - 1);
+            var ci = info.characterInfo[idx];
+            caretX = ci.xAdvance;
+            int li = Mathf.Clamp(ci.lineNumber, 0, info.lineCount - 1);
+            var line = info.lineInfo[li];
+            caretY = line.ascender; caretH = Mathf.Max(line.ascender - line.descender, 1f);
+            caretPad = CARET_X_PAD;
+        }
+        _activeCaretRT.anchoredPosition = new Vector2(caretX - taRect.xMin + caretPad, caretY - taRect.yMax);
+        _activeCaretRT.sizeDelta = new Vector2(2f, caretH);
+    }
+
+    // 自前キャレット付きインライン入力の「箱」だけ作る共通ヘルパー（onSelect/onEndEdit等の配線は呼び出し側）。
+    private TMP_InputField BuildInlineFieldCore(Transform parent, string initial, string placeholder,
+                                                out RectTransform caretRT, out Image caretImg)
+    {
+        var fieldGO = NewUI("InlineInput", parent);
+        var fieldRT = fieldGO.GetComponent<RectTransform>();
+        fieldRT.anchorMin = Vector2.zero; fieldRT.anchorMax = Vector2.one;
+        fieldRT.offsetMin = Vector2.zero; fieldRT.offsetMax = Vector2.zero;
+        var fieldImg = fieldGO.AddComponent<Image>();
+        fieldImg.color = Color.clear;
+        var taGO = NewUI("TextArea", fieldGO.transform);
+        var taRT = taGO.GetComponent<RectTransform>();
+        taRT.anchorMin = Vector2.zero; taRT.anchorMax = Vector2.one;
+        taRT.offsetMin = new Vector2(2f, 0f); taRT.offsetMax = new Vector2(-2f, 0f);
+        taGO.AddComponent<RectMask2D>();
+        var txtTMP = NewText("Text", taGO.transform, initial ?? "", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
+        var txtRT = txtTMP.GetComponent<RectTransform>();
+        txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one;
+        txtRT.offsetMin = Vector2.zero; txtRT.offsetMax = Vector2.zero;
+        var phTMP = NewText("Placeholder", taGO.transform, placeholder ?? "", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextMuted);
+        var phRT = phTMP.GetComponent<RectTransform>();
+        phRT.anchorMin = Vector2.zero; phRT.anchorMax = Vector2.one;
+        phRT.offsetMin = Vector2.zero; phRT.offsetMax = Vector2.zero;
+        var caretGO = NewUI("CustomCaret", taGO.transform);
+        caretRT = caretGO.GetComponent<RectTransform>();
+        caretRT.anchorMin = new Vector2(0f, 1f); caretRT.anchorMax = new Vector2(0f, 1f);
+        caretRT.pivot = new Vector2(0f, 1f);
+        caretRT.sizeDelta = new Vector2(2f, 16f);
+        caretRT.anchoredPosition = Vector2.zero;
+        caretImg = caretGO.AddComponent<Image>();
+        caretImg.color = Color.clear;
+        caretImg.raycastTarget = false;
+        var input = fieldGO.AddComponent<TMP_InputField>();
+        input.targetGraphic = fieldImg;
+        input.textViewport  = taRT;
+        input.textComponent = txtTMP;
+        input.placeholder   = phTMP;
+        input.lineType      = TMP_InputField.LineType.SingleLine;
+        input.text          = initial ?? "";
+        input.customCaretColor = true;
+        input.caretColor       = Color.clear;
+        input.caretWidth       = 2;
+        input.selectionColor   = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        return input;
     }
 
     private void BuildEmptyLabel()
