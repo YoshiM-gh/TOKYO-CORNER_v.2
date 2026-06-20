@@ -196,7 +196,7 @@ public class MemoListUI : MonoBehaviour
     private void UpdateHeader()
     {
         if (backButton != null) backButton.gameObject.SetActive(_view != LeftView.Folders);
-        if (titleText != null) titleText.text = _view == LeftView.Folders ? "メモ" : (_view == LeftView.Trash ? "ゴミ箱" : FolderName(_viewFolderId));
+        if (titleText != null) titleText.text = _view == LeftView.Folders ? "メモ" : (_view == LeftView.Trash ? "メモのゴミ箱" : FolderName(_viewFolderId));
 
         var addLbl = addButton != null ? addButton.GetComponentInChildren<TextMeshProUGUI>(true) : null;
         if (_view == LeftView.Trash)
@@ -581,7 +581,7 @@ public class MemoListUI : MonoBehaviour
         hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
         hlg.childAlignment = TextAnchor.MiddleLeft;
         AddIcon(row.transform, trashIcon, UITheme_FocusMode.TextMuted);
-        var name = NewText("Name", row.transform, "ゴミ箱", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
+        var name = NewText("Name", row.transform, "メモのゴミ箱", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
         name.alignment = TextAlignmentOptions.MidlineLeft;
         var nameLE = name.gameObject.AddComponent<LayoutElement>();
         nameLE.minWidth = 0; nameLE.flexibleWidth = 1;
@@ -604,7 +604,7 @@ public class MemoListUI : MonoBehaviour
             var empty = NewUI("Empty", listContent);
             var le = empty.AddComponent<LayoutElement>();
             le.minHeight = 80;
-            var label = NewText("Label", empty.transform, "ゴミ箱は空です", UITheme_FocusMode.FontBody, UITheme_FocusMode.TextPlaceholder);
+            var label = NewText("Label", empty.transform, "メモのゴミ箱は空です", UITheme_FocusMode.FontBody, UITheme_FocusMode.TextPlaceholder);
             label.alignment = TextAlignmentOptions.Center;
             var rt = label.GetComponent<RectTransform>();
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;

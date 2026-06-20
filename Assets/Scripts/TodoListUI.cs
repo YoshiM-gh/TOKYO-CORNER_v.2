@@ -457,6 +457,9 @@ public class TodoListUI : MonoBehaviour
         }
 
         // 「…」詳細を開くアイコン（右端）
+        // 「…」はモーダルを開く Daily のときだけ表示。FullList(Todoタブ)では出さない：
+        // タイトルのインライン編集にフォーカスすると onSelect→Select で右ペインが切り替わるため、「…」での右ペイン起動は不要・紛らわしい。
+        if (displayMode != TodoDisplayMode.DailyToday) return;
         var more = NewUI("MoreBtn", row.transform);
         var moreImg = more.AddComponent<Image>();
         moreImg.color = Color.clear; // 透明の当たり判定（テキストで…を出す）
@@ -472,9 +475,7 @@ public class TodoListUI : MonoBehaviour
         moreBtn.targetGraphic = moreImg;
         moreBtn.onClick.AddListener(() =>
         {
-            if (displayMode == TodoDisplayMode.DailyToday && _todoModal != null)
-                _todoModal.OpenEdit(captured); // Dailyはモーダルで編集
-            else { Select(captured); Rebuild(); } // Todoタブは従来どおり右ペイン
+            if (_todoModal != null) _todoModal.OpenEdit(captured); // モーダルで編集
         });
     }
 
