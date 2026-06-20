@@ -51,6 +51,7 @@ public class MemoListUI : MonoBehaviour
     private bool _wired;
 
     private string _flashNoteId;
+    private string _flashFolderId;
     private Coroutine _flashCo;
     private float     _flashDelay = 0.30f;
     private Coroutine _pinCo;
@@ -234,22 +235,32 @@ public class MemoListUI : MonoBehaviour
     {
         var notes = nm.GetMemoNotes(_viewFolderId);   // null=すべて・ゴミ箱除外・ピン優先→作成日降順
         if (notes.Count == 0) { BuildEmptyLabel(); return; }
-        foreach (var note in notes) BuildRow(note);
+        for (int i = 0; i < notes.Count; i++)
+        {
+            var note = notes[i];
+            // ▲▼は同じピングループ内のみ（ピンは常に上・境界では無効化）
+            MemoNote prev = (i > 0 && notes[i - 1].isPinned == note.isPinned) ? notes[i - 1] : null;
+            MemoNote next = (i < notes.Count - 1 && notes[i + 1].isPinned == note.isPinned) ? notes[i + 1] : null;
+            BuildRow(note, prev, next);
+        }
     }
 
     // ── フォルダ一覧（ドリルダウン） ────────────────────────────
     private void BuildFolderList(NotebookManager nm)
     {
-        BuildFolderRow("すべて", null, editable: false, canDelete: false);                                 // 横断
-        BuildFolderRow("メモ", NotebookManager.DefaultMemoFolderId, editable: true, canDelete: false);       // 既定（リネーム可・削除不可）
-        foreach (var f in nm.GetMemoFolders())
+        BuildFolderRow("すべて", null, editable: false, canDelete: false, canReorder: false, prevId: null, nextId: null);                                 // 横断
+        BuildFolderRow("メモ", NotebookManager.DefaultMemoFolderId, editable: true, canDelete: false, canReorder: false, prevId: null, nextId: null);       // 既定（リネーム可・削除不可）
+        var userFolders = nm.GetMemoFolders().FindAll(x => x.id != NotebookManager.DefaultMemoFolderId);
+        for (int i = 0; i < userFolders.Count; i++)
         {
-            if (f.id == NotebookManager.DefaultMemoFolderId) continue;   // 既定は上で出した
-            BuildFolderRow(f.name, f.id, editable: true, canDelete: true);
+            var f = userFolders[i];
+            string prevId = i > 0 ? userFolders[i - 1].id : null;
+            string nextId = i < userFolders.Count - 1 ? userFolders[i + 1].id : null;
+            BuildFolderRow(f.name, f.id, editable: true, canDelete: true, canReorder: true, prevId: prevId, nextId: nextId);
         }
     }
 
-    private void BuildFolderRow(string label, string folderId, bool editable, bool canDelete)
+    private void BuildFolderRow(string label, string folderId, bool editable, bool canDelete, bool canReorder, string prevId, string nextId)
     {
         bool editing = editable && folderId == _editingFolderId;
 
@@ -257,6 +268,13 @@ public class MemoListUI : MonoBehaviour
         var rowImg = row.AddComponent<Image>();
         rowImg.color = UITheme_FocusMode.PanelBG;
         UIStyleKit.ApplyRounded(rowImg, 10f);
+        // 並べ替え直後のフォルダ行を一瞬フラッシュ（移動の視認性）
+        if (_flashFolderId != null && _flashFolderId == folderId)
+        {
+            _flashFolderId = null;
+            if (_flashCo != null) StopCoroutine(_flashCo);
+            _flashCo = StartCoroutine(FlashRow(rowImg, false, _flashDelay));
+        }
 
         var rowLE = row.AddComponent<LayoutElement>();
         rowLE.minHeight = 52; rowLE.preferredHeight = 52;
@@ -316,6 +334,17 @@ public class MemoListUI : MonoBehaviour
         count.alignment = TextAlignmentOptions.MidlineRight;
         var countLE = count.gameObject.AddComponent<LayoutElement>();
         countLE.minWidth = 22;
+
+        if (canReorder)
+        {
+            string capFolder = folderId; string capPrev = prevId; string capNext = nextId;
+            BuildReorderButton(row.transform, "\u25B2", capPrev != null, () => {
+                if (capPrev != null) { NotebookManager.Instance?.SwapMemoFolderOrder(capFolder, capPrev); _flashFolderId = capFolder; _flashDelay = 0.05f; Rebuild(); }
+            });
+            BuildReorderButton(row.transform, "\u25BC", capNext != null, () => {
+                if (capNext != null) { NotebookManager.Instance?.SwapMemoFolderOrder(capFolder, capNext); _flashFolderId = capFolder; _flashDelay = 0.05f; Rebuild(); }
+            });
+        }
 
         if (editable)
         {
@@ -428,7 +457,7 @@ public class MemoListUI : MonoBehaviour
     }
 
     // ── ノート行（M-1/M-2a・無改変） ────────────────────────────
-    private void BuildRow(MemoNote note)
+    private void BuildRow(MemoNote note, MemoNote prevInGroup, MemoNote nextInGroup)
     {
         bool selected = note.id == _selectedId;
         var captured = note;
@@ -448,7 +477,7 @@ public class MemoListUI : MonoBehaviour
         var rowLE = row.AddComponent<LayoutElement>();
         rowLE.minHeight = 60; rowLE.preferredHeight = 60;
 
-        // 行は横並び：[テキスト列(残り幅)] [星ボタン(固定28)]
+        // 行は横並び：[テキスト列(残り幅)] [▲][▼] [星ボタン(固定28)]
         var hlg = row.AddComponent<HorizontalLayoutGroup>();
         hlg.padding = new RectOffset(14, 14, 9, 9);
         hlg.spacing = 14;
@@ -485,6 +514,15 @@ public class MemoListUI : MonoBehaviour
         meta.alignment = TextAlignmentOptions.MidlineLeft;
 
         if (selected) { _selTitleTmp = title; _selMetaTmp = meta; }
+
+        // ▲▼ 手動並べ替え（同ピングループ内のみ・端では無効）
+        var capPrev = prevInGroup; var capNext = nextInGroup;
+        BuildReorderButton(row.transform, "\u25B2", capPrev != null, () => {
+            if (capPrev != null) { NotebookManager.Instance?.SwapMemoNoteOrder(captured.id, capPrev.id); _flashNoteId = captured.id; _flashDelay = 0.05f; Rebuild(); }
+        });
+        BuildReorderButton(row.transform, "\u25BC", capNext != null, () => {
+            if (capNext != null) { NotebookManager.Instance?.SwapMemoNoteOrder(captured.id, capNext.id); _flashNoteId = captured.id; _flashDelay = 0.05f; Rebuild(); }
+        });
 
         // ピン（星）ボタン。未ピン=線の星(薄グレー)、ピン=塗りの星(アクセント青)。
         var pin = NewUI("PinBtn", row.transform);
@@ -605,6 +643,56 @@ public class MemoListUI : MonoBehaviour
     }
 
     // ── ヘルパー（TodoListUI と同方式） ──
+    // ───────── 並べ替え ▲▼ ボタン（Todoと同方式）─────────
+    private const float REORDER_GLYPH_SIZE = 14f;
+    private void BuildReorderButton(Transform parent, string glyph, bool enabled, UnityEngine.Events.UnityAction onClick)
+    {
+        var go = NewUI("ReorderBtn", parent);
+        var le = go.AddComponent<LayoutElement>();
+        le.minWidth = 26; le.preferredWidth = 26; le.minHeight = 30;
+        var bg = go.AddComponent<Image>();
+        bg.sprite = null; bg.type = Image.Type.Simple; bg.color = Color.clear;
+        // Kotonoruは▲(U+25B2)を持たずフォールバックでサイズが食い違うため、両グリフを持つ日本語フォントに固定。
+        var txt = NewText("Arrow", go.transform, glyph, UITheme_FocusMode.FontCaption,
+            enabled ? UITheme_FocusMode.TextSecondary : UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextMuted, 0.28f));
+        var jp = GetJpFallbackFont();
+        if (jp != null) txt.font = jp;
+        txt.fontSize = REORDER_GLYPH_SIZE;
+        txt.enableAutoSizing = false;
+        txt.alignment = TextAlignmentOptions.Center;
+        txt.raycastTarget = false;
+        var trt = txt.GetComponent<RectTransform>();
+        trt.anchorMin = Vector2.zero; trt.anchorMax = Vector2.one;
+        trt.offsetMin = Vector2.zero; trt.offsetMax = Vector2.zero;
+        if (enabled)
+        {
+            var btn = go.AddComponent<Button>();
+            btn.transition = Selectable.Transition.ColorTint;
+            btn.targetGraphic = bg;
+            var cb = btn.colors;
+            cb.normalColor      = Color.clear;
+            cb.highlightedColor = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextSecondary, 0.22f);
+            cb.pressedColor     = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.55f);
+            cb.selectedColor    = Color.clear;
+            cb.disabledColor    = Color.clear;
+            cb.colorMultiplier  = 1f;
+            cb.fadeDuration     = 0.08f;
+            btn.colors = cb;
+            btn.onClick.AddListener(onClick);
+        }
+    }
+
+    private TMP_FontAsset _jpFallbackCache;
+    private TMP_FontAsset GetJpFallbackFont()
+    {
+        if (_jpFallbackCache != null) return _jpFallbackCache;
+        var settings = TMPro.TMP_Settings.fallbackFontAssets;
+        if (settings != null && settings.Count > 0) _jpFallbackCache = settings[0];
+        if (_jpFallbackCache == null)
+            _jpFallbackCache = Resources.Load<TMP_FontAsset>("Fonts & Materials/NotoSansJP-Regular SDF");
+        return _jpFallbackCache;
+    }
+
     private GameObject NewUI(string name, Transform parent)
     {
         var go = new GameObject(name, typeof(RectTransform));

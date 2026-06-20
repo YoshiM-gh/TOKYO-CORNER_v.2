@@ -74,6 +74,7 @@ public class NotebookManager : MonoBehaviour
         routineData = ReadJson<RoutineListData>(PathRoutine)   ?? new RoutineListData();
         memoNotes   = ReadJson<MemoNotesData>(PathMemoNotes)   ?? new MemoNotesData();
         EnsureDefaultMemoFolder();
+        EnsureMemoNoteSortOrders();
         PruneOldEvents();
         ArchiveOldTodos();
     }
@@ -506,7 +507,12 @@ public class NotebookManager : MonoBehaviour
         memoNotes.folders.Insert(0, new MemoFolder { id = DefaultMemoFolderId, name = "メモ", sortOrder = 0 });
     }
 
-    public List<MemoFolder> GetMemoFolders() => new List<MemoFolder>(memoNotes.folders);
+    public List<MemoFolder> GetMemoFolders()
+    {
+        var list = new List<MemoFolder>(memoNotes.folders);
+        list.Sort((a, b) => a.sortOrder.CompareTo(b.sortOrder));
+        return list;
+    }
 
     public MemoFolder AddMemoFolder(string name)
     {
@@ -554,9 +560,61 @@ public class NotebookManager : MonoBehaviour
             !m.IsTrashed && (folderId == null || m.folderId == folderId));
         list.Sort((a, b) => {
             if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+            if (a.sortOrder != b.sortOrder) return a.sortOrder.CompareTo(b.sortOrder);
             return string.Compare(b.createdAt, a.createdAt, StringComparison.Ordinal);
         });
         return list;
+    }
+
+    // 手動並べ替え用の連番を一度だけ焼き付ける（既存メモは sortOrder 未設定=全0）。
+    private void EnsureMemoNoteSortOrders()
+    {
+        if (memoNotes.notes.Count == 0) return;
+        if (memoNotes.notes.Any(n => n.sortOrder != 0)) return;   // 既に採番済み
+        var ordered = new List<MemoNote>(memoNotes.notes);
+        ordered.Sort((a, b) => {
+            if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+            return string.Compare(b.createdAt, a.createdAt, StringComparison.Ordinal);
+        });
+        for (int i = 0; i < ordered.Count; i++) ordered[i].sortOrder = i;
+        SaveAll();
+    }
+
+    /// <summary>2メモの並び順を交換（▲▼）。同値なら現在の表示順を焼き付けてから交換。</summary>
+    public void SwapMemoNoteOrder(string idA, string idB)
+    {
+        if (string.IsNullOrEmpty(idA) || string.IsNullOrEmpty(idB) || idA == idB) return;
+        var a = memoNotes.notes.Find(m => m.id == idA);
+        var b = memoNotes.notes.Find(m => m.id == idB);
+        if (a == null || b == null) return;
+        if (a.sortOrder == b.sortOrder)
+        {
+            var ordered = new List<MemoNote>(memoNotes.notes);
+            ordered.Sort((x, y) => {
+                if (x.isPinned != y.isPinned) return x.isPinned ? -1 : 1;
+                return string.Compare(y.createdAt, x.createdAt, StringComparison.Ordinal);
+            });
+            for (int i = 0; i < ordered.Count; i++) ordered[i].sortOrder = i;
+        }
+        int tmp = a.sortOrder; a.sortOrder = b.sortOrder; b.sortOrder = tmp;
+        SaveAll();
+    }
+
+    /// <summary>2フォルダの並び順を交換（▲▼）。同値なら現在の sortOrder 順を焼き付けてから交換。</summary>
+    public void SwapMemoFolderOrder(string idA, string idB)
+    {
+        if (string.IsNullOrEmpty(idA) || string.IsNullOrEmpty(idB) || idA == idB) return;
+        var a = memoNotes.folders.Find(f => f.id == idA);
+        var b = memoNotes.folders.Find(f => f.id == idB);
+        if (a == null || b == null) return;
+        if (a.sortOrder == b.sortOrder)
+        {
+            var ordered = new List<MemoFolder>(memoNotes.folders);
+            ordered.Sort((x, y) => x.sortOrder.CompareTo(y.sortOrder));
+            for (int i = 0; i < ordered.Count; i++) ordered[i].sortOrder = i;
+        }
+        int tmp = a.sortOrder; a.sortOrder = b.sortOrder; b.sortOrder = tmp;
+        SaveAll();
     }
 
     public List<MemoNote> GetTrashedMemoNotes() =>
@@ -571,6 +629,7 @@ public class NotebookManager : MonoBehaviour
             id = Guid.NewGuid().ToString(), folderId = folderId ?? DefaultMemoFolderId,
             title = "", createdAt = NowKey(), updatedAt = NowKey()
         };
+        m.sortOrder = memoNotes.notes.Count == 0 ? 0 : memoNotes.notes.Min(x => x.sortOrder) - 1;   // 先頭に積む
         memoNotes.notes.Add(m);
         SaveAll();
         return m;

@@ -226,6 +226,7 @@ public class MemoNote
     public string createdAt;   // "yyyy-MM-dd HH:mm"
     public string updatedAt;
     public bool   isPinned;    // 上位表示固定
+    public int    sortOrder;   // 手動並べ替え順（小さいほど上・ピングループ内）
     public string deletedAt;   // null=通常 / 値あり=ゴミ箱（"yyyy-MM-dd HH:mm"）
 
     public bool IsTrashed => !string.IsNullOrEmpty(deletedAt);
