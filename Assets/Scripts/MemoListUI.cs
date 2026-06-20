@@ -35,8 +35,9 @@ public class MemoListUI : MonoBehaviour
     [Header("アイコン")]
     [SerializeField] private Sprite folderIcon;  // フォルダ行の左アイコン（MUIP Folder）
     [SerializeField] private Sprite noteIcon;    // メモ行の左アイコン（MUIP Document）
+    [SerializeField] private Sprite trashIcon;   // ゴミ箱行の左アイコン（MUIP System/Trash）
 
-    private enum LeftView { Folders, Notes }
+    private enum LeftView { Folders, Notes, Trash }
     private LeftView _view = LeftView.Notes;   // 起動時は「すべて」ノート一覧
     private string _viewFolderId;              // null = すべて（Notesビューの対象）
     private string _editingFolderId;           // インラインリネーム中のフォルダid（null=なし）
@@ -194,11 +195,15 @@ public class MemoListUI : MonoBehaviour
     // ── ヘッダー更新 ────────────────────────────
     private void UpdateHeader()
     {
-        if (backButton != null) backButton.gameObject.SetActive(_view == LeftView.Notes);
-        if (titleText != null) titleText.text = _view == LeftView.Folders ? "メモ" : FolderName(_viewFolderId);
+        if (backButton != null) backButton.gameObject.SetActive(_view != LeftView.Folders);
+        if (titleText != null) titleText.text = _view == LeftView.Folders ? "メモ" : (_view == LeftView.Trash ? "ゴミ箱" : FolderName(_viewFolderId));
 
         var addLbl = addButton != null ? addButton.GetComponentInChildren<TextMeshProUGUI>(true) : null;
-        if (_view == LeftView.Folders)
+        if (_view == LeftView.Trash)
+        {
+            if (addButton != null) addButton.gameObject.SetActive(false);   // ゴミ箱では追加なし
+        }
+        else if (_view == LeftView.Folders)
         {
             var nm = NotebookManager.Instance;
             bool canAdd = nm != null && nm.GetMemoFolders().Count < MaxFolders;
@@ -228,6 +233,7 @@ public class MemoListUI : MonoBehaviour
         if (nm == null) return;
 
         if (_view == LeftView.Folders) BuildFolderList(nm);
+        else if (_view == LeftView.Trash) BuildTrashList(nm);
         else BuildNoteList(nm);
     }
 
@@ -258,6 +264,7 @@ public class MemoListUI : MonoBehaviour
             string nextId = i < userFolders.Count - 1 ? userFolders[i + 1].id : null;
             BuildFolderRow(f.name, f.id, editable: true, canDelete: true, canReorder: true, prevId: prevId, nextId: nextId);
         }
+        BuildTrashEntryRow(nm.GetTrashedMemoNotes().Count);   // 末尾にゴミ箱（件数0でも常時表示）
     }
 
     private void BuildFolderRow(string label, string folderId, bool editable, bool canDelete, bool canReorder, string prevId, string nextId)
@@ -304,18 +311,20 @@ public class MemoListUI : MonoBehaviour
                 delLE.minHeight = 32; delLE.preferredHeight = 32;
                 var delImg = del.AddComponent<Image>();
                 UIStyleKit.ApplyControl(delImg);
-                delImg.color = new Color(0.85f, 0.30f, 0.30f, 0.16f);
+                delImg.color = new Color(0.80f, 0.29f, 0.29f, 1f);   // アクティブに見える濃い赤の塗り
                 var delLbl = NewText("Label", del.transform, "削除",
-                    UITheme_FocusMode.FontCaption, new Color(0.86f, 0.34f, 0.34f, 1f));
+                    UITheme_FocusMode.FontCaption, Color.white);   // 塗りの上で読める白文字
                 delLbl.alignment = TextAlignmentOptions.Center;
                 var delRt = delLbl.GetComponent<RectTransform>();
                 delRt.anchorMin = Vector2.zero; delRt.anchorMax = Vector2.one;
                 delRt.offsetMin = Vector2.zero; delRt.offsetMax = Vector2.zero;
-                var delBtn = del.AddComponent<Button>();
-                delBtn.transition = Selectable.Transition.None;
-                delBtn.targetGraphic = delImg;
                 string capDel = folderId;
-                delBtn.onClick.AddListener(() => DeleteFolderRow(capDel));
+                // onClick(PointerUp)だと、入力フィールドの blur→次フレーム再構築でこのボタンが先に破棄され
+                // クリックが発火しない。PointerDown で確定的に削除する（EventSystemの処理順に依存しない）。
+                var delTrigger = del.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+                var delEntry = new UnityEngine.EventSystems.EventTrigger.Entry { eventID = UnityEngine.EventSystems.EventTriggerType.PointerDown };
+                delEntry.callback.AddListener((_) => DeleteFolderRow(capDel));
+                delTrigger.triggers.Add(delEntry);
             }
 
             AttachRenameInput(slot.transform, folderId);
@@ -545,6 +554,120 @@ public class MemoListUI : MonoBehaviour
         btn.transition = Selectable.Transition.None;  // 行の色は選択(SelectedBG)とフラッシュのみで制御
         btn.targetGraphic = rowImg;
         btn.onClick.AddListener(() => { Select(captured); Rebuild(); });
+    }
+
+    // ── ゴミ箱 ──────────────────────────────────────
+    private void EnterTrash()
+    {
+        CancelFolderEdit();
+        _view = LeftView.Trash;
+        _selectedId = null;
+        Rebuild();
+    }
+
+    // フォルダ一覧末尾の「ゴミ箱」行（タップでゴミ箱ビューへ）。
+    private void BuildTrashEntryRow(int count)
+    {
+        var row = NewUI("Folder_trash", listContent);
+        var rowImg = row.AddComponent<Image>();
+        rowImg.color = UITheme_FocusMode.PanelBG;
+        UIStyleKit.ApplyRounded(rowImg, 10f);
+        var rowLE = row.AddComponent<LayoutElement>();
+        rowLE.minHeight = 52; rowLE.preferredHeight = 52;
+        var hlg = row.AddComponent<HorizontalLayoutGroup>();
+        hlg.padding = new RectOffset(14, 10, 8, 8);
+        hlg.spacing = 14;
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        hlg.childAlignment = TextAnchor.MiddleLeft;
+        AddIcon(row.transform, trashIcon, UITheme_FocusMode.TextMuted);
+        var name = NewText("Name", row.transform, "ゴミ箱", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
+        name.alignment = TextAlignmentOptions.MidlineLeft;
+        var nameLE = name.gameObject.AddComponent<LayoutElement>();
+        nameLE.minWidth = 0; nameLE.flexibleWidth = 1;
+        var c = NewText("Count", row.transform, count.ToString(), UITheme_FocusMode.FontCaption, UITheme_FocusMode.TextMuted);
+        c.alignment = TextAlignmentOptions.MidlineRight;
+        var cLE = c.gameObject.AddComponent<LayoutElement>();
+        cLE.minWidth = 22;
+        var btn = row.AddComponent<Button>();
+        btn.transition = Selectable.Transition.None;
+        btn.targetGraphic = rowImg;
+        btn.onClick.AddListener(() => EnterTrash());
+    }
+
+    private void BuildTrashList(NotebookManager nm)
+    {
+        var notes = nm.GetTrashedMemoNotes();
+        notes.Sort((a, b) => string.CompareOrdinal(b.deletedAt, a.deletedAt));   // 新しく削除した順
+        if (notes.Count == 0)
+        {
+            var empty = NewUI("Empty", listContent);
+            var le = empty.AddComponent<LayoutElement>();
+            le.minHeight = 80;
+            var label = NewText("Label", empty.transform, "ゴミ箱は空です", UITheme_FocusMode.FontBody, UITheme_FocusMode.TextPlaceholder);
+            label.alignment = TextAlignmentOptions.Center;
+            var rt = label.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+            return;
+        }
+        foreach (var note in notes) BuildTrashRow(nm, note);
+    }
+
+    private void BuildTrashRow(NotebookManager nm, MemoNote note)
+    {
+        var captured = note;
+        var row = NewUI("Trash_" + note.id, listContent);
+        var rowImg = row.AddComponent<Image>();
+        rowImg.color = UITheme_FocusMode.PanelBG;
+        UIStyleKit.ApplyRounded(rowImg, 10f);
+        var rowLE = row.AddComponent<LayoutElement>();
+        rowLE.minHeight = 60; rowLE.preferredHeight = 60;
+        var hlg = row.AddComponent<HorizontalLayoutGroup>();
+        hlg.padding = new RectOffset(14, 14, 9, 9);
+        hlg.spacing = 14;
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        hlg.childAlignment = TextAnchor.MiddleLeft;
+        AddIcon(row.transform, noteIcon, UITheme_FocusMode.TextMuted);
+        var textCol = NewUI("TextCol", row.transform);
+        var colLE = textCol.AddComponent<LayoutElement>();
+        colLE.minWidth = 0; colLE.flexibleWidth = 1;
+        var colVlg = textCol.AddComponent<VerticalLayoutGroup>();
+        colVlg.padding = new RectOffset(0, 0, 0, 0);
+        colVlg.spacing = 3;
+        colVlg.childControlWidth = true; colVlg.childControlHeight = true;
+        colVlg.childForceExpandWidth = true; colVlg.childForceExpandHeight = false;
+        colVlg.childAlignment = TextAnchor.MiddleLeft;
+        bool untitled = string.IsNullOrWhiteSpace(note.title);
+        var title = NewText("Title", textCol.transform, untitled ? "（無題）" : note.title, UITheme_FocusMode.FontChipTitle, untitled ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextPrimary);
+        title.alignment = TextAlignmentOptions.MidlineLeft;
+        int left = nm.MemoTrashDaysLeft(note);
+        string metaStr = left <= 0 ? "まもなく完全削除" : ("あと" + left + "日で完全削除");
+        var meta = NewText("Meta", textCol.transform, metaStr, UITheme_FocusMode.FontCaption, UITheme_FocusMode.TextMuted);
+        meta.alignment = TextAlignmentOptions.MidlineLeft;
+        BuildTrashActionButton(row.transform, "復元", false, () => { NotebookManager.Instance?.RestoreMemoNote(captured.id); Rebuild(); });
+        BuildTrashActionButton(row.transform, "削除", true,  () => { NotebookManager.Instance?.DeleteMemoNotePermanently(captured.id); Rebuild(); });
+    }
+
+    // ゴミ箱の行アクション（復元=青 / 削除=赤）。Selectable.None で明示色を保つ。
+    private void BuildTrashActionButton(Transform parent, string label, bool danger, UnityEngine.Events.UnityAction onClick)
+    {
+        var go = NewUI("Action", parent);
+        var le = go.AddComponent<LayoutElement>();
+        le.minWidth = 52; le.preferredWidth = 52; le.minHeight = 32; le.preferredHeight = 32;
+        var img = go.AddComponent<Image>();
+        UIStyleKit.ApplyControl(img);
+        img.color = danger ? new Color(0.80f, 0.29f, 0.29f, 1f) : UITheme_FocusMode.AccentBlueSolid;   // アクティブに見える塗り（削除=赤 / 復元=青）
+        var lbl = NewText("Label", go.transform, label, UITheme_FocusMode.FontCaption, Color.white);   // 塗りの上で読める白文字
+        lbl.alignment = TextAlignmentOptions.Center;
+        var rt = lbl.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        var btn = go.AddComponent<Button>();
+        btn.transition = Selectable.Transition.None;
+        btn.targetGraphic = img;
+        btn.onClick.AddListener(onClick);
     }
 
     private void BuildEmptyLabel()

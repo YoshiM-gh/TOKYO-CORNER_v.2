@@ -77,6 +77,8 @@ public class NotebookManager : MonoBehaviour
         EnsureMemoNoteSortOrders();
         PruneOldEvents();
         ArchiveOldTodos();
+        AutoTrashStaleMemoNotes();
+        PurgeOldTrashedMemoNotes();
     }
 
     private static void WriteJson<T>(string path, T data)
@@ -340,6 +342,8 @@ public class NotebookManager : MonoBehaviour
     // 完了後30日経過したTodoを本体から外し、アーカイブファイルへ追記する(起動時に1回)。
     // アーカイブは追記専用で、ランタイムでは読み込まない(将来の振り返り・統計用)。
     private const int TODO_ARCHIVE_DAYS = 30;
+    private const int MEMO_AUTO_TRASH_DAYS = 30;       // 更新がこの日数ないメモを自動でゴミ箱へ
+    private const int MEMO_TRASH_RETENTION_DAYS = 10;  // ゴミ箱でこの日数を超えたら完全削除
 
     private void ArchiveOldTodos()
     {
@@ -674,4 +678,56 @@ public class NotebookManager : MonoBehaviour
         memoNotes.notes.RemoveAll(m => m.id == id);
         SaveAll();
     }
+
+    // 30日更新のないメモを自動でゴミ箱へ（ピン留めは除外）。LoadAll で実行。
+    private void AutoTrashStaleMemoNotes()
+    {
+        if (memoNotes == null || memoNotes.notes == null || memoNotes.notes.Count == 0) return;
+        var threshold = DateTime.Now.Date.AddDays(-MEMO_AUTO_TRASH_DAYS);
+        int n = 0;
+        foreach (var m in memoNotes.notes)
+        {
+            if (m.IsTrashed || m.isPinned) continue;   // ピン留めは残す意思として除外
+            string src = string.IsNullOrEmpty(m.updatedAt) ? m.createdAt : m.updatedAt;
+            if (DateTime.TryParseExact(src, "yyyy-MM-dd HH:mm",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var dt)
+                && dt.Date <= threshold)
+            {
+                m.deletedAt = NowKey();
+                n++;
+            }
+        }
+        if (n > 0) { SaveAll(); Debug.Log("[NotebookManager] メモ自動ゴミ箱: " + n + "件（30日更新なし）"); }
+    }
+
+    // ゴミ箱で保持日数を超えたメモを完全削除。LoadAll で実行。
+    private void PurgeOldTrashedMemoNotes()
+    {
+        if (memoNotes == null || memoNotes.notes == null || memoNotes.notes.Count == 0) return;
+        var threshold = DateTime.Now.Date.AddDays(-MEMO_TRASH_RETENTION_DAYS);
+        int before = memoNotes.notes.Count;
+        memoNotes.notes.RemoveAll(m =>
+        {
+            if (!m.IsTrashed) return false;
+            return DateTime.TryParseExact(m.deletedAt, "yyyy-MM-dd HH:mm",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var dt)
+                && dt.Date <= threshold;
+        });
+        int removed = before - memoNotes.notes.Count;
+        if (removed > 0) { SaveAll(); Debug.Log("[NotebookManager] メモ完全削除(保持期限切れ): " + removed + "件"); }
+    }
+
+    /// <summary>ゴミ箱のメモが完全削除されるまでの残り日数（表示用・0なら期限到達）。</summary>
+    public int MemoTrashDaysLeft(MemoNote note)
+    {
+        if (note == null || !note.IsTrashed) return 0;
+        if (!DateTime.TryParseExact(note.deletedAt, "yyyy-MM-dd HH:mm",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var dt)) return MEMO_TRASH_RETENTION_DAYS;
+        int left = MEMO_TRASH_RETENTION_DAYS - (DateTime.Now.Date - dt.Date).Days;
+        return left < 0 ? 0 : left;
+    }
+
 }
