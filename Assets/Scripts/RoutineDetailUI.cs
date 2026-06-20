@@ -160,6 +160,16 @@ public class RoutineDetailUI : MonoBehaviour
         if (emptyState != null) emptyState.SetActive(true);
     }
 
+    // インライン一覧編集→確定時に、開いている右ペインのタイトル欄も同期（全Rebuildせず）。
+    public void RefreshTitleIfOpen(string id, string newTitle)
+    {
+        if (_target == null || _target.id != id) return;
+        if (titleInput == null) return;
+        _loading = true;                       // この更新で onValueChanged/onEndEdit を誤発火させない
+        titleInput.text = newTitle ?? "";
+        _loading = false;
+    }
+
     public void FocusTitle()
     {
         if (titleInput == null) return;

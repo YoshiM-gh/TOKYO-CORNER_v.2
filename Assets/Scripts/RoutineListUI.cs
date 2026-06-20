@@ -19,6 +19,17 @@ public class RoutineListUI : MonoBehaviour
     [SerializeField] private RoutineDetailUI detail;
 
     private string _selectedId;
+    private bool _suppressInline; // インライン編集の同期更新中、value/endEditの誤発火を抑制
+
+    // ── インライン編集の自前キャレット（動的生成InputFieldは標準キャレットが出ないため自前描画）──
+    // 各行がLateUpdate/コルーチンを持つと重いので、RoutineListUIが1つだけ回す。
+    private TMP_InputField _activeInput;
+    private RectTransform  _activeCaretRT;
+    private Image          _activeCaretImg;
+    private int            _lastCaretPos = -1;
+    private Coroutine      _caretCo;
+    private static readonly Color CaretColor = new Color(0.85f, 0.85f, 0.88f, 1f);
+    private const float CARET_X_PAD = 3f;
     private static readonly string[] DayNames = { "日", "月", "火", "水", "木", "金", "土" };
 
     private void OnEnable()
@@ -155,17 +166,11 @@ public class RoutineListUI : MonoBehaviour
             });
         }
 
-        // タイトル(クリップ枠 + Overflow)
-        var titleClip = NewUI("TitleClip", row.transform);
-        titleClip.AddComponent<RectMask2D>();
-        var clipLE = titleClip.AddComponent<LayoutElement>();
-        clipLE.flexibleWidth = 1; clipLE.minHeight = 30;
-        var title = NewText("Title", titleClip.transform, item.title, UITheme_FocusMode.FontChipTitle,
-            done ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextSecondary);
-        if (done) title.fontStyle = FontStyles.Strikethrough;
-        var titleRT = title.GetComponent<RectTransform>();
-        titleRT.anchorMin = Vector2.zero; titleRT.anchorMax = Vector2.one;
-        titleRT.offsetMin = Vector2.zero; titleRT.offsetMax = Vector2.zero;
+        // タイトル(インライン編集InputField・クリックで直接打てる。Todo/Dailyと同方式)
+        var titleHost = NewUI("TitleHost", row.transform);
+        var hostLE = titleHost.AddComponent<LayoutElement>();
+        hostLE.flexibleWidth = 1; hostLE.minHeight = 30;
+        BuildInlineTitleInput(titleHost.transform, item, done);
 
         // 「高」チップ
         if (item.priorityHigh)
@@ -179,6 +184,160 @@ public class RoutineListUI : MonoBehaviour
         BuildChip(row.transform, label,
             done ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextMuted,
             UITheme_FocusMode.InputBG);
+    }
+
+    // ── インライン編集タイトル入力（Todo/Daily の BuildInlineTitleInput を移植）──
+    private TMP_InputField BuildInlineTitleInput(Transform parent, RoutineItem item, bool done)
+    {
+        var captured = item;
+        var fieldGO = NewUI("TitleInput", parent);
+        var fieldRT = fieldGO.GetComponent<RectTransform>();
+        fieldRT.anchorMin = Vector2.zero; fieldRT.anchorMax = Vector2.one;
+        fieldRT.offsetMin = Vector2.zero; fieldRT.offsetMax = Vector2.zero;
+        var fieldImg = fieldGO.AddComponent<Image>();
+        fieldImg.color = Color.clear; // 透明（背景は行が持つ）。raycastは受ける
+        var taGO = NewUI("TextArea", fieldGO.transform);
+        var taRT = taGO.GetComponent<RectTransform>();
+        taRT.anchorMin = Vector2.zero; taRT.anchorMax = Vector2.one;
+        taRT.offsetMin = new Vector2(2f, 0f); taRT.offsetMax = new Vector2(-2f, 0f);
+        taGO.AddComponent<RectMask2D>();
+        var txtTMP = NewText("Text", taGO.transform, item.title ?? "", UITheme_FocusMode.FontChipTitle,
+            done ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextSecondary);
+        if (done) txtTMP.fontStyle = FontStyles.Strikethrough;
+        var txtRT = txtTMP.GetComponent<RectTransform>();
+        txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one;
+        txtRT.offsetMin = Vector2.zero; txtRT.offsetMax = Vector2.zero;
+        var phTMP = NewText("Placeholder", taGO.transform, "ルーチン名", UITheme_FocusMode.FontChipTitle,
+            UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextMuted, 0.5f));
+        var phRT = phTMP.GetComponent<RectTransform>();
+        phRT.anchorMin = Vector2.zero; phRT.anchorMax = Vector2.one;
+        phRT.offsetMin = Vector2.zero; phRT.offsetMax = Vector2.zero;
+        var caretGO = NewUI("CustomCaret", taGO.transform);
+        var caretRT = caretGO.GetComponent<RectTransform>();
+        caretRT.anchorMin = new Vector2(0f, 1f); caretRT.anchorMax = new Vector2(0f, 1f);
+        caretRT.pivot = new Vector2(0f, 1f);
+        caretRT.sizeDelta = new Vector2(2f, 16f);
+        caretRT.anchoredPosition = Vector2.zero;
+        var caretImg = caretGO.AddComponent<Image>();
+        caretImg.color = Color.clear;
+        caretImg.raycastTarget = false;
+        var input = fieldGO.AddComponent<TMP_InputField>();
+        input.targetGraphic = fieldImg;
+        input.textViewport  = taRT;
+        input.textComponent = txtTMP;
+        input.placeholder   = phTMP;
+        input.lineType      = TMP_InputField.LineType.SingleLine;
+        input.text          = item.title ?? "";
+        input.customCaretColor = true;
+        input.caretColor       = Color.clear;
+        input.caretWidth       = 2;
+        input.selectionColor   = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        input.onSelect.AddListener(_ =>
+        {
+            if (_suppressInline) return;
+            Select(captured);                       // フォーカスイン→右ペインに表示
+            ActivateCaret(input, caretRT, caretImg);
+        });
+        input.onDeselect.AddListener(_ => DeactivateCaret(input));
+        input.onEndEdit.AddListener(v =>
+        {
+            if (_suppressInline) return;
+            if (string.IsNullOrWhiteSpace(v))
+            {
+                _suppressInline = true; input.text = captured.title ?? ""; _suppressInline = false;
+                return;
+            }
+            if (captured.title == v) return;
+            captured.title = v;
+            NotebookManager.Instance?.UpdateRoutine(captured);
+            if (detail != null) detail.RefreshTitleIfOpen(captured.id, v);
+        });
+        return input;
+    }
+
+    private void LateUpdate()
+    {
+        if (_activeInput == null || !_activeInput.isFocused) return;
+        if (_activeInput.caretPosition != _lastCaretPos)
+        {
+            _lastCaretPos = _activeInput.caretPosition;
+            UpdateActiveCaret();
+            RestartCaretBlink();
+        }
+    }
+
+    private void ActivateCaret(TMP_InputField input, RectTransform caretRT, Image caretImg)
+    {
+        _activeInput = input; _activeCaretRT = caretRT; _activeCaretImg = caretImg;
+        _lastCaretPos = -1;
+        UpdateActiveCaret();
+        RestartCaretBlink();
+    }
+
+    private void DeactivateCaret(TMP_InputField input)
+    {
+        if (_activeInput != input) { if (input == null) return; }
+        if (_caretCo != null) { StopCoroutine(_caretCo); _caretCo = null; }
+        if (_activeCaretImg != null) _activeCaretImg.color = Color.clear;
+        if (_activeInput == input)
+        {
+            _activeInput = null; _activeCaretRT = null; _activeCaretImg = null; _lastCaretPos = -1;
+        }
+    }
+
+    private void RestartCaretBlink()
+    {
+        if (_caretCo != null) StopCoroutine(_caretCo);
+        _caretCo = StartCoroutine(CaretBlinkCo());
+    }
+
+    private System.Collections.IEnumerator CaretBlinkCo()
+    {
+        bool visible = true;
+        var wfs = new WaitForSeconds(0.53f);
+        do
+        {
+            if (_activeCaretImg != null) _activeCaretImg.color = visible ? CaretColor : Color.clear;
+            visible = !visible;
+            yield return wfs;
+        } while (_activeInput != null && _activeInput.isFocused);
+        if (_activeCaretImg != null) _activeCaretImg.color = Color.clear;
+    }
+
+    private void UpdateActiveCaret()
+    {
+        if (_activeCaretRT == null || _activeInput?.textComponent == null) return;
+        _activeInput.ForceLabelUpdate();
+        var txt = _activeInput.textComponent;
+        txt.ForceMeshUpdate(true, true);
+        var info = txt.textInfo;
+        var taRect = _activeCaretRT.parent.GetComponent<RectTransform>().rect;
+        int cp = _activeInput.caretPosition;
+        float caretX, caretY, caretH;
+        float caretPad = 0f;
+        if (info == null || info.characterCount == 0 || cp <= 0 || info.lineCount == 0)
+        {
+            if (info != null && info.lineCount > 0)
+            {
+                var li0 = info.lineInfo[0];
+                caretY = li0.ascender; caretH = Mathf.Max(li0.ascender - li0.descender, 1f);
+            }
+            else { caretY = taRect.yMax; caretH = txt.fontSize * 1.15f; }
+            caretX = taRect.xMin;
+            caretPad = 0f;
+        }
+        else
+        {
+            int idx = Mathf.Clamp(cp - 1, 0, info.characterCount - 1);
+            var ci = info.characterInfo[idx];
+            caretX = ci.xAdvance;
+            int li = Mathf.Clamp(ci.lineNumber, 0, info.lineCount - 1);
+            var line = info.lineInfo[li];
+            caretY = line.ascender; caretH = Mathf.Max(line.ascender - line.descender, 1f);
+            caretPad = CARET_X_PAD;
+        }
+        _activeCaretRT.anchoredPosition = new Vector2(caretX - taRect.xMin + caretPad, caretY - taRect.yMax);
+        _activeCaretRT.sizeDelta = new Vector2(2f, caretH);
     }
 
     private static string RepeatLabel(RoutineItem item)
