@@ -541,6 +541,7 @@ public class NotebookManager : MonoBehaviour
     public void RenameMemoFolder(string folderId, string newName)
     {
         if (string.IsNullOrWhiteSpace(newName)) return;
+        if (folderId == DefaultMemoFolderId) return; // 既定フォルダはリネーム不可（退避先の器）
         var f = memoNotes.folders.Find(x => x.id == folderId);
         if (f == null) return;
         f.name = newName.Trim();

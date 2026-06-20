@@ -42,6 +42,9 @@ public class MemoListUI : MonoBehaviour
     private string _viewFolderId;              // null = すべて（Notesビューの対象）
     private string _editingFolderId;           // インラインリネーム中のフォルダid（null=なし）
     private string _confirmDeleteFolderId;     // 削除確認中のフォルダid（null=なし）
+    private TMP_InputField _headerNameInput;   // ヘッダー(Notesビュー)のフォルダ名インライン入力
+    private GameObject _headerNameHost;
+    private string _headerEditingFolderId;     // ヘッダーで編集中のフォルダid
     private Transform _renameParkParent;       // folderRenameInput の待避先（初期親）
     private Coroutine _renameExitCo;           // リネーム確定後の編集解除（次フレーム）
 
@@ -207,7 +210,31 @@ public class MemoListUI : MonoBehaviour
     private void UpdateHeader()
     {
         if (backButton != null) backButton.gameObject.SetActive(_view != LeftView.Folders);
-        if (titleText != null) titleText.text = _view == LeftView.Folders ? "メモ" : (_view == LeftView.Trash ? "メモのゴミ箱" : FolderName(_viewFolderId));
+        // Notesビューでユーザーフォルダなら、フォルダ名をインライン編集に（「すべて」「メモ」は従来の固定表示）
+        bool headerEditable = (_view == LeftView.Notes && _viewFolderId != null && _viewFolderId != NotebookManager.DefaultMemoFolderId);
+        if (headerEditable)
+        {
+            EnsureHeaderNameInput();
+            if (titleText != null) titleText.gameObject.SetActive(false);
+            if (_headerNameHost != null) _headerNameHost.SetActive(true);
+            _headerEditingFolderId = _viewFolderId;
+            if (_headerNameInput != null && !_headerNameInput.isFocused)
+            {
+                _suppressInline = true;
+                _headerNameInput.text = FolderName(_viewFolderId);
+                _suppressInline = false;
+            }
+        }
+        else
+        {
+            if (_headerNameHost != null) _headerNameHost.SetActive(false);
+            if (titleText != null)
+            {
+                titleText.gameObject.SetActive(true);
+                titleText.text = _view == LeftView.Folders ? "メモ" : (_view == LeftView.Trash ? "メモのゴミ箱" : FolderName(_viewFolderId));
+            }
+            _headerEditingFolderId = null;
+        }
 
         var addLbl = addButton != null ? addButton.GetComponentInChildren<TextMeshProUGUI>(true) : null;
         if (_view == LeftView.Trash)
@@ -266,7 +293,7 @@ public class MemoListUI : MonoBehaviour
     private void BuildFolderList(NotebookManager nm)
     {
         BuildFolderRow("すべて", null, editable: false, canDelete: false, canReorder: false, prevId: null, nextId: null);                                 // 横断
-        BuildFolderRow("メモ", NotebookManager.DefaultMemoFolderId, editable: true, canDelete: false, canReorder: false, prevId: null, nextId: null);       // 既定（リネーム可・削除不可）
+        BuildFolderRow("メモ", NotebookManager.DefaultMemoFolderId, editable: false, canDelete: false, canReorder: false, prevId: null, nextId: null);      // 既定（リネーム・削除・並べ替え不可。退避先の器なので固定）
         var userFolders = nm.GetMemoFolders().FindAll(x => x.id != NotebookManager.DefaultMemoFolderId);
         for (int i = 0; i < userFolders.Count; i++)
         {
@@ -932,8 +959,9 @@ public class MemoListUI : MonoBehaviour
 
     // 自前キャレット付きインライン入力の「箱」だけ作る共通ヘルパー（onSelect/onEndEdit等の配線は呼び出し側）。
     private TMP_InputField BuildInlineFieldCore(Transform parent, string initial, string placeholder,
-                                                out RectTransform caretRT, out Image caretImg)
+                                                out RectTransform caretRT, out Image caretImg, float fontSize = -1f)
     {
+        float fs = fontSize > 0f ? fontSize : UITheme_FocusMode.FontChipTitle;
         var fieldGO = NewUI("InlineInput", parent);
         var fieldRT = fieldGO.GetComponent<RectTransform>();
         fieldRT.anchorMin = Vector2.zero; fieldRT.anchorMax = Vector2.one;
@@ -945,11 +973,11 @@ public class MemoListUI : MonoBehaviour
         taRT.anchorMin = Vector2.zero; taRT.anchorMax = Vector2.one;
         taRT.offsetMin = new Vector2(2f, 0f); taRT.offsetMax = new Vector2(-2f, 0f);
         taGO.AddComponent<RectMask2D>();
-        var txtTMP = NewText("Text", taGO.transform, initial ?? "", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
+        var txtTMP = NewText("Text", taGO.transform, initial ?? "", fs, UITheme_FocusMode.TextPrimary);
         var txtRT = txtTMP.GetComponent<RectTransform>();
         txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one;
         txtRT.offsetMin = Vector2.zero; txtRT.offsetMax = Vector2.zero;
-        var phTMP = NewText("Placeholder", taGO.transform, placeholder ?? "", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextMuted);
+        var phTMP = NewText("Placeholder", taGO.transform, placeholder ?? "", fs, UITheme_FocusMode.TextMuted);
         var phRT = phTMP.GetComponent<RectTransform>();
         phRT.anchorMin = Vector2.zero; phRT.anchorMax = Vector2.one;
         phRT.offsetMin = Vector2.zero; phRT.offsetMax = Vector2.zero;
@@ -974,6 +1002,35 @@ public class MemoListUI : MonoBehaviour
         input.caretWidth       = 2;
         input.selectionColor   = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
         return input;
+    }
+
+    // ヘッダー(Notesビュー)のフォルダ名インライン入力を一度だけ生成（TopBar の TitleText 直後に置く）
+    private void EnsureHeaderNameInput()
+    {
+        if (_headerNameInput != null) return;
+        if (titleText == null) return;
+        var topBar = titleText.transform.parent;
+        _headerNameHost = NewUI("HeaderNameHost", topBar);
+        var le = _headerNameHost.AddComponent<LayoutElement>();
+        le.minWidth = 0; le.flexibleWidth = 1; le.minHeight = 26; le.preferredHeight = 26;
+        _headerNameHost.transform.SetSiblingIndex(titleText.transform.GetSiblingIndex() + 1);
+        RectTransform caretRT; Image caretImg;
+        _headerNameInput = BuildInlineFieldCore(_headerNameHost.transform, "", "フォルダ名", out caretRT, out caretImg, titleText.fontSize);
+        _headerNameInput.onSelect.AddListener(_ =>
+        {
+            if (_suppressInline) return;
+            ActivateCaret(_headerNameInput, caretRT, caretImg);
+        });
+        _headerNameInput.onDeselect.AddListener(_ => DeactivateCaret(_headerNameInput));
+        _headerNameInput.onEndEdit.AddListener(v =>
+        {
+            if (_suppressInline) return;
+            var fid = _headerEditingFolderId;
+            if (string.IsNullOrEmpty(fid)) return;
+            if (!string.IsNullOrWhiteSpace(v)) NotebookManager.Instance?.RenameMemoFolder(fid, v.Trim());
+            UpdateHeader();   // 表示反映（空は据え置き＝元の名前に戻す）
+        });
+        _headerNameHost.SetActive(false);
     }
 
     private void BuildEmptyLabel()
