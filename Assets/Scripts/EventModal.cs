@@ -103,6 +103,8 @@ public class EventModal : MonoBehaviour
                 int idx = i;
                 string tagId = TagConfig.Tags[idx].id;
                 tagButtons[i]?.onClick.AddListener(() => SetTag(tagId));
+                var lbl = tagButtons[i]?.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
+                if (lbl != null) lbl.text = TagConfig.Tags[idx].displayName;   // ラベルはコード駆動（並べ替え/改名に追従）
             }
         }
     }

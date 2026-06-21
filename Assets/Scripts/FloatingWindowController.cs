@@ -155,7 +155,7 @@ public void OpenAddForm(string defaultDate, ScheduleEvent editTarget, string def
         tagSelHL.childForceExpandHeight = false;
         tagSelGO.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        string selectedTagId = isEdit ? editTarget.tagId : "todo";
+        string selectedTagId = isEdit ? editTarget.tagId : "yotei";
         var tagBtns = new List<(Button btn, Image img, TextMeshProUGUI txt, string id)>();
         foreach (var tagDef in TagConfig.Tags)
         {
