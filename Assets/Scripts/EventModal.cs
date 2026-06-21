@@ -290,6 +290,7 @@ public class EventModal : MonoBehaviour
         {
             var tag  = TagConfig.Tags[i];
             var img  = tagButtons[i]?.GetComponent<UnityEngine.UI.Image>();
+            if (tagButtons[i] != null) tagButtons[i].transition = UnityEngine.UI.Selectable.Transition.None; // ColorTint無効化（SetTagの手動色を最優先・開いた瞬間の旧色上書きを防ぐ）
             var tmp  = tagButtons[i]?.GetComponentInChildren<TMPro.TextMeshProUGUI>();
             bool sel = tag.id == tagId;
             // 選択: selectorBG（適切な彩度）/ 未選択: 薄い白
