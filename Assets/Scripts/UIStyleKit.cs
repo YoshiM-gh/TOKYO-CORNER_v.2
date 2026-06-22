@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
@@ -188,5 +188,67 @@ public static class NavHeaderStyler
             var t = header.Find(n);
             if (t != null) UIStyleKit.ApplyRounded(t.GetComponent<Image>(), 12f);  // カード規格と統一
         }
+    }
+
+    public static void LayoutAndGear(Transform header, System.Action onGear)
+    {
+        if (header == null) return;
+        Style(header);
+        Transform prev  = header.Find("PrevMonthBtn");  if (prev == null) prev = header.Find("PrevDayBtn");
+        Transform next  = header.Find("NextMonthBtn");  if (next == null) next = header.Find("NextDayBtn");
+        Transform label = header.Find("MonthLabel");    if (label == null) label = header.Find("WeekLabel"); if (label == null) label = header.Find("DayLabel");
+        Transform sun   = header.Find("WeekStartSunBtn");
+        Transform mon   = header.Find("WeekStartMonBtn");
+        const float PAD = 8f, BTN = 48f, GN = 4f, LW = 230f, GC = 16f, TW = 108f, GT = 4f;
+        PlaceLeft(prev,  PAD,              BTN, -8f);
+        PlaceLeft(label, PAD+BTN+GN,       LW,   0f);
+        PlaceLeft(next,  PAD+BTN+GN+LW+GN, BTN, -8f);
+        if (label != null) { var lt = label.GetComponent<TMPro.TextMeshProUGUI>(); if (lt != null) { lt.alignment = TMPro.TextAlignmentOptions.Center; lt.textWrappingMode = TMPro.TextWrappingModes.NoWrap; } }
+        var gearT = header.Find("SettingsBtn");
+        if (gearT == null)
+        {
+            var go = new GameObject("SettingsBtn", typeof(RectTransform));
+            go.transform.SetParent(header, false);
+            var img = go.AddComponent<Image>();
+            var prevImg = prev != null ? prev.GetComponent<Image>() : null;
+            img.color = prevImg != null ? prevImg.color : new Color(1f, 1f, 1f, 0.06f);
+            UIStyleKit.ApplyRounded(img, 12f);
+            var btn = go.AddComponent<Button>();
+            btn.targetGraphic = img;
+            btn.transition = Selectable.Transition.None;
+            var cb = onGear;
+            btn.onClick.AddListener(() => { if (cb != null) cb(); });
+            var iconGO = new GameObject("Icon", typeof(RectTransform));
+            iconGO.transform.SetParent(go.transform, false);
+            var iconImg = iconGO.AddComponent<Image>();
+            iconImg.sprite = Resources.Load<Sprite>("Icons/Settings");
+            iconImg.preserveAspect = true;
+            iconImg.raycastTarget = false;
+            var prevTxt = prev != null ? prev.GetComponentInChildren<TMPro.TextMeshProUGUI>(true) : null;
+            iconImg.color = prevTxt != null ? prevTxt.color : new Color(0.85f, 0.85f, 0.88f, 1f);
+            var iRT = (RectTransform)iconGO.transform;
+            iRT.anchorMin = new Vector2(0.5f, 0.5f); iRT.anchorMax = new Vector2(0.5f, 0.5f); iRT.pivot = new Vector2(0.5f, 0.5f);
+            iRT.sizeDelta = new Vector2(22f, 22f); iRT.anchoredPosition = Vector2.zero;
+            gearT = go.transform;
+        }
+        PlaceRight(gearT, PAD,               BTN, -8f);
+        PlaceRight(mon,   PAD+BTN+GC,         TW,  -6f);
+        PlaceRight(sun,   PAD+BTN+GC+TW+GT,   TW,  -6f);
+    }
+
+    private static void PlaceLeft(Transform t, float x, float w, float vInset)
+    {
+        if (t == null) return;
+        var rt = t as RectTransform; if (rt == null) return;
+        rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(0f, 1f); rt.pivot = new Vector2(0f, 0.5f);
+        rt.sizeDelta = new Vector2(w, vInset); rt.anchoredPosition = new Vector2(x, 0f);
+    }
+
+    private static void PlaceRight(Transform t, float rightInset, float w, float vInset)
+    {
+        if (t == null) return;
+        var rt = t as RectTransform; if (rt == null) return;
+        rt.anchorMin = new Vector2(1f, 0f); rt.anchorMax = new Vector2(1f, 1f); rt.pivot = new Vector2(1f, 0.5f);
+        rt.sizeDelta = new Vector2(w, vInset); rt.anchoredPosition = new Vector2(-rightInset, 0f);
     }
 }

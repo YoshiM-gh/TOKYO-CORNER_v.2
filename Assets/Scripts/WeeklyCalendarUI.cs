@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -66,7 +66,7 @@ public class WeeklyCalendarUI : MonoBehaviour
     private void OnEnable()
     {
         if (timelineScroll != null) timelineScroll.scrollSensitivity = 60f;
-        NavHeaderStyler.Style(transform.Find("Content/Header"));  // Phase1: ヘッダー部品規格
+        NavHeaderStyler.LayoutAndGear(transform.Find("Content/Header"), CategorySettingsController.Toggle);  // Phase1: ヘッダー部品規格
         UITheme_FocusMode.OnThemeChanged += Refresh;
         weekStart = GetWeekStart(DateTime.Now, weekStartDow);
         SetupButtons();

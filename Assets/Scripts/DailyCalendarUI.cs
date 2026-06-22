@@ -164,18 +164,6 @@ private void BuildScaffold()
         _nextBtn = nextGO?.GetComponent<Button>();
         _nextBtn?.onClick.RemoveAllListeners();
 
-        // ── 月曜はじまり（右から 56px）──────────────────
-        var monGO = CloneSrcBtn(wHdr?.Find("WeekStartMonBtn")?.gameObject, go.transform, "WeekStartMonBtn", "月曜はじまり");
-        SetBtnRT(monGO, ancLeft: false, width: 108f, vMgn: 3f, offset: 56f);
-        _monBtn = monGO?.GetComponent<Button>();
-        _monBtn?.onClick.RemoveAllListeners();
-
-        // ── 日曜はじまり（右から 168px）─────────────────
-        var sunGO = CloneSrcBtn(wHdr?.Find("WeekStartSunBtn")?.gameObject, go.transform, "WeekStartSunBtn", "日曜はじまり");
-        SetBtnRT(sunGO, ancLeft: false, width: 108f, vMgn: 3f, offset: 168f);
-        _sunBtn = sunGO?.GetComponent<Button>();
-        _sunBtn?.onClick.RemoveAllListeners();
-
         // ── DayLabel（ボタン間を充填）────────────────────
         var lblGO = MakeGO("DayLabel", go.transform);
         var lblRT = lblGO.GetComponent<RectTransform>();
@@ -189,7 +177,7 @@ private void BuildScaffold()
         _dayLabel.color     = UITheme_FocusMode.TextBody;
         _dayLabel.alignment = TextAlignmentOptions.Center;
 
-        NavHeaderStyler.Style(go.transform);  // Phase1: ヘッダー部品規格
+        NavHeaderStyler.LayoutAndGear(go.transform, CategorySettingsController.Toggle);  // Phase1: ヘッダー部品規格
         return go;
     }
 
