@@ -46917,6 +46917,7 @@ GameObject:
   - component: {fileID: 1115253683}
   - component: {fileID: 1115253685}
   - component: {fileID: 1115253684}
+  - component: {fileID: 1115253686}
   m_Layer: 0
   m_Name: CharacterCard
   m_TagString: Untagged
@@ -46981,6 +46982,18 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1115253682}
   m_CullTransparentMesh: 1
+--- !u!114 &1115253686
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1115253682}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca67acf46f6167e4585c1357c1da13f9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterCardUI
 --- !u!1 &1118553007
 GameObject:
   m_ObjectHideFlags: 0

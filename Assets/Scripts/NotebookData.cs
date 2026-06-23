@@ -238,3 +238,19 @@ public class MemoNotesData
     public List<MemoFolder> folders = new List<MemoFolder>();
     public List<MemoNote>   notes   = new List<MemoNote>();
 }
+
+[Serializable]
+public class DailyMoment
+{
+    public string id;          // 日付キー "yyyy-MM-dd"（1日1件）
+    public string date;        // "yyyy-MM-dd"
+    public string speakerId;   // "owner"（将来 secretary 等）
+    public string type;        // "line"（将来 emote 等）
+    public string body;        // セリフ本文（15〜60字想定）
+}
+
+[Serializable]
+public class MomentLogData
+{
+    public List<DailyMoment> moments = new List<DailyMoment>();
+}

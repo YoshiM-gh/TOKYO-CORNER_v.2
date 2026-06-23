@@ -24,6 +24,7 @@ public class NotebookManager : MonoBehaviour
     private TodoListData    todoData    = new TodoListData();
     private RoutineListData routineData = new RoutineListData();
     private MemoNotesData   memoNotes   = new MemoNotesData();
+    private MomentLogData   momentLog   = new MomentLogData();
 
     // 表示対象期間：過去1年・未来1年
     private static readonly int RANGE_DAYS = 365;
@@ -37,6 +38,7 @@ public class NotebookManager : MonoBehaviour
     private string PathTodoArchive => Path.Combine(Application.persistentDataPath, "notebook_todo_archive.json");
     private string PathRoutine   => Path.Combine(Application.persistentDataPath, "notebook_routine.json");
     private string PathMemoNotes => Path.Combine(Application.persistentDataPath, "notebook_memo_notes.json");
+    private string PathMoments   => Path.Combine(Application.persistentDataPath, "notebook_moments.json");
 
     private void Awake()
     {
@@ -61,6 +63,7 @@ public class NotebookManager : MonoBehaviour
         WriteJson(PathTodo,      todoData);
         WriteJson(PathRoutine,   routineData);
         WriteJson(PathMemoNotes, memoNotes);
+        WriteJson(PathMoments,   momentLog);
     }
 
     private void LoadAll()
@@ -73,6 +76,7 @@ public class NotebookManager : MonoBehaviour
         todoData    = ReadJson<TodoListData>(PathTodo)         ?? new TodoListData();
         routineData = ReadJson<RoutineListData>(PathRoutine)   ?? new RoutineListData();
         memoNotes   = ReadJson<MemoNotesData>(PathMemoNotes)   ?? new MemoNotesData();
+        momentLog   = ReadJson<MomentLogData>(PathMoments)     ?? new MomentLogData();
         EnsureDefaultMemoFolder();
         EnsureMemoNoteSortOrders();
         PruneOldEvents();
@@ -309,6 +313,22 @@ public class NotebookManager : MonoBehaviour
 
     public static string NowKey()
         => DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+    // ─── DailyMoment（キャラカードの今日の一言・1日1件） ───────────
+    /// <summary>指定日に記録済みの moment を返す（無ければ null）。</summary>
+    public DailyMoment GetMomentForDate(string dateKey)
+        => momentLog.moments.Find(m => m.id == dateKey);
+
+    /// <summary>その日の moment を記録（既に有ればそのまま返す）。</summary>
+    public DailyMoment RecordMoment(DailyMoment m)
+    {
+        if (m == null) return null;
+        var existing = momentLog.moments.Find(x => x.id == m.id);
+        if (existing != null) return existing;
+        momentLog.moments.Add(m);
+        SaveAll();
+        return m;
+    }
 
     public static string GetWeekKey(DateTime date)
     {
