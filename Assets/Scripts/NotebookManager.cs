@@ -176,6 +176,15 @@ public class NotebookManager : MonoBehaviour
         return removed > 0;
     }
 
+    /// <summary>指定タグのイベントを全削除（カテゴリー改名の削除パス用）。削除件数を返す。</summary>
+    public int DeleteEventsByTag(string tagId)
+    {
+        if (string.IsNullOrEmpty(tagId)) return 0;
+        int removed = scheduleData.events.RemoveAll(e => e.tagId == tagId);
+        if (removed > 0) SaveAll();
+        return removed;
+    }
+
     /// <summary>表示範囲外の古いイベントを削除（日付なしは残す）</summary>
     private void PruneOldEvents()
     {

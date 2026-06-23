@@ -292,6 +292,7 @@ public class EventModal : MonoBehaviour
             var img  = tagButtons[i]?.GetComponent<UnityEngine.UI.Image>();
             if (tagButtons[i] != null) tagButtons[i].transition = UnityEngine.UI.Selectable.Transition.None; // ColorTint無効化（SetTagの手動色を最優先・開いた瞬間の旧色上書きを防ぐ）
             var tmp  = tagButtons[i]?.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+            if (tmp != null) tmp.text = tag.displayName;   // 改名に毎回追従（開くたびに最新名）
             bool sel = tag.id == tagId;
             // 選択: selectorBG（適切な彩度）/ 未選択: 薄い白
             // 選択: chipBG を濃く・鮮やかに / 未選択: ほんのり着色

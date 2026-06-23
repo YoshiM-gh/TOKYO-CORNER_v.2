@@ -27,6 +27,9 @@ public class TodoListUI : MonoBehaviour
     private TodoModal _todoModal; // Daily編集モーダル（DailyTodayのとき「⋯」で開く）
 
     private string _selectedId;
+    private string _editingTodoId;             // インライン改名中のタスクid（null=なし・Todoタブのみ）
+    private string _confirmDeleteTodoId;       // 削除確認中のタスクid（null=なし・Todoタブのみ）
+    private Coroutine _todoRenameExitCo;        // 改名確定後の編集解除（次フレーム）
     private bool _suppressInline; // インライン編集の同期更新中、value/endEditの誤発火を抑制
     private string _flashTodoId; // 並べ替え直後に一瞬ハイライトする行のid（クリック結果のフィードバック）
     private Coroutine _flashCo;     // フラッシュは常に1本だけ（多重起動による色の揺れを防ぐ）
@@ -350,7 +353,155 @@ public class TodoListUI : MonoBehaviour
 
     // ── 行の生成 ──────────────────────────────
 
+    // displayMode で分岐：FullList=Todoタブ(3状態) / DailyToday=Daily(モーダル・現状維持)
     private void BuildRow(TodoItem item, DateTime today, bool canReorder = false, TodoItem prevItem = null, TodoItem nextItem = null)
+    {
+        if (displayMode == TodoDisplayMode.FullList)
+            BuildRowTab(item, today, canReorder, prevItem, nextItem);
+        else
+            BuildRowDaily(item, today, canReorder, prevItem, nextItem);
+    }
+
+    // Todoタブ専用：フォルダ方式の3状態（通常=表示テキスト＋…／編集=入力＋削除／確認=やめる・削除する）
+    private void BuildRowTab(TodoItem item, DateTime today, bool canReorder, TodoItem prevItem, TodoItem nextItem)
+    {
+        bool confirming = (item.id == _confirmDeleteTodoId);
+        bool editing = !confirming && (item.id == _editingTodoId);
+        bool done = item.isCompleted;
+        bool selected = item.id == _selectedId;
+        var captured = item;
+
+        var row = NewUI("Row_" + item.id, listContent);
+        var rowImg = row.AddComponent<Image>();
+        rowImg.color = selected ? UITheme_FocusMode.SelectedBG : done ? UITheme_FocusMode.DoneBG : UITheme_FocusMode.PanelBG;
+        UIStyleKit.ApplyRounded(rowImg, 10f);
+        if (_flashTodoId == item.id)
+        {
+            _flashTodoId = null;
+            if (_flashCo != null) StopCoroutine(_flashCo);
+            _flashCo = StartCoroutine(FlashRow(rowImg, selected, done));
+        }
+        var rowLE = row.AddComponent<LayoutElement>();
+        rowLE.minHeight = 56; rowLE.preferredHeight = 56;
+        var hlg = row.AddComponent<HorizontalLayoutGroup>();
+        hlg.padding = new RectOffset(14, 14, 9, 9);
+        hlg.spacing = 12;
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        hlg.childAlignment = TextAnchor.MiddleLeft;
+
+        if (!confirming && !editing)
+        {
+            var check = NewUI("Check", row.transform);
+            var checkImg = check.AddComponent<Image>();
+            checkImg.sprite = UISprites.Circle;
+            if (done) checkImg.color = UITheme_FocusMode.AccentBlueSolid;
+            else { UIStyleKit.ApplyCircleGhost(checkImg); checkImg.color = UITheme_FocusMode.WithAlpha(Color.white, 0.30f); }
+            var checkLE = check.AddComponent<LayoutElement>();
+            checkLE.minWidth = 26; checkLE.minHeight = 26; checkLE.preferredWidth = 26; checkLE.preferredHeight = 26;
+            var checkBtn = check.AddComponent<Button>();
+            checkBtn.targetGraphic = checkImg;
+            checkBtn.onClick.AddListener(() => { NotebookManager.Instance.SetTodoCompleted(captured.id, !captured.isCompleted); Rebuild(); });
+        }
+        else
+        {
+            var sp = NewUI("CheckSpacer", row.transform);
+            var spLE = sp.AddComponent<LayoutElement>();
+            spLE.minWidth = 26; spLE.preferredWidth = 26;
+        }
+
+        if (confirming)
+        {
+            var col = NewUI("ConfirmText", row.transform);
+            var colLE = col.AddComponent<LayoutElement>(); colLE.minWidth = 0; colLE.flexibleWidth = 1;
+            var q = NewText("Q", col.transform, "削除しますか？", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
+            q.alignment = TextAlignmentOptions.MidlineLeft;
+            string capId = item.id;
+            var cancel = NewUI("Cancel", row.transform);
+            var cancelLE = cancel.AddComponent<LayoutElement>(); cancelLE.minWidth = 56; cancelLE.preferredWidth = 56; cancelLE.minHeight = 32; cancelLE.preferredHeight = 32;
+            var cancelImg = cancel.AddComponent<Image>(); UIStyleKit.ApplyControl(cancelImg); cancelImg.color = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextMuted, 0.18f);
+            var cancelLbl = NewText("Label", cancel.transform, "やめる", UITheme_FocusMode.FontCaption, UITheme_FocusMode.TextSecondary); cancelLbl.alignment = TextAlignmentOptions.Center;
+            var cancelRt = cancelLbl.GetComponent<RectTransform>(); cancelRt.anchorMin = Vector2.zero; cancelRt.anchorMax = Vector2.one; cancelRt.offsetMin = Vector2.zero; cancelRt.offsetMax = Vector2.zero;
+            var cancelBtn = cancel.AddComponent<Button>(); cancelBtn.transition = Selectable.Transition.None; cancelBtn.targetGraphic = cancelImg;
+            cancelBtn.onClick.AddListener(() => { CancelTodoEdit(); Rebuild(); });
+            var del = NewUI("ConfirmDelete", row.transform);
+            var delLE = del.AddComponent<LayoutElement>(); delLE.minWidth = 72; delLE.preferredWidth = 72; delLE.minHeight = 32; delLE.preferredHeight = 32;
+            var delImg = del.AddComponent<Image>(); UIStyleKit.ApplyControl(delImg); delImg.color = new Color(0.80f, 0.29f, 0.29f, 1f);
+            var delLbl = NewText("Label", del.transform, "削除する", UITheme_FocusMode.FontCaption, Color.white); delLbl.alignment = TextAlignmentOptions.Center;
+            var delRt = delLbl.GetComponent<RectTransform>(); delRt.anchorMin = Vector2.zero; delRt.anchorMax = Vector2.one; delRt.offsetMin = Vector2.zero; delRt.offsetMax = Vector2.zero;
+            var delBtn = del.AddComponent<Button>(); delBtn.transition = Selectable.Transition.None; delBtn.targetGraphic = delImg;
+            delBtn.onClick.AddListener(() => DeleteTodoRow(capId));
+            return;
+        }
+
+        var titleHost = NewUI("TitleHost", row.transform);
+        var hostLE = titleHost.AddComponent<LayoutElement>();
+        hostLE.flexibleWidth = 1; hostLE.minHeight = 30;
+        if (editing)
+        {
+            AttachTodoRenameInput(titleHost.transform, item);
+        }
+        else
+        {
+            string disp = string.IsNullOrEmpty(item.title) ? "タスク名" : item.title;
+            Color tcol = string.IsNullOrEmpty(item.title) ? UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextMuted, 0.5f) : (done ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextSecondary);
+            var titleTmp = NewText("Title", titleHost.transform, disp, UITheme_FocusMode.FontChipTitle, tcol);
+            if (done) titleTmp.fontStyle = FontStyles.Strikethrough;
+            titleTmp.alignment = TextAlignmentOptions.MidlineLeft;
+            var ttRt = titleTmp.GetComponent<RectTransform>(); ttRt.anchorMin = Vector2.zero; ttRt.anchorMax = Vector2.one; ttRt.offsetMin = Vector2.zero; ttRt.offsetMax = Vector2.zero;
+        }
+
+        if (editing)
+        {
+            var del = NewUI("Delete", row.transform);
+            var delLE = del.AddComponent<LayoutElement>(); delLE.minWidth = 44; delLE.preferredWidth = 44; delLE.minHeight = 32; delLE.preferredHeight = 32;
+            var delImg = del.AddComponent<Image>(); UIStyleKit.ApplyControl(delImg); delImg.color = new Color(0.80f, 0.29f, 0.29f, 1f);
+            var delLbl = NewText("Label", del.transform, "削除", UITheme_FocusMode.FontCaption, Color.white); delLbl.alignment = TextAlignmentOptions.Center;
+            var delRt = delLbl.GetComponent<RectTransform>(); delRt.anchorMin = Vector2.zero; delRt.anchorMax = Vector2.one; delRt.offsetMin = Vector2.zero; delRt.offsetMax = Vector2.zero;
+            string capDel = item.id;
+            var delTrigger = del.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+            var delEntry = new UnityEngine.EventSystems.EventTrigger.Entry { eventID = UnityEngine.EventSystems.EventTriggerType.PointerDown };
+            delEntry.callback.AddListener((_) => EnterConfirmDeleteTodo(capDel));
+            delTrigger.triggers.Add(delEntry);
+            return;
+        }
+
+        if (item.priorityHigh)
+            BuildChip(row.transform, "高", done ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.AccentRed, UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentRed, 0.16f));
+        if (!done && HasDateBefore(item, today))
+        {
+            int days = DaysOverdue(item, today);
+            BuildChip(row.transform, days + "日経過", UITheme_FocusMode.AccentRed, UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentRed, 0.14f));
+        }
+        else if (!string.IsNullOrEmpty(item.time))
+        {
+            Color chipText = (!done && IsOnDate(item, today)) ? UITheme_FocusMode.AccentSatBlue : UITheme_FocusMode.TextMuted;
+            Color chipBG   = (!done && IsOnDate(item, today)) ? UITheme_FocusMode.AccentBlueFaint : UITheme_FocusMode.InputBG;
+            BuildChip(row.transform, item.time, chipText, chipBG);
+        }
+        if (canReorder)
+        {
+            BuildReorderButton(row.transform, "▲", prevItem != null, () => { if (prevItem != null) { _flashTodoId = item.id; NotebookManager.Instance?.SwapTodoOrder(item.id, prevItem.id); Rebuild(); } });
+            BuildReorderButton(row.transform, "▼", nextItem != null, () => { if (nextItem != null) { _flashTodoId = item.id; NotebookManager.Instance?.SwapTodoOrder(item.id, nextItem.id); Rebuild(); } });
+        }
+
+        var more = NewUI("MoreBtn", row.transform);
+        var moreImg = more.AddComponent<Image>(); moreImg.color = Color.clear;
+        var moreLE = more.AddComponent<LayoutElement>(); moreLE.minWidth = 30; moreLE.preferredWidth = 30; moreLE.minHeight = 30;
+        var moreTxt = NewText("Dots", more.transform, "…", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextMuted);
+        moreTxt.alignment = TextAlignmentOptions.Center;
+        var moreTxtRT = moreTxt.GetComponent<RectTransform>(); moreTxtRT.anchorMin = Vector2.zero; moreTxtRT.anchorMax = Vector2.one; moreTxtRT.offsetMin = Vector2.zero; moreTxtRT.offsetMax = Vector2.zero;
+        var moreBtn = more.AddComponent<Button>(); moreBtn.transition = Selectable.Transition.None; moreBtn.targetGraphic = moreImg;
+        string capMore = item.id;
+        moreBtn.onClick.AddListener(() => StartTodoRename(capMore));
+
+        var rowBtn = row.AddComponent<Button>();
+        rowBtn.transition = Selectable.Transition.None;
+        rowBtn.targetGraphic = rowImg;
+        rowBtn.onClick.AddListener(() => { Select(captured); Rebuild(); });
+    }
+
+    private void BuildRowDaily(TodoItem item, DateTime today, bool canReorder = false, TodoItem prevItem = null, TodoItem nextItem = null)
     {
         bool done = item.isCompleted;
         bool selected = item.id == _selectedId;
@@ -711,6 +862,92 @@ public class TodoListUI : MonoBehaviour
         });
 
         return input;
+    }
+
+    // ───────── Todoタブ行の編集/削除（フォルダ方式をミラー・削除は直接）─────────
+    private void StartTodoRename(string id)
+    {
+        _editingTodoId = id;
+        Rebuild();
+    }
+
+    private void CommitTodoRename(TodoItem item, string newName)
+    {
+        if (item == null || _editingTodoId != item.id) return;
+        string nt = (newName ?? "").Trim();
+        if (nt.Length > 0 && item.title != nt)   // 空は据え置き（タスクは空タイトル不可）
+        {
+            item.title = nt;
+            NotebookManager.Instance?.UpdateTodo(item);
+            if (detail != null) detail.RefreshTitleIfOpen(item.id, nt);
+        }
+        string id = item.id;
+        if (_todoRenameExitCo != null) StopCoroutine(_todoRenameExitCo);
+        _todoRenameExitCo = StartCoroutine(ExitTodoEditNextFrame(id));
+    }
+
+    private System.Collections.IEnumerator ExitTodoEditNextFrame(string id)
+    {
+        yield return null;
+        _todoRenameExitCo = null;
+        if (_editingTodoId == id) { _editingTodoId = null; Rebuild(); }
+    }
+
+    private void EnterConfirmDeleteTodo(string id)
+    {
+        CancelTodoEdit();
+        _confirmDeleteTodoId = id;
+        Rebuild();
+    }
+
+    private void CancelTodoEdit()
+    {
+        _editingTodoId = null;
+        _confirmDeleteTodoId = null;
+        if (_todoRenameExitCo != null) { StopCoroutine(_todoRenameExitCo); _todoRenameExitCo = null; }
+    }
+
+    private void DeleteTodoRow(string id)
+    {
+        var nm = NotebookManager.Instance;
+        if (nm == null) return;
+        CancelTodoEdit();
+        nm.DeleteTodo(id);                       // 直接削除（ゴミ箱なし）
+        if (detail != null && detail.CurrentId == id) detail.Clear();
+        if (_selectedId == id) _selectedId = null;
+        Rebuild();
+    }
+
+    private void AttachTodoRenameInput(Transform slot, TodoItem item)
+    {
+        var captured = item;
+        string current = item.title ?? "";
+        var fieldGO = NewUI("TitleInput", slot);
+        var fieldRT = fieldGO.GetComponent<RectTransform>();
+        fieldRT.anchorMin = Vector2.zero; fieldRT.anchorMax = Vector2.one; fieldRT.offsetMin = Vector2.zero; fieldRT.offsetMax = Vector2.zero;
+        var fieldImg = fieldGO.AddComponent<Image>(); fieldImg.color = Color.clear;
+        var taGO = NewUI("TextArea", fieldGO.transform);
+        var taRT = taGO.GetComponent<RectTransform>();
+        taRT.anchorMin = Vector2.zero; taRT.anchorMax = Vector2.one; taRT.offsetMin = new Vector2(2f, 0f); taRT.offsetMax = new Vector2(-2f, 0f);
+        taGO.AddComponent<RectMask2D>();
+        var txtTMP = NewText("Text", taGO.transform, current, UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextSecondary);
+        var txtRT = txtTMP.GetComponent<RectTransform>(); txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one; txtRT.offsetMin = Vector2.zero; txtRT.offsetMax = Vector2.zero;
+        var phTMP = NewText("Placeholder", taGO.transform, "タスク名", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.WithAlpha(UITheme_FocusMode.TextMuted, 0.5f));
+        var phRT = phTMP.GetComponent<RectTransform>(); phRT.anchorMin = Vector2.zero; phRT.anchorMax = Vector2.one; phRT.offsetMin = Vector2.zero; phRT.offsetMax = Vector2.zero;
+        var caretGO = NewUI("CustomCaret", taGO.transform);
+        var caretRT = caretGO.GetComponent<RectTransform>(); caretRT.anchorMin = new Vector2(0f, 1f); caretRT.anchorMax = new Vector2(0f, 1f); caretRT.pivot = new Vector2(0f, 1f); caretRT.sizeDelta = new Vector2(2f, 16f); caretRT.anchoredPosition = Vector2.zero;
+        var caretImg = caretGO.AddComponent<Image>(); caretImg.color = Color.clear; caretImg.raycastTarget = false;
+        var input = fieldGO.AddComponent<TMP_InputField>();
+        input.targetGraphic = fieldImg; input.textViewport = taRT; input.textComponent = txtTMP; input.placeholder = phTMP;
+        input.lineType = TMP_InputField.LineType.SingleLine; input.text = current;
+        input.customCaretColor = true; input.caretColor = Color.clear; input.caretWidth = 2;
+        input.selectionColor = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        input.onSelect.AddListener(_ => { if (_suppressInline) return; ActivateCaret(input, caretRT, caretImg); });
+        input.onDeselect.AddListener(_ => DeactivateCaret(input));
+        input.onEndEdit.AddListener(v => { if (_suppressInline) return; CommitTodoRename(captured, v); });
+        input.Select(); input.ActivateInputField();
+        int caret = current.Length; input.caretPosition = caret; input.selectionAnchorPosition = caret; input.selectionFocusPosition = caret;
+        ActivateCaret(input, caretRT, caretImg);
     }
 
     private GameObject NewUI(string name, Transform parent)

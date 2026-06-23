@@ -73,4 +73,36 @@ public static class TagConfig
         if (t != null) return t;
         return Legacy.Find(x => x.id == id);   // 廃止カテゴリも解決（既存データ表示用）
     }
+
+    // ───────── 改名（予定以外の4つ。色は固定・表示名のみ変更可）─────────
+    // 改名可能な id（Tags と対応）。「予定(yotei)」は固定なので含めない。
+    public static readonly string[] Renamable = { "mokuhyo", "hobby", "custom1", "custom2" };
+
+    public static bool IsRenamable(string id) => System.Array.IndexOf(Renamable, id) >= 0;
+
+    // 起動時に保存済みカスタム名を displayName へ上書き（PlayerPrefs: "catname_<id>"）
+    static TagConfig()
+    {
+        foreach (var id in Renamable)
+        {
+            string key = "catname_" + id;
+            if (PlayerPrefs.HasKey(key))
+            {
+                var def = Tags.Find(x => x.id == id);
+                if (def != null) def.displayName = PlayerPrefs.GetString(key);
+            }
+        }
+    }
+
+    // カスタム名を設定（in-memory 反映＋永続化）。空文字・改名不可idは無視。
+    public static void SetCustomName(string id, string name)
+    {
+        if (!IsRenamable(id)) return;
+        name = (name ?? "").Trim();
+        if (name.Length == 0) return;
+        var def = GetById(id);
+        if (def != null) def.displayName = name;
+        PlayerPrefs.SetString("catname_" + id, name);
+        PlayerPrefs.Save();
+    }
 }

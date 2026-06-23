@@ -142,11 +142,14 @@ public class StickyNote : MonoBehaviour
         AddEt(et, EventTriggerType.EndDrag,   OnBarEndDrag);
 
         // タグドット（TopBar 左）
-        _tagDots = new Image[TAG_COLORS.Length];
-        for (int i = 0; i < TAG_COLORS.Length; i++)
+        _tagDots = new Image[TagConfig.Tags.Count];
+        for (int i = 0; i < TagConfig.Tags.Count; i++)
         {
             int cap = i;
-            var (tid, bg, lbl) = TAG_COLORS[i];
+            var def = TagConfig.Tags[i];
+            string tid = def.id;
+            var bg = new Color(def.chipBG.r, def.chipBG.g, def.chipBG.b, 1f);
+            string lbl = def.displayName.Length > 0 ? def.displayName.Substring(0, 1) : "?";
             var dGO  = new GameObject($"TagDot_{tid}", typeof(RectTransform));
             dGO.transform.SetParent(barGO.transform, false);
             var dRT  = dGO.GetComponent<RectTransform>();
@@ -155,11 +158,9 @@ public class StickyNote : MonoBehaviour
             dRT.sizeDelta = new Vector2(22f, 22f);
             dRT.anchoredPosition = new Vector2(4f + i * 26f, 0f);
             // タグドット色も TagConfig 連動（なければ TAG_COLORS 色）
-            var tagData = TagConfig.GetById(tid);
-            var dotBg = tagData != null ? new Color(tagData.chipBG.r, tagData.chipBG.g, tagData.chipBG.b, 1f) : bg;
-            var dImg  = dGO.AddComponent<Image>(); dImg.color = dotBg;
+            var dImg  = dGO.AddComponent<Image>(); dImg.color = bg;
             var dBtn  = dGO.AddComponent<Button>(); dBtn.targetGraphic = dImg;
-            dBtn.onClick.AddListener(() => { ApplyTagColor(TAG_COLORS[cap].id); SaveNote(); });
+            dBtn.onClick.AddListener(() => { ApplyTagColor(TagConfig.Tags[cap].id); SaveNote(); });
             var dET = dGO.AddComponent<EventTrigger>();
             AddEt(dET, EventTriggerType.PointerDown, _ => _suppressEmptyDelete = true);
             _tagDots[i] = dImg;
@@ -349,11 +350,11 @@ public class StickyNote : MonoBehaviour
         }
         if (_handleImage) _handleImage.color = new Color(0f, 0f, 0f, 0.18f);
         if (_tagDots == null) return;
-        for (int i = 0; i < TAG_COLORS.Length; i++)
+        for (int i = 0; i < TagConfig.Tags.Count; i++)
         {
-            bool sel = TAG_COLORS[i].id == _tagId;
-            var td = TagConfig.GetById(TAG_COLORS[i].id);
-            var bc = td != null ? new Color(td.chipBG.r, td.chipBG.g, td.chipBG.b, 1f) : TAG_COLORS[i].bg;
+            var def = TagConfig.Tags[i];
+            bool sel = def.id == _tagId;
+            var bc = new Color(def.chipBG.r, def.chipBG.g, def.chipBG.b, 1f);
             _tagDots[i].color = sel ? Color.Lerp(bc, Color.white, 0.35f) : Color.Lerp(bc, new Color(0,0,0,1), 0.2f);
         }
     }
