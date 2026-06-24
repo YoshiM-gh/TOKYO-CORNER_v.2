@@ -30,11 +30,18 @@ public class CharacterStage : MonoBehaviour
     [SerializeField] private float lightIntensity = 3f;
     [SerializeField] private float lightRange = 30f;
 
+    [Header("エモート（約10分±ランダムで1回）")]
+    [SerializeField] private float emoteMinSeconds = 480f;
+    [SerializeField] private float emoteMaxSeconds = 720f;
+
     private RenderTexture _rt;
     private RawImage _raw;
     private Camera _cam;
     private GameObject _char;
     private Vector3 _origin;
+    private Animator _anim;
+    private float _emoteTimer;
+    private readonly string[] _emoteTriggers = { "Wave", "LookPhone", "LookAround", "Listen" };
 
     void Start()
     {
@@ -50,6 +57,16 @@ public class CharacterStage : MonoBehaviour
         _cam.transform.position = _origin + new Vector3(0f, camHeight, camDistance);
         _cam.transform.LookAt(_origin + new Vector3(0f, lookHeight, 0f));
         if (_char != null) _char.transform.localRotation = Quaternion.Euler(0f, charYaw, 0f);
+
+        if (_anim != null && _emoteTriggers.Length > 0)
+        {
+            _emoteTimer -= Time.deltaTime;
+            if (_emoteTimer <= 0f)
+            {
+                PlayRandomEmote();
+                _emoteTimer = Random.Range(emoteMinSeconds, emoteMaxSeconds);
+            }
+        }
     }
 
     void BuildRawImage()
@@ -87,6 +104,7 @@ public class CharacterStage : MonoBehaviour
         anim.runtimeAnimatorController = controller;
         anim.applyRootMotion = false;
         anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        _anim = anim;
 
         var lightGO = new GameObject("StageLight");
         lightGO.transform.SetParent(root.transform, false);
@@ -113,6 +131,14 @@ public class CharacterStage : MonoBehaviour
 
         var main = Camera.main;
         if (main != null) main.cullingMask &= ~(1 << layer);
+        _emoteTimer = Random.Range(emoteMinSeconds, emoteMaxSeconds);
+    }
+
+    [ContextMenu("▶ エモートを1回再生(テスト)")]
+    public void PlayRandomEmote()
+    {
+        if (_anim == null || _emoteTriggers.Length == 0) return;
+        _anim.SetTrigger(_emoteTriggers[Random.Range(0, _emoteTriggers.Length)]);
     }
 
     void MergeToSingleSkeleton(GameObject root)
