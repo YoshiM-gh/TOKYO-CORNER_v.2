@@ -27441,7 +27441,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114053079057648066, guid: bdb8f55c79de3ce429e354b19dc74938, type: 3}
       propertyPath: m_text
-      value: "\u30A2\u30A4\u30C6\u30E0\u3092\u8FFD\u52A0"
+      value: "\u4E88\u5B9A\u3092\u8FFD\u52A0"
       objectReference: {fileID: 0}
     - target: {fileID: 114053079057648066, guid: bdb8f55c79de3ce429e354b19dc74938, type: 3}
       propertyPath: m_fontSize
@@ -46919,6 +46919,7 @@ GameObject:
   - component: {fileID: 1115253684}
   - component: {fileID: 1115253686}
   - component: {fileID: 1115253687}
+  - component: {fileID: 1115253688}
   m_Layer: 0
   m_Name: CharacterCard
   m_TagString: Untagged
@@ -47013,13 +47014,57 @@ MonoBehaviour:
   rtWidth: 512
   rtHeight: 430
   camDistance: 6.3
-  camHeight: 1.25
-  lookHeight: 1.25
+  camHeight: 1.38
+  lookHeight: 1.38
   fov: 30
   charYaw: 0
   bgColor: {r: 0.173, g: 0.2, b: 0.227, a: 1}
   lightIntensity: 3
   lightRange: 30
+  emoteMinSeconds: 120
+  emoteMaxSeconds: 120
+  skyColor: {r: 0.95, g: 0.93, b: 0.88, a: 1}
+  sunColor: {r: 1, g: 0.96, b: 0.88, a: 1}
+  sunEuler: {x: 30, y: -28, z: 0}
+  sunIntensity: 1.4
+  backdropItems:
+  - prefab: {fileID: 4337176053586623025, guid: 07787872856aacd428911359cb63d56a, type: 3}
+    position: {x: 0.7, y: 0, z: -2.3}
+    euler: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+  - prefab: {fileID: 8576571321633396279, guid: 87d3231aa8935af45bf11ca5741082a7, type: 3}
+    position: {x: -1.1, y: 0, z: -1.4}
+    euler: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+  - prefab: {fileID: 2487800364680027194, guid: 7a693737fe0a5ae409289ad97c090021, type: 3}
+    position: {x: -1.6, y: 1.5, z: -3.1}
+    euler: {x: 0, y: 180, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+  - prefab: {fileID: 7879148652149616503, guid: ec234838a40cde3448241c51eeb141f7, type: 3}
+    position: {x: 0.9, y: 0, z: -1.3}
+    euler: {x: 0, y: 0, z: 0}
+    scale: {x: 0.9, y: 0.9, z: 0.9}
+  buildFloor: 1
+  buildWall: 1
+  floorColor: {r: 0.55, g: 0.42, b: 0.3, a: 1}
+  wallColor: {r: 0.18, g: 0.48, b: 0.55, a: 1}
+  windowGlow: 0
+  windowGlowColor: {r: 1, g: 0.96, b: 0.85, a: 1}
+  windowGlowPos: {x: 0.7, y: 1, z: -2.5}
+  windowGlowScale: {x: 1.7, y: 2, z: 0.05}
+--- !u!114 &1115253688
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1115253682}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31a19414c41e5ae4aae2af33fee712f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Mask
+  m_ShowMaskGraphic: 1
 --- !u!1 &1118553007
 GameObject:
   m_ObjectHideFlags: 0

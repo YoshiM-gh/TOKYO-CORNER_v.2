@@ -34,6 +34,30 @@ public class CharacterStage : MonoBehaviour
     [SerializeField] private float emoteMinSeconds = 480f;
     [SerializeField] private float emoteMaxSeconds = 720f;
 
+    [Header("背景（朝の窓・観葉植物）")]
+    [SerializeField] private Color skyColor = new Color(0.95f, 0.93f, 0.88f, 1f);
+    [SerializeField] private Color sunColor = new Color(1.0f, 0.96f, 0.88f, 1f);
+    [SerializeField] private Vector3 sunEuler = new Vector3(35f, -35f, 0f);
+    [SerializeField] private float sunIntensity = 1.1f;
+    [SerializeField] private BackdropItem[] backdropItems;
+    [SerializeField] private bool buildFloor = true;
+    [SerializeField] private bool buildWall = true;
+    [SerializeField] private Color floorColor = new Color(0.55f, 0.42f, 0.30f, 1f);
+    [SerializeField] private Color wallColor = new Color(0.82f, 0.74f, 0.62f, 1f);
+    [SerializeField] private bool windowGlow = true;
+    [SerializeField] private Color windowGlowColor = new Color(1.0f, 0.96f, 0.85f, 1f);
+    [SerializeField] private Vector3 windowGlowPos = new Vector3(0.7f, 1.0f, -2.5f);
+    [SerializeField] private Vector3 windowGlowScale = new Vector3(1.7f, 2.0f, 0.05f);
+
+    [System.Serializable]
+    public class BackdropItem
+    {
+        public GameObject prefab;
+        public Vector3 position;
+        public Vector3 euler;
+        public Vector3 scale = Vector3.one;
+    }
+
     private RenderTexture _rt;
     private RawImage _raw;
     private Camera _cam;
@@ -41,7 +65,7 @@ public class CharacterStage : MonoBehaviour
     private Vector3 _origin;
     private Animator _anim;
     private float _emoteTimer;
-    private readonly string[] _emoteTriggers = { "Wave", "LookPhone", "LookAround", "Listen" };
+    private readonly string[] _emoteTriggers = { "Wave", "LookPhone", "LookAround", "Listen", "Dance", "TalkPhone", "TakePhoto" };
 
     void Start()
     {
@@ -115,12 +139,71 @@ public class CharacterStage : MonoBehaviour
         light.intensity = lightIntensity;
         light.color = Color.white;
 
+        // 朝の太陽光（指向性・ステージレイヤーのみ）
+        var sunGO = new GameObject("StageSun");
+        sunGO.transform.SetParent(root.transform, false);
+        sunGO.transform.rotation = Quaternion.Euler(sunEuler);
+        var sun = sunGO.AddComponent<Light>();
+        sun.type = LightType.Directional;
+        sun.color = sunColor;
+        sun.intensity = sunIntensity;
+        sun.cullingMask = 1 << layer;
+
+        // 背景アイテム（窓・観葉植物など）
+        if (backdropItems != null)
+        {
+            foreach (var item in backdropItems)
+            {
+                if (item == null || item.prefab == null) continue;
+                var b = Instantiate(item.prefab, origin + item.position, Quaternion.Euler(item.euler), root.transform);
+                b.transform.localScale = (item.scale == Vector3.zero) ? Vector3.one : item.scale;
+                SetLayerRecursive(b, layer);
+            }
+        }
+
+        // 床と壁（部屋化）
+        if (buildFloor)
+        {
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            floor.name = "StageFloor";
+            floor.transform.SetParent(root.transform, false);
+            floor.transform.position = origin + new Vector3(0f, -0.05f, -1.5f);
+            floor.transform.localScale = new Vector3(14f, 0.1f, 10f);
+            StripCollider(floor);
+            SetStageMaterial(floor, floorColor);
+            SetLayerRecursive(floor, layer);
+        }
+        if (buildWall)
+        {
+            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wall.name = "StageWall";
+            wall.transform.SetParent(root.transform, false);
+            wall.transform.position = origin + new Vector3(0f, 3f, -3.2f);
+            wall.transform.localScale = new Vector3(14f, 6f, 0.1f);
+            StripCollider(wall);
+            SetStageMaterial(wall, wallColor);
+            SetLayerRecursive(wall, layer);
+        }
+
+        // 窓グロー（外から光が差し込む＝発光パネル）
+        if (windowGlow)
+        {
+            var glow = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            glow.name = "WindowGlow";
+            glow.transform.SetParent(root.transform, false);
+            glow.transform.position = origin + windowGlowPos;
+            glow.transform.localScale = (windowGlowScale == Vector3.zero) ? new Vector3(1.7f,2f,0.05f) : windowGlowScale;
+            StripCollider(glow);
+            SetUnlitMaterial(glow, windowGlowColor);
+            SetLayerRecursive(glow, layer);
+        }
+
         var camGO = new GameObject("StageCamera");
         camGO.transform.SetParent(root.transform, false);
         _cam = camGO.AddComponent<Camera>();
         _cam.cullingMask = 1 << layer;
         _cam.clearFlags = CameraClearFlags.SolidColor;
-        _cam.backgroundColor = bgColor;
+        _cam.backgroundColor = skyColor;
         _cam.orthographic = false;
         _cam.fieldOfView = fov;
         _cam.nearClipPlane = 0.05f;
@@ -139,6 +222,36 @@ public class CharacterStage : MonoBehaviour
     {
         if (_anim == null || _emoteTriggers.Length == 0) return;
         _anim.SetTrigger(_emoteTriggers[Random.Range(0, _emoteTriggers.Length)]);
+    }
+
+    static void SetStageMaterial(GameObject go, Color c)
+    {
+        var r = go.GetComponent<Renderer>();
+        if (r == null) return;
+        var sh = Shader.Find("Universal Render Pipeline/Lit");
+        if (sh == null) sh = Shader.Find("Standard");
+        var m = new Material(sh);
+        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+        m.color = c;
+        r.sharedMaterial = m;
+    }
+
+    static void SetUnlitMaterial(GameObject go, Color c)
+    {
+        var r = go.GetComponent<Renderer>();
+        if (r == null) return;
+        var sh = Shader.Find("Universal Render Pipeline/Unlit");
+        if (sh == null) sh = Shader.Find("Unlit/Color");
+        var m = new Material(sh);
+        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+        m.color = c;
+        r.sharedMaterial = m;
+    }
+
+    static void StripCollider(GameObject go)
+    {
+        var col = go.GetComponent<Collider>();
+        if (col != null) Destroy(col);
     }
 
     void MergeToSingleSkeleton(GameObject root)

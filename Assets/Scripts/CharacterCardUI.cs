@@ -30,9 +30,9 @@ public class CharacterCardUI : MonoBehaviour
         var brt = (RectTransform)_bubble.transform;
         brt.anchorMin = new Vector2(0f, 1f); brt.anchorMax = new Vector2(1f, 1f); brt.pivot = new Vector2(0.5f, 1f);
         brt.sizeDelta = new Vector2(-28f, 0f);          // 横: カード幅 - 28（左右14マージン）
-        brt.anchoredPosition = new Vector2(0f, -16f);   // 上から16px
+        brt.anchoredPosition = new Vector2(0f, -28f);   // 上から16px
         var bimg = _bubble.GetComponent<Image>();
-        bimg.color = new Color(0.95f, 0.93f, 0.87f, 1f);  // 紙色（ほぼ日『今日の一言』風）
+        bimg.color = new Color(1f, 1f, 1f, 1f);  // 白で固定（背景に色をつけてコントラスト）
         UIStyleKit.ApplyRounded(bimg, 12f);
         var vlg = _bubble.GetComponent<VerticalLayoutGroup>();
         vlg.padding = new RectOffset(16, 16, 13, 13);
@@ -48,7 +48,7 @@ public class CharacterCardUI : MonoBehaviour
         if (_font != null) _lineText.font = _font;
         _lineText.text = "";
         _lineText.fontSize = 17f;
-        _lineText.color = new Color(0.13f, 0.13f, 0.14f, 1f);   // 黒系
+        _lineText.color = new Color(0.11f, 0.11f, 0.12f, 1f);   // 黒文字（やや黒気味グレー）
         _lineText.alignment = TextAlignmentOptions.TopLeft;
         _lineText.textWrappingMode = TextWrappingModes.Normal;
         _lineText.lineSpacing = -35f;   // 行間を詰める（フォント標準が広いので負で寄せる）
