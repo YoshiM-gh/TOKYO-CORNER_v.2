@@ -46918,6 +46918,7 @@ GameObject:
   - component: {fileID: 1115253685}
   - component: {fileID: 1115253684}
   - component: {fileID: 1115253686}
+  - component: {fileID: 1115253687}
   m_Layer: 0
   m_Name: CharacterCard
   m_TagString: Untagged
@@ -46994,6 +46995,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ca67acf46f6167e4585c1357c1da13f9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterCardUI
+--- !u!114 &1115253687
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1115253682}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a302baa44eea714ca50ec308963756a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterStage
+  characterPrefab: {fileID: 3530059385246154609, guid: 313408a7c56b31e48888705042cbf7c2, type: 3}
+  characterAvatar: {fileID: 9000000, guid: 8ef54e699c9481e4288e6dbe54c9c316, type: 3}
+  controller: {fileID: 9100000, guid: ef961c4dfb47fbb46b14bdb394ce46d4, type: 2}
+  rtWidth: 512
+  rtHeight: 430
+  camDistance: 6.3
+  camHeight: 1.25
+  lookHeight: 1.25
+  fov: 30
+  charYaw: 0
+  bgColor: {r: 0.173, g: 0.2, b: 0.227, a: 1}
+  lightIntensity: 3
+  lightRange: 30
 --- !u!1 &1118553007
 GameObject:
   m_ObjectHideFlags: 0

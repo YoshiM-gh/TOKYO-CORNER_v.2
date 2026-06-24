@@ -51,7 +51,7 @@ public class CharacterCardUI : MonoBehaviour
         _lineText.color = new Color(0.13f, 0.13f, 0.14f, 1f);   // 黒系
         _lineText.alignment = TextAlignmentOptions.TopLeft;
         _lineText.textWrappingMode = TextWrappingModes.Normal;
-        _lineText.lineSpacing = -50f;   // 行間を詰める（フォント標準が広いので負で寄せる）
+        _lineText.lineSpacing = -35f;   // 行間を詰める（フォント標準が広いので負で寄せる）
     }
 
     void RefreshToday()
