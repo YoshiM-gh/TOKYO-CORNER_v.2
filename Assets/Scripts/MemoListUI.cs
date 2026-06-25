@@ -426,6 +426,7 @@ public class MemoListUI : MonoBehaviour
         var name = NewText("Name", row.transform, label,
             UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextPrimary);
         name.alignment = TextAlignmentOptions.MidlineLeft;
+        name.overflowMode = TextOverflowModes.Ellipsis; // 長い名前は…で省略（NoWrap維持）
         var nameLE = name.gameObject.AddComponent<LayoutElement>();
         nameLE.minWidth = 0; nameLE.flexibleWidth = 1;
 
@@ -750,6 +751,7 @@ public class MemoListUI : MonoBehaviour
             Color tcol = string.IsNullOrEmpty(note.title) ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextPrimary;
             var titleTmp = NewText("Title", titleHost.transform, disp, UITheme_FocusMode.FontChipTitle, tcol);
             titleTmp.alignment = TextAlignmentOptions.MidlineLeft;
+            titleTmp.overflowMode = TextOverflowModes.Ellipsis; // 長いタイトルは…で省略
             var ttRt = titleTmp.GetComponent<RectTransform>(); ttRt.anchorMin = Vector2.zero; ttRt.anchorMax = Vector2.one; ttRt.offsetMin = Vector2.zero; ttRt.offsetMax = Vector2.zero;
             if (selected) _selTitleTmp = titleTmp;
         }
@@ -890,6 +892,7 @@ public class MemoListUI : MonoBehaviour
         bool untitled = string.IsNullOrWhiteSpace(note.title);
         var title = NewText("Title", textCol.transform, untitled ? "（無題）" : note.title, UITheme_FocusMode.FontChipTitle, untitled ? UITheme_FocusMode.TextMuted : UITheme_FocusMode.TextPrimary);
         title.alignment = TextAlignmentOptions.MidlineLeft;
+        title.overflowMode = TextOverflowModes.Ellipsis; // 長いタイトルは…で省略
         int left = nm.MemoTrashDaysLeft(note);
         string metaStr = left <= 0 ? "まもなく完全削除" : ("あと" + left + "日で完全削除");
         var meta = NewText("Meta", textCol.transform, metaStr, UITheme_FocusMode.FontCaption, UITheme_FocusMode.TextMuted);

@@ -14,10 +14,34 @@ public class CharacterCardUI : MonoBehaviour
     TMP_FontAsset _font;
     string _shownDate;
 
+    [Header("セリフのセッション内ローテーション")]
+    [SerializeField] bool rotateMoments = true;            // セッション中に別のセリフへ切り替えるか
+    [SerializeField] float momentRotateSeconds = 1200f;    // 切り替え間隔（秒）。既定1200=20分
+    float _rotateTimer;
+
     void OnEnable()
     {
         EnsureBuilt();
         RefreshToday();
+        _rotateTimer = momentRotateSeconds;
+    }
+
+    void Update()
+    {
+        if (!rotateMoments || _lineText == null) return;
+        if (MomentLibrary.PoolCount <= 1) return;
+        _rotateTimer -= Time.unscaledDeltaTime;
+        if (_rotateTimer <= 0f) RotateMomentNow();
+    }
+
+    /// <summary>セッション内ローテーション：プールから現在と違うセリフをランダム表示（記録はしない＝アーカイブは日次1本のまま）。</summary>
+    [ContextMenu("▶ セリフを今すぐ切り替え(テスト)")]
+    public void RotateMomentNow()
+    {
+        if (_lineText == null) return;
+        var tmpl = MomentLibrary.PickRandom(_lineText.text);
+        if (tmpl != null) _lineText.text = tmpl.body;
+        _rotateTimer = momentRotateSeconds;
     }
 
     void EnsureBuilt()

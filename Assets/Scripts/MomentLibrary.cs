@@ -37,5 +37,19 @@ public static class MomentLibrary
         return _pool[idx];
     }
 
+    /// <summary>プールからランダムに1件。excludeBody と同じ本文は（可能なら）避ける。セッション内ローテ用。</summary>
+    public static MomentTemplate PickRandom(string excludeBody = null)
+    {
+        EnsureLoaded();
+        if (_pool.Count == 0) return null;
+        if (_pool.Count == 1) return _pool[0];
+        for (int attempt = 0; attempt < 8; attempt++)
+        {
+            var c = _pool[Random.Range(0, _pool.Count)];
+            if (string.IsNullOrEmpty(excludeBody) || c.body != excludeBody) return c;
+        }
+        return _pool[Random.Range(0, _pool.Count)];
+    }
+
     public static int PoolCount { get { EnsureLoaded(); return _pool.Count; } }
 }
