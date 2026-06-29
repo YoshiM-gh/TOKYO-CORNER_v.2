@@ -45,6 +45,7 @@ public class DrinkInventory : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+        if (transform.parent != null) transform.SetParent(null); // DDOLはルート必須。子オブジェクトだと失敗するので親から切り離す
         DontDestroyOnLoad(gameObject);
     }
 

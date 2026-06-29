@@ -11,6 +11,12 @@ using System.Collections.Generic;
 /// </summary>
 public class SeatInteractableImproved : MonoBehaviour
 {
+    public enum SitPoseType { Table, Relax }
+
+    [Header("Sit Pose")]
+    [SerializeField] private SitPoseType sitPose = SitPoseType.Table;
+    [SerializeField] private string sitVariantParameter = "SitVariant";
+
     [SerializeField] private float interactRange = 0.9f;  // ✅ 0.9f に変更（より小さい判定範囲）
     [SerializeField] private Transform sitPoint;
     [Tooltip("未指定時は椅子の前方（-forward）に離席します。")]
@@ -42,10 +48,16 @@ public class SeatInteractableImproved : MonoBehaviour
         private Animator[] playerAnimators;
     private Renderer[] playerRenderers;
     private bool isSeated = false;
+
+    private Vector3 standReturnPosition;   // 起立時に戻す位置（着席前の立ち位置=椅子の横）
+    private Quaternion standReturnRotation;
+    private bool hasStandReturn = false;
     private bool warnedPlayerMissing = false;
     private Vector3 lastApproachGroundPos;
     private bool hasAppliedSitAnimatorState = false;
     private bool appliedSitAnimatorState;
+
+    private static SeatInteractableImproved s_occupied;
 
     private void Awake()
     {
@@ -74,7 +86,7 @@ public class SeatInteractableImproved : MonoBehaviour
                 new Vector2(origin.x, origin.z),
                 new Vector2(player.position.x, player.position.z));
 
-            if (WasInteractPressed() && distanceXZ <= interactRange)
+            if (WasInteractPressed() && distanceXZ <= interactRange && (s_occupied == null || !s_occupied.isSeated) && IsNearestInRangeSeat(distanceXZ))
                 SitDown();
         }
         else
@@ -92,12 +104,34 @@ public class SeatInteractableImproved : MonoBehaviour
         }
     }
 
+    private bool IsNearestInRangeSeat(float myDistanceXZ)
+    {
+        if (player == null) return true;
+        var seats = Object.FindObjectsByType<SeatInteractableImproved>(FindObjectsSortMode.None);
+        Vector2 pp = new Vector2(player.position.x, player.position.z);
+        for (int i = 0; i < seats.Length; i++)
+        {
+            SeatInteractableImproved s = seats[i];
+            if (s == null || s == this || s.isSeated) continue;
+            Transform sp = s.sitPoint != null ? s.sitPoint : s.transform;
+            float d = Vector2.Distance(new Vector2(sp.position.x, sp.position.z), pp);
+            if (d <= s.interactRange && d < myDistanceXZ) return false;
+        }
+        return true;
+    }
+
 private void SitDown()
     {
         lastApproachGroundPos = player.position;
         lastApproachGroundPos.y = 0f;
 
+        // 起立時に戻す立ち位置（着席前=椅子の横の歩いて来た場所）を保存
+        standReturnPosition = player.position;
+        standReturnRotation = player.rotation;
+        hasStandReturn = true;
+
         isSeated = true;
+        s_occupied = this;
         Vector3 targetPos = sitPoint != null ? sitPoint.position : transform.position;
         player.position = targetPos;
         if (lockToSitPointRotation)
@@ -106,21 +140,50 @@ private void SitDown()
             player.rotation = targetRot;
         }
 
+        ApplySitVariant();
         SetSitAnimatorState(true);
         if (sitDebugBridge != null) sitDebugBridge.SetSitState(true);
         if (playerMover != null) playerMover.enabled = false;
-        SetPlayerVisible(false);
-        GameModeManager.Instance.EnterFocusMode(sitPoint != null ? sitPoint : transform);
+        SetPlayerVisible(true); // 着席メニュー中はプレイヤーを表示したまま
+        SeatMenuController.OpenFor(this); // 着席 → 着席メニューを開く（フォーカスはメニューの「集中する」から） // 着席 → フォーカス(UI_Prototype)へシーン切替（旧: GameModeManagerのオーバーレイ）
         Debug.Log($"[Seat] Sat down at: {gameObject.name}");
     }
 
-private void StandUp()
+public void RequestStandUp() { StandUp(); } // 着席メニューの「席を立つ」から呼ぶ
+
+    private void StandUp()
     {
+        if (SeatMenuController.Instance != null) SeatMenuController.Instance.Close(); // メニューが開いていれば閉じる
         isSeated = false;
         
         Vector3 sitWorld = sitPoint != null ? sitPoint.position : transform.position;
-        Vector3 standPos = ComputeStandPosition(sitWorld);
-        Vector3 validatedStandPos = ValidateStandPosition(standPos, sitWorld);
+        Vector3 standPos;
+        Vector3 validatedStandPos;
+        Quaternion standRot = player.rotation;
+        // 椅子の横に立たせる: XZは standPoint（あれば）優先・Yは着席前の立ち高さ（standPointのYは信用しない）
+        float standY = hasStandReturn ? standReturnPosition.y : (player != null ? player.position.y : sitWorld.y);
+        Vector3 flatSeat = new Vector3(sitWorld.x, 0f, sitWorld.z);
+        // 起立位置は「座った椅子からの相対」で算出（standPointの絶対座標には依存しない）
+        // 基本は着席直前に立っていた場所(=歩いて来た椅子の横)へ戻す。近すぎ/不明なら座席から外向きへ一定距離離す。
+        Vector3 approachFlat = hasStandReturn ? new Vector3(standReturnPosition.x, 0f, standReturnPosition.z) : flatSeat;
+        Vector3 standXZ;
+        if (hasStandReturn && (approachFlat - flatSeat).magnitude >= 0.6f)
+        {
+            standXZ = approachFlat;
+        }
+        else
+        {
+            Vector3 dir = approachFlat - flatSeat;
+            if (dir.sqrMagnitude < 0.09f && standPoint != null)
+                dir = new Vector3(standPoint.position.x - flatSeat.x, 0f, standPoint.position.z - flatSeat.z);
+            if (dir.sqrMagnitude < 0.09f) { Vector3 f = transform.forward; f.y = 0f; dir = -f; }
+            if (dir.sqrMagnitude < 0.0001f) dir = Vector3.back;
+            dir.Normalize();
+            standXZ = flatSeat + dir * Mathf.Max(standOffDistance, 0.8f);
+        }
+        standPos = new Vector3(standXZ.x, standY, standXZ.z);
+        validatedStandPos = standPos;
+        standRot = hasStandReturn ? standReturnRotation : player.rotation;
         
         if (debugLogs)
         {
@@ -144,6 +207,7 @@ private void StandUp()
         }
         
         player.position = validatedStandPos;
+        player.rotation = standRot;
         if (debugLogs)
             Debug.Log($"[Seat] Teleported player to: ({validatedStandPos.x:F2}, {validatedStandPos.y:F2}, {validatedStandPos.z:F2})");
         
@@ -161,7 +225,7 @@ private void StandUp()
         if (playerMover != null)
             playerMover.enabled = true;
         
-        GameModeManager.Instance.ExitFocusMode(player);
+        // 新アーキ: 着席→メニューはGameModeManagerのフォーカスに入らないため ExitFocusMode は呼ばない（フォーカス未開始セッションの誤終了を防止）
         
         Debug.Log($"[Seat] Stood up from: {gameObject.name}");
     }
@@ -376,6 +440,20 @@ private void StandUp()
 
         groundedY = bestY;
         return true;
+    }
+
+    private void ApplySitVariant()
+    {
+        int variant = (sitPose == SitPoseType.Relax) ? 1 : 0;
+        if (playerAnimators != null)
+        {
+            for (int i = 0; i < playerAnimators.Length; i++)
+            {
+                var a = playerAnimators[i];
+                if (a != null && HasAnimatorParameter(a, sitVariantParameter, AnimatorControllerParameterType.Int))
+                    a.SetInteger(sitVariantParameter, variant);
+            }
+        }
     }
 
     private void SetSitAnimatorState(bool sit)

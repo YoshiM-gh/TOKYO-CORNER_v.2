@@ -52,7 +52,10 @@ public class SaveDataManager : MonoBehaviour
 
     private void Awake()
     {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; } // 重複ガード（シーン切替で生き残る本体を1つに）
         Instance = this;
+        if (transform.parent != null) transform.SetParent(null); // DDOLはルート必須。子オブジェクトだと失敗するので親から切り離す
+        DontDestroyOnLoad(gameObject); // ★ シーン切替（Cafe↔UI_Prototype）をまたいでコイン/セーブを保持
         savePath = Path.Combine(Application.persistentDataPath, "savedata.json");
         Load();
         MigrateLegacyPlaytime();
