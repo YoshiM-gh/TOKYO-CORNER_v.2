@@ -65,7 +65,7 @@ public class DrinkHudUI : MonoBehaviour
         foreach (var d in drinks)
         {
             if (sb.Length > 0) sb.Append("  ");
-            sb.Append($"Drink({d.sipsRemaining}/{DrinkInventory.SipsPerDrink})");
+            sb.Append($"Drink({d.sipsRemaining}/{d.sipsMax})");
         }
         drinkText.text = sb.ToString();
     }

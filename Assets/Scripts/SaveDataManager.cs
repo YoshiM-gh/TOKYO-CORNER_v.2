@@ -29,6 +29,11 @@ public class SaveData
     public float todayFocusSeconds = 0f;
 
     public MenuCountEntry[] menuPurchases = new MenuCountEntry[0];
+
+    /// <summary>コーナースペシャル〈ドリンク〉のプレイヤー命名（空=未命名）。オープニングで設定。</summary>
+    public string playerDrinkName = "";
+    /// <summary>コーナースペシャル〈フード〉のプレイヤー命名（空=未命名）。オープニングで設定。</summary>
+    public string playerFoodName = "";
 }
 
 public class SaveDataManager : MonoBehaviour
@@ -196,6 +201,15 @@ public class SaveDataManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>メニュー定義から購入（コイン減算＋スタンプ＋購入履歴）。</summary>
+    public bool TryPurchase(MenuItemDef def)
+    {
+        if (def == null) return false;
+        if (!PurchaseItem(def.price)) return false;
+        AddMenuPurchase(def.id);
+        return true;
+    }
+
     public bool PurchaseItem(int cost)
     {
         if (saveData.coins < cost) return false;
@@ -242,6 +256,31 @@ public class SaveDataManager : MonoBehaviour
 
         saveData.menuPurchases = list.ToArray();
         Save();
+    }
+
+    // ── メニュー命名（コーナースペシャル） ──────────────
+
+    /// <summary>プレイヤー命名スロットの名前（未命名は空文字）。</summary>
+    public string GetPlayerMenuName(MenuCategory category) =>
+        category == MenuCategory.Drink ? saveData.playerDrinkName : saveData.playerFoodName;
+
+    public void SetPlayerMenuName(MenuCategory category, string name)
+    {
+        if (category == MenuCategory.Drink) saveData.playerDrinkName = name ?? "";
+        else saveData.playerFoodName = name ?? "";
+        Save();
+    }
+
+    /// <summary>表示名解決。命名スロットで命名済みならその名前、それ以外はマスターの displayName。</summary>
+    public string ResolveDisplayName(MenuItemDef def)
+    {
+        if (def == null) return "";
+        if (def.isPlayerNamed)
+        {
+            string custom = GetPlayerMenuName(def.category);
+            if (!string.IsNullOrEmpty(custom)) return custom;
+        }
+        return def.displayName;
     }
 
     public int GetCoins() => saveData.coins;

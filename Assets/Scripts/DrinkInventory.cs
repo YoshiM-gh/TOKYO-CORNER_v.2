@@ -1,27 +1,34 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// セッション限定のドリンク在庫管理。シーンをまたいで保持するが、アプリ終了で消える。
+/// 3a: メニュー個体化。各ドリンクが menuId / 表示名 / 一口数(portions) を持つ。
 /// 購入時刻と残り口数を持ち、古い順に消費する。
+/// ※フォーカス中のFキー一口は廃止（ROADMAP確定）。飲むのは着席メニューから。
 /// </summary>
 public class DrinkItem
 {
+    public string menuId;
+    public string displayName;
     public System.DateTime purchasedAt;
+    public int sipsMax;
     public int sipsRemaining;
 
-    public DrinkItem()
+    public DrinkItem(string menuId, string displayName, int portions)
     {
+        this.menuId = menuId;
+        this.displayName = displayName;
         purchasedAt = System.DateTime.Now;
-        sipsRemaining = DrinkInventory.SipsPerDrink;
+        sipsMax = Mathf.Max(1, portions);
+        sipsRemaining = sipsMax;
     }
 
-    /// <summary>残り口数を [*][*][_][_] 形式で返す</summary>
+    /// <summary>残り口数を [*][*][ ][ ] 形式で返す</summary>
     public string SipDots()
     {
         var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < DrinkInventory.SipsPerDrink; i++)
+        for (int i = 0; i < sipsMax; i++)
             sb.Append(i < sipsRemaining ? "[*]" : "[ ]");
         return sb.ToString();
     }
@@ -34,8 +41,7 @@ public class DrinkInventory : MonoBehaviour
 {
     public static DrinkInventory Instance { get; private set; }
 
-    public const int MaxDrinks = 4;
-    public const int SipsPerDrink = 4;
+    public const int MaxDrinks = 1; // 1度に1杯まで（飲み切ってから次を購入）
 
     private readonly List<DrinkItem> drinks = new();
 
@@ -47,16 +53,6 @@ public class DrinkInventory : MonoBehaviour
         Instance = this;
         if (transform.parent != null) transform.SetParent(null); // DDOLはルート必須。子オブジェクトだと失敗するので親から切り離す
         DontDestroyOnLoad(gameObject);
-    }
-
-    private void Update()
-    {
-        if (GameModeManager.Instance == null) return;
-        if (GameModeManager.Instance.CurrentMode != GameModeManager.GameMode.Focus) return;
-
-        bool fPressed = Input.GetKeyDown(KeyCode.F) ||
-                        (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame);
-        if (fPressed) TakeSip();
     }
 
     private void OnApplicationQuit() => ClearAll();
@@ -80,12 +76,12 @@ public class DrinkInventory : MonoBehaviour
 
     public bool CanPurchase() => drinks.Count < MaxDrinks;
 
-    /// <summary>ドリンクを1つ追加。満杯なら false。</summary>
-    public bool AddDrink()
+    /// <summary>ドリンクを1つ追加（メニュー個体）。満杯なら false。</summary>
+    public bool AddDrink(string menuId, string displayName, int portions)
     {
         if (!CanPurchase()) return false;
-        drinks.Add(new DrinkItem());
-        Debug.Log($"[Drink] Purchased. Inventory: {drinks.Count}/{MaxDrinks}");
+        drinks.Add(new DrinkItem(menuId, displayName, portions));
+        Debug.Log($"[Drink] Purchased '{displayName}' ({portions} sips). Inventory: {drinks.Count}/{MaxDrinks}");
         OnDrinksChanged?.Invoke();
         return true;
     }
@@ -104,11 +100,11 @@ public class DrinkInventory : MonoBehaviour
             if (drinks[i].sipsRemaining <= 0) continue;
             drinks[i].sipsRemaining--;
             int left = drinks[i].sipsRemaining;
-            Debug.Log($"[Drink] \"{SipMessage}\" | Drink #{i + 1}: {left}/{SipsPerDrink} sips left.");
+            Debug.Log($"[Drink] \"{SipMessage}\" | {drinks[i].displayName}: {left}/{drinks[i].sipsMax} sips left.");
             if (left == 0)
             {
+                Debug.Log($"[Drink] '{drinks[i].displayName}' finished and removed.");
                 drinks.RemoveAt(i);
-                Debug.Log($"[Drink] Drink finished and removed. Inventory: {drinks.Count}/{MaxDrinks}");
             }
             OnDrinksChanged?.Invoke();
             return true;
@@ -127,7 +123,7 @@ public class DrinkInventory : MonoBehaviour
         if (index < 0 || index >= drinks.Count) return false;
         var d = drinks[index];
         drinks.RemoveAt(index);
-        Debug.Log($"[Drink] Discarded drink #{index + 1} (bought {d.purchasedAt:HH:mm}, {d.sipsRemaining} sips left). Inventory: {drinks.Count}/{MaxDrinks}");
+        Debug.Log($"[Drink] Discarded '{d.displayName}' (bought {d.purchasedAt:HH:mm}, {d.sipsRemaining} sips left). Inventory: {drinks.Count}/{MaxDrinks}");
         OnDrinksChanged?.Invoke();
         return true;
     }
@@ -141,7 +137,12 @@ public class DrinkInventory : MonoBehaviour
         return total;
     }
 
-    public int TotalSipsMax() => drinks.Count * SipsPerDrink;
+    public int TotalSipsMax()
+    {
+        int total = 0;
+        foreach (var d in drinks) total += d.sipsMax;
+        return total;
+    }
 
     /// <summary>"Drink 3/4" 形式の文字列。ドリンクなしは空文字。</summary>
     public string BuildDrinkHudText()

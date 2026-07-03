@@ -1,0 +1,148 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af13d0c09d70a4948a3f251e7be519c9, type: 3}
+  m_Name: MenuDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::MenuDatabase
+  items:
+  - id: corner_coffee
+    displayName: "\u30B3\u30FC\u30CA\u30FC\u30B9\u30BF\u30A4\u30EB\u30B3\u30FC\u30D2\u30FC"
+    category: 0
+    price: 50
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 1
+  - id: cold_brew
+    displayName: "\u6C34\u51FA\u3057\u30B3\u30FC\u30D2\u30FC"
+    category: 0
+    price: 80
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: americano
+    displayName: "\u30A2\u30E1\u30EA\u30AB\u30FC\u30CE\u30FB\u30A2\u30E1\u30EA\u30AB\u30FC\u30CA"
+    category: 0
+    price: 50
+    portions: 2
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: deep_espresso
+    displayName: "\u30C7\u30A3\u30FC\u30D7\u30A8\u30B9\u30D7\u30EC\u30C3\u30BD"
+    category: 0
+    price: 120
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: frosty_coffee
+    displayName: "\u30B3\u30FC\u30CA\u30FC\u30D5\u30ED\u30B9\u30C6\u30A3 \u30B3\u30FC\u30D2\u30FC"
+    category: 0
+    price: 200
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: frosty_matcha
+    displayName: "\u30B3\u30FC\u30CA\u30FC\u30D5\u30ED\u30B9\u30C6\u30A3 \u62B9\u8336"
+    category: 0
+    price: 200
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: frosty_vanilla
+    displayName: "\u30B3\u30FC\u30CA\u30FC\u30D5\u30ED\u30B9\u30C6\u30A3 \u30D0\u30CB\u30E9"
+    category: 0
+    price: 200
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: frosty_peach
+    displayName: "\u30B3\u30FC\u30CA\u30FC\u30D5\u30ED\u30B9\u30C6\u30A3 \u30D4\u30FC\u30C1"
+    category: 0
+    price: 200
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: green_smoothie_pistachio
+    displayName: "\u30B0\u30EA\u30FC\u30F3\u30B9\u30E0\u30FC\u30B8\u30FC \u30D4\u30B9\u30BF\u30C1\u30AA\u30D3\u30C3\u30C4"
+    category: 0
+    price: 350
+    portions: 4
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: special_drink
+    displayName: "\u30B3\u30FC\u30CA\u30FC\u30B9\u30DA\u30B7\u30E3\u30EB"
+    category: 0
+    price: 800
+    portions: 5
+    isPlayerNamed: 1
+    hasTemperature: 0
+  - id: sugar_donut
+    displayName: "\u30B7\u30E5\u30AC\u30FC\u30C9\u30FC\u30CA\u30C4"
+    category: 1
+    price: 30
+    portions: 2
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: locabo_donut
+    displayName: "\u30ED\u30AB\u30DC \u30CE\u30F3\u30B7\u30E5\u30AC\u30FC\u30C9\u30FC\u30CA\u30C4"
+    category: 1
+    price: 50
+    portions: 2
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: old_fashioned_donut
+    displayName: "\u30AA\u30FC\u30EB\u30C9\u30D5\u30A1\u30C3\u30B7\u30E7\u30F3\u30C9\u30FC\u30CA\u30C4"
+    category: 1
+    price: 40
+    portions: 2
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: new_fashioned_donut
+    displayName: "\u30CB\u30E5\u30FC\u30D5\u30A1\u30C3\u30B7\u30E7\u30F3\u30C9\u30FC\u30CA\u30C4"
+    category: 1
+    price: 80
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: scone
+    displayName: "\u30B9\u30B3\u30FC\u30F3"
+    category: 1
+    price: 35
+    portions: 2
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: corner_cheesecake
+    displayName: "\u30B3\u30FC\u30CA\u30FC\u30B9\u30BF\u30A4\u30EB\u30C1\u30FC\u30BA\u30B1\u30FC\u30AD"
+    category: 1
+    price: 45
+    portions: 2
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: rock_salt_chips
+    displayName: "\u5CA9\u5869\u30BD\u30EB\u30C8\u30DD\u30C6\u30C8\u30C1\u30C3\u30D7\u30B9"
+    category: 1
+    price: 60
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: mexican_tacos_chips
+    displayName: "\u30E1\u30AD\u30B7\u30AB\u30F3\u30C1\u30FC\u30B8\u30FC\u30BF\u30B3\u30B9\u30C1\u30C3\u30D7\u30B9"
+    category: 1
+    price: 60
+    portions: 3
+    isPlayerNamed: 0
+    hasTemperature: 0
+  - id: special_food
+    displayName: "\u30B3\u30FC\u30CA\u30FC\u30B9\u30DA\u30B7\u30E3\u30EB"
+    category: 1
+    price: 500
+    portions: 4
+    isPlayerNamed: 1
+    hasTemperature: 0

@@ -15,6 +15,9 @@ public class SeatMenuController : MonoBehaviour
 {
     public static SeatMenuController Instance { get; private set; }
 
+    /// <summary>着席メニューが表示中か（他UIとの排他用）。</summary>
+    public bool IsOpen => _panel != null && _panel.activeSelf;
+
     private GameObject _panel;
     private Button _drinkBtn, _foodBtn, _focusBtn, _standBtn;
     private TMPro.TMP_Text _drinkLabel, _foodLabel, _focusLabel, _standLabel;
@@ -110,7 +113,14 @@ public class SeatMenuController : MonoBehaviour
         int sips = 0, maxSips = 0;
         var di = DrinkInventory.Instance;
         if (di != null) { sips = di.TotalSipsRemaining(); maxSips = di.TotalSipsMax(); }
-        if (_drinkLabel != null) _drinkLabel.text = "保有しているドリンクを飲む (" + sips + "/" + maxSips + ")";
+        var dlist = di != null ? di.GetDrinks() : null;
+        if (_drinkLabel != null)
+        {
+            if (dlist != null && dlist.Count > 0)
+                _drinkLabel.text = dlist[0].displayName + " を飲む（残り " + dlist[0].sipsRemaining + "/" + dlist[0].sipsMax + " 口）";
+            else
+                _drinkLabel.text = "ドリンクを飲む (0/0)";
+        }
         if (_drinkBtn != null) _drinkBtn.interactable = sips > 0;
 
         // フードは未実装（3bで実装）→ 0/0 グレーアウト
