@@ -40,9 +40,11 @@ public class TrashCanInteractable : MonoBehaviour
 
         if (!col.Raycast(ray, out RaycastHit _, 100f)) return;
 
-        if (DrinkInventory.Instance == null || DrinkInventory.Instance.GetDrinks().Count == 0)
+        int items = (DrinkInventory.Instance != null ? DrinkInventory.Instance.GetDrinks().Count : 0)
+                  + (FoodInventory.Instance != null ? FoodInventory.Instance.GetFoods().Count : 0);
+        if (items == 0)
         {
-            Debug.Log("[TrashCan] Clicked - no drinks to discard.");
+            Debug.Log("[TrashCan] Clicked - no items to discard.");
             return;
         }
 

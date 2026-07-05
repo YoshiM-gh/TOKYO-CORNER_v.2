@@ -43,6 +43,8 @@ public class SaveDataManager : MonoBehaviour
     public event System.Action OnStatsChanged;
 
     public const int DailyLoginCoins = 100;
+    /// <summary>コイン所持上限。加算処理は必ずこれでクランプすること。</summary>
+    public const int MaxCoins = 9999;
     public const int MvpDrinkPrice = 100;
     /// <summary>セーブ用ID（ASCII）。表示は <see cref="FormatMenuLine"/> で英語ラベルに。</summary>
     public const string MenuIdMvpDrink = "mvp_drink";
@@ -354,7 +356,7 @@ public class SaveDataManager : MonoBehaviour
             Debug.Log($"[Login] Daily bonus already claimed today ({saveData.lastCoinDate}). Coins: {saveData.coins}C");
             return;
         }
-        saveData.coins += DailyLoginCoins;
+        saveData.coins = Mathf.Min(saveData.coins + DailyLoginCoins, MaxCoins);
         saveData.lastCoinDate = TodayString();
         Save();
         OnStatsChanged?.Invoke();

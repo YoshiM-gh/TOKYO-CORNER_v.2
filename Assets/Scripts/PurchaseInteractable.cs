@@ -3,7 +3,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
 
 /// <summary>
-/// 購入エリア（カウンター）をクリックでメニューUIを開く。
+/// カフェスタッフ（Waiter）をクリック＝話しかけでメニューUIを開く。
 /// 3a: 旧「クリック即・固定価格ドリンク購入」から差し替え。実購入は MenuShopUI 側。
 /// 同一GameObjectに Collider（推奨: BoxCollider）が必要。Collider.Raycast で他オブジェクトより優先判定。
 /// </summary>
@@ -22,7 +22,9 @@ public class PurchaseInteractable : MonoBehaviour
 
     private void Start()
     {
-        GameObject p = GameObject.FindWithTag("Player");
+        // 操作キャラ本体を名指しで取得（"Player"タグは原点の親コンテナにも付いているため）。Seat側と同じ流儀。
+        GameObject p = GameObject.Find("23_Businessman");
+        if (p == null) p = GameObject.FindWithTag("Player");
         if (p != null) player = p.transform;
     }
 

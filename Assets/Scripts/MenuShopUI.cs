@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// メニュー購入UI（Cafeシーン / MenuShopCanvas）。
-/// 入口: PurchaseCounter クリック or デバッグキーM（Roaming中・着席メニュー非表示時のみ）。
+/// 入口: カフェスタッフ（Waiter）に近づいてクリック＝話しかけ（PurchaseInteractable）。
 /// 購入フロー: 行ホバーで▶＋ハイライト（MenuRowHighlight）→ 温度選択（対象品のみ）→ 購入クリック
 ///  → ドリンク保有中なら案内バー（OKのみ）／未保有なら「本当に〜?」確認（はい/いいえ）
 ///  → はい=購入成立でメニューを閉じる（終了）／いいえ=メニューに戻る。
@@ -59,26 +59,12 @@ public class MenuShopUI : MonoBehaviour
     private void Update()
     {
         if (_panel == null || Keyboard.current == null) return;
-        bool mPressed = Keyboard.current.mKey.wasPressedThisFrame;
-        bool escPressed = Keyboard.current.escapeKey.wasPressedThisFrame;
-        if (_panel.activeSelf)
+        if (_panel.activeSelf && Keyboard.current.escapeKey.wasPressedThisFrame)
         {
-            if (escPressed)
-            {
-                if (_confirmBar != null && _confirmBar.activeSelf) CancelConfirm();
-                else Close();
-            }
-            else if (mPressed) Close();
-        }
-        else if (mPressed && IsRoaming() && !IsSeatMenuOpen())
-        {
-            Open();
+            if (_confirmBar != null && _confirmBar.activeSelf) CancelConfirm();
+            else Close();
         }
     }
-
-    private bool IsRoaming() =>
-        GameModeManager.Instance == null ||
-        GameModeManager.Instance.CurrentMode == GameModeManager.GameMode.Roaming;
 
     private bool IsSeatMenuOpen() =>
         SeatMenuController.Instance != null && SeatMenuController.Instance.IsOpen;
@@ -148,7 +134,6 @@ public class MenuShopUI : MonoBehaviour
         var nameLabel = FindTextIn(row, "NameLabel");
         var portions = FindTextIn(row, "PortionsLabel");
         var price = FindTextIn(row, "PriceLabel");
-        var soon = FindTextIn(row, "SoonLabel");
         var hotT = FindDeep(row, "HotButton");
         var iceT = FindDeep(row, "IceButton");
         var buyT = FindDeep(row, "BuyButton");
@@ -162,10 +147,9 @@ public class MenuShopUI : MonoBehaviour
 
         bool isDrink = def.category == MenuCategory.Drink;
         bool canAfford = coins >= def.price;
-        bool buyable = isDrink && canAfford; // 保有中でも押せる（押下時に案内を出す）
+        bool buyable = canAfford; // 保有中でも押せる（押下時に案内を出す）
 
-        if (buyT != null) buyT.gameObject.SetActive(isDrink);
-        if (soon != null) soon.gameObject.SetActive(!isDrink);
+        if (buyT != null) buyT.gameObject.SetActive(true);
         if (buyBtn != null)
         {
             buyBtn.interactable = buyable;
@@ -219,10 +203,13 @@ public class MenuShopUI : MonoBehaviour
             return;
         }
         bool drinkHeld = def.category == MenuCategory.Drink && DrinkInventory.Instance != null && !DrinkInventory.Instance.CanPurchase();
-        if (drinkHeld)
+        bool foodHeld = def.category == MenuCategory.Food && FoodInventory.Instance != null && !FoodInventory.Instance.CanPurchase();
+        if (drinkHeld || foodHeld)
         {
             _pendingDef = null; // 案内のみ・購入予約なし
-            _confirmLabel.text = "ドリンクは一杯ずつ。飲み切ってから次を購入してくださいね。";
+            _confirmLabel.text = drinkHeld
+                ? "ドリンクは一杯ずつ。飲み切ってから次を購入してくださいね。"
+                : "フードは一皿ずつ。食べ切ってから次を購入してくださいね。";
             SetBarMode(true);
         }
         else
@@ -263,15 +250,22 @@ public class MenuShopUI : MonoBehaviour
         CancelConfirm();
         if (def == null || SaveDataManager.Instance == null) { Refresh(); return; }
         if (def.category == MenuCategory.Drink && DrinkInventory.Instance != null && !DrinkInventory.Instance.CanPurchase()) { Refresh(); return; }
+        if (def.category == MenuCategory.Food && FoodInventory.Instance != null && !FoodInventory.Instance.CanPurchase()) { Refresh(); return; }
         if (!SaveDataManager.Instance.TryPurchase(def)) { Refresh(); return; }
 
+        string acquiredName = SaveDataManager.Instance.ResolveDisplayName(def);
         if (def.category == MenuCategory.Drink && DrinkInventory.Instance != null)
         {
-            string dn = SaveDataManager.Instance.ResolveDisplayName(def);
-            if (def.hasTemperature) dn += hot ? "（ホット）" : "（アイス）";
-            DrinkInventory.Instance.AddDrink(def.id, dn, def.portions);
+            if (def.hasTemperature) acquiredName += hot ? "（ホット）" : "（アイス）";
+            DrinkInventory.Instance.AddDrink(def.id, acquiredName, def.portions);
+        }
+        else if (def.category == MenuCategory.Food && FoodInventory.Instance != null)
+        {
+            FoodInventory.Instance.AddFood(def.id, acquiredName, def.portions);
         }
         Close(); // はい=購入成立 → メニューを閉じて終了
+        if (AcquireToastUI.Instance != null) AcquireToastUI.Instance.Show(acquiredName);
+        if (PlayerEmote.Instance != null) PlayerEmote.Instance.Show("♪");
     }
 
     private void CancelConfirm()

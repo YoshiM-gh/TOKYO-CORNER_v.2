@@ -123,11 +123,20 @@ public class SeatMenuController : MonoBehaviour
         }
         if (_drinkBtn != null) _drinkBtn.interactable = sips > 0;
 
-        // フードは未実装（3bで実装）→ 0/0 グレーアウト
-        if (_foodLabel != null) _foodLabel.text = "保有しているフードを食べる (0/0)";
-        if (_foodBtn != null) _foodBtn.interactable = false;
+        int bites = 0;
+        var fi = FoodInventory.Instance;
+        if (fi != null) bites = fi.TotalBitesRemaining();
+        var flist = fi != null ? fi.GetFoods() : null;
+        if (_foodLabel != null)
+        {
+            if (flist != null && flist.Count > 0)
+                _foodLabel.text = flist[0].displayName + " を食べる（残り " + flist[0].bitesRemaining + "/" + flist[0].bitesMax + " 口）";
+            else
+                _foodLabel.text = "フードを食べる (0/0)";
+        }
+        if (_foodBtn != null) _foodBtn.interactable = bites > 0;
         if (_drinkLabel != null) _drinkLabel.color = (_drinkBtn != null && _drinkBtn.interactable) ? new Color(1f,1f,1f,1f) : new Color(0.45f,0.45f,0.45f,1f);
-        if (_foodLabel != null) _foodLabel.color = new Color(0.45f,0.45f,0.45f,1f);
+        if (_foodLabel != null) _foodLabel.color = (_foodBtn != null && _foodBtn.interactable) ? new Color(1f,1f,1f,1f) : new Color(0.45f,0.45f,0.45f,1f);
 
         if (_focusLabel != null) _focusLabel.text = "フォーカスモードに入る";
         if (_standLabel != null) _standLabel.text = "席を立つ";
@@ -142,7 +151,9 @@ public class SeatMenuController : MonoBehaviour
 
     private void OnFood()
     {
-        // 未実装（フード実装は3b）
+        var fi = FoodInventory.Instance;
+        if (fi != null && fi.HasAnyBite()) fi.TakeBite();
+        Refresh();
     }
 
     private void OnFocus()
