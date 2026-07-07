@@ -27,10 +27,7 @@ public class DailyCalendarUI : MonoBehaviour
     private const float NOTE_W         = 200f;
     private const float NOTE_H         = 200f;
 
-    private static readonly string[] POLICY_OPTIONS =
-    { "", "ガンガンいこうぜ", "しっかりマイペース", "いろいろやろうぜ",
-      "ととのえていこうぜ", "かいふくゆうせん", "ともだちだいじに",
-      "かぞくをだいじに", "じぶんをだいじに", "こいびとだいじに" };
+    private static string[] POLICY_OPTIONS => PolicyOptions.All; // 単一ソース化(PolicyOptions.cs)。挙動不変
 
     private static readonly string[] DOW_LABELS =
         { "日", "月", "火", "水", "木", "金", "土" };

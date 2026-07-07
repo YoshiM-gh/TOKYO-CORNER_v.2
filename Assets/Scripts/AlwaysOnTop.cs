@@ -37,18 +37,29 @@ public class AlwaysOnTop : MonoBehaviour
     }
 #endif
 
+    private static bool _pluginMissing; // ネイティブプラグイン欠落時に以後の呼び出しを止める
+
     public void SetAlwaysOnTop(bool onTop)
     {
 #if UNITY_STANDALONE_OSX
-        SetWindowAlwaysOnTop(onTop);
-        Debug.Log("[AlwaysOnTop] " + (onTop ? "有効" : "無効"));
+        if (_pluginMissing) return;
+        try
+        {
+            SetWindowAlwaysOnTop(onTop);
+            Debug.Log("[AlwaysOnTop] " + (onTop ? "有効" : "無効"));
+        }
+        catch (System.DllNotFoundException)
+        {
+            _pluginMissing = true;
+            Debug.LogWarning("[AlwaysOnTop] ネイティブプラグイン(AlwaysOnTop.bundle)未導入のため無効化しました（エディタ/未導入環境では正常動作。例外でError Pauseが発火し全フレーム凍結するのを防ぐ）");
+        }
 #endif
     }
 
     void OnApplicationQuit()
     {
 #if UNITY_STANDALONE_OSX
-        SetWindowAlwaysOnTop(false);
+        SetAlwaysOnTop(false); // try-catch経由に統一
 #endif
     }
 }

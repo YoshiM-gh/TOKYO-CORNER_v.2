@@ -45,7 +45,7 @@ public class WeeklyCalendarUI : MonoBehaviour
     private const float NOTIME_ITEM_H  = 28f;
     private const int   NOTIME_VISIBLE = 3;    // 最大表示件数（超過 → 他N件）
     private const float MEMO_ROW_H     = 80f;  // 3行分の高さ (14pt対応)
-    private static readonly string[] POLICY_OPTIONS = { "", "ガンガンいこうぜ", "しっかりマイペース", "いろいろやろうぜ", "ととのえていこうぜ", "かいふくゆうせん", "ともだちだいじに", "かぞくをだいじに", "じぶんをだいじに", "こいびとだいじに" };
+    private static string[] POLICY_OPTIONS => PolicyOptions.All; // 単一ソース化(PolicyOptions.cs)。挙動不変
     private const float NOTIME_ROW_H   = 92f;  // 3行分 + 余白
     private float _hairline = 2f;   // 物理ピクセルにスナップ済みのヘアライン太さ（Refreshで更新）
 
