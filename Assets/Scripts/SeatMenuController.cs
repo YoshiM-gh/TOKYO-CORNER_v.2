@@ -159,7 +159,15 @@ public class SeatMenuController : MonoBehaviour
     private void OnFocus()
     {
         Close();
-        if (SceneRouter.Instance != null) SceneRouter.Instance.EnterFocus();
+        var seat = _seat;
+        if (PolicyPromptUI.Instance != null && SceneRouter.Instance != null)
+        {
+            // 儀式ループ: 方針が未設定の日のみ問いかけを挟む。「やめる」で着席メニューに戻す
+            PolicyPromptUI.Instance.OpenOrPass(
+                () => SceneRouter.Instance.EnterFocus(),
+                () => OpenFor(seat));
+        }
+        else if (SceneRouter.Instance != null) SceneRouter.Instance.EnterFocus();
     }
 
     private void OnStand()

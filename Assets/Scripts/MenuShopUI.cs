@@ -35,6 +35,8 @@ public class MenuShopUI : MonoBehaviour
     private bool _hotSelected = true;
     private MenuItemDef _pendingDef;
     private bool _pendingHot;
+    private Transform _staff;    // スタッフ経由の来店（見送りの一言に使う）
+    private bool _purchased;     // この来店で購入したか
     private readonly List<GameObject> _rows = new();
 
     private static readonly Color ColActive = new Color32(232, 237, 242, 255);
@@ -71,9 +73,13 @@ public class MenuShopUI : MonoBehaviour
 
     // ── 開閉 ──────────────────────────────────────────
 
-    public void Open()
+    public bool IsOpen => _panel != null && _panel.activeSelf;
+
+    public void Open(Transform staff = null)
     {
         if (_panel == null || IsSeatMenuOpen()) return;
+        _staff = staff;
+        _purchased = false;
         _tab = MenuCategory.Drink;
         CancelConfirm();
         _panel.SetActive(true);
@@ -83,7 +89,17 @@ public class MenuShopUI : MonoBehaviour
     public void Close()
     {
         CancelConfirm();
+        bool wasOpen = _panel != null && _panel.activeSelf;
         if (_panel != null) _panel.SetActive(false);
+        // スタッフ経由の来店なら見送りの一言（購入済み: ごゆっくり / 冷やかし: またどうぞ）
+        var staff = _staff;
+        _staff = null;
+        if (wasOpen && staff != null && DialogueUI.Instance != null)
+        {
+            var pi2 = staff.GetComponent<PurchaseInteractable>();
+            string sn = pi2 != null ? pi2.DisplayName : "店員";
+            DialogueUI.Instance.ShowLines(sn, new[] { _purchased ? "ごゆっくりどうぞ。" : "またどうぞ。" }, null, staff);
+        }
     }
 
     private void SetTab(MenuCategory tab)
@@ -252,6 +268,7 @@ public class MenuShopUI : MonoBehaviour
         if (def.category == MenuCategory.Drink && DrinkInventory.Instance != null && !DrinkInventory.Instance.CanPurchase()) { Refresh(); return; }
         if (def.category == MenuCategory.Food && FoodInventory.Instance != null && !FoodInventory.Instance.CanPurchase()) { Refresh(); return; }
         if (!SaveDataManager.Instance.TryPurchase(def)) { Refresh(); return; }
+        _purchased = true;
 
         string acquiredName = SaveDataManager.Instance.ResolveDisplayName(def);
         if (def.category == MenuCategory.Drink && DrinkInventory.Instance != null)
