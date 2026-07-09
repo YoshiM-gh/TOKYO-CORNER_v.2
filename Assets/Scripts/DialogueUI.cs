@@ -40,6 +40,7 @@ public class DialogueUI : MonoBehaviour
     private Transform _player; // 23_Businessman（自動取得・キャッシュ）
     private Behaviour _playerInput; // MovePlayerInput（会話中は移動をロック）
     private bool _playerInputWasEnabled = true; // ロック前の状態（解除時に復元・他システムと衝突しない）
+    private bool _movementLocked; // 再入ガード（連鎖ShowLinesでロック中のfalseを元値として上書きしないため）
 
     private string[] _lines;
     private int _lineIndex;
@@ -252,12 +253,17 @@ public class DialogueUI : MonoBehaviour
         if (_playerInput == null) return;
         if (locked)
         {
-            _playerInputWasEnabled = _playerInput.enabled;
+            if (!_movementLocked) // 初回ロック時のみ元値を保存（見送りセリフ等の連鎖ShowLinesで上書きしない）
+            {
+                _playerInputWasEnabled = _playerInput.enabled;
+                _movementLocked = true;
+            }
             _playerInput.enabled = false;
         }
-        else
+        else if (_movementLocked)
         {
             _playerInput.enabled = _playerInputWasEnabled; // 元の状態へ復元
+            _movementLocked = false;
         }
     }
 
