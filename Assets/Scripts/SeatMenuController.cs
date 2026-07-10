@@ -145,15 +145,24 @@ public class SeatMenuController : MonoBehaviour
     private void OnDrink()
     {
         var di = DrinkInventory.Instance;
-        if (di != null && di.HasAnySip()) di.TakeSip();
+        if (di != null && di.HasAnySip() && di.TakeSip()) ShowMealLine(di.LastSipLine);
         Refresh();
     }
 
     private void OnFood()
     {
         var fi = FoodInventory.Instance;
-        if (fi != null && fi.HasAnyBite()) fi.TakeBite();
+        if (fi != null && fi.HasAnyBite() && fi.TakeBite()) ShowMealLine(fi.LastBiteLine);
         Refresh();
+    }
+
+    /// <summary>食事の一言をプレイヤーのセリフとして会話UIで表示（話者名=登録した名前）</summary>
+    private void ShowMealLine(string line)
+    {
+        if (string.IsNullOrEmpty(line) || DialogueUI.Instance == null) return;
+        string speaker = SaveDataManager.Instance != null && !string.IsNullOrEmpty(SaveDataManager.Instance.PlayerName)
+            ? SaveDataManager.Instance.PlayerName : "わたし";
+        DialogueUI.Instance.ShowLines(speaker, new[] { line }, null, null, false, DialogueUI.PortraitSide.Left);
     }
 
     private void OnFocus()

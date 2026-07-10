@@ -90,7 +90,8 @@ public class DrinkInventory : MonoBehaviour
 
     public bool HasAnySip() => TotalSipsRemaining() > 0;
 
-    private const string SipMessage = "この一口がいつだって俺を奮い立たせてくれるんだ";
+    /// <summary>直近のTakeSipで選ばれた一言（呼び出し側が会話UIで表示）</summary>
+    public string LastSipLine { get; private set; } = "";
 
     /// <summary>古いドリンクから1口消費する。飲み切ったらリストから削除。</summary>
     public bool TakeSip()
@@ -100,7 +101,11 @@ public class DrinkInventory : MonoBehaviour
             if (drinks[i].sipsRemaining <= 0) continue;
             drinks[i].sipsRemaining--;
             int left = drinks[i].sipsRemaining;
-            Debug.Log($"[Drink] \"{SipMessage}\" | {drinks[i].displayName}: {left}/{drinks[i].sipsMax} sips left.");
+            // 一口=「美味しい」の一言 / 飲み切り=満腹で幸せな一言（オープニングで登録・未設定は既定値）
+            string line = SaveDataManager.Instance == null ? "……うまい。"
+                : (left == 0 ? SaveDataManager.Instance.FullLine : SaveDataManager.Instance.TastyLine);
+            LastSipLine = line;
+            Debug.Log($"[Drink] \"{line}\" | {drinks[i].displayName}: {left}/{drinks[i].sipsMax} sips left.");
             if (left == 0)
             {
                 Debug.Log($"[Drink] '{drinks[i].displayName}' finished and removed.");

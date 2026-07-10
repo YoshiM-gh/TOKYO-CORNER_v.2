@@ -10,7 +10,7 @@ using UnityEngine.EventSystems;
 [RequireComponent(typeof(Collider))]
 public class PurchaseInteractable : MonoBehaviour
 {
-    [SerializeField] private float interactRange = 2.5f;
+    [SerializeField] private float interactRange = 4f; // カウンター越しでも届く距離
     [SerializeField] private string staffName = "店員"; // ネームプレート表示名（キャラ名はシーンで設定）
 
     public string DisplayName => staffName;

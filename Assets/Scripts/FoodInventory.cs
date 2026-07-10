@@ -90,7 +90,8 @@ public class FoodInventory : MonoBehaviour
 
     public bool HasAnyBite() => TotalBitesRemaining() > 0;
 
-    private const string BiteMessage = "……うまい。";
+    /// <summary>直近のTakeBiteで選ばれた一言（呼び出し側が会話UIで表示）</summary>
+    public string LastBiteLine { get; private set; } = "";
 
     /// <summary>古いフードから1口消費する。食べ切ったらリストから削除。</summary>
     public bool TakeBite()
@@ -100,7 +101,11 @@ public class FoodInventory : MonoBehaviour
             if (foods[i].bitesRemaining <= 0) continue;
             foods[i].bitesRemaining--;
             int left = foods[i].bitesRemaining;
-            Debug.Log($"[Food] \"{BiteMessage}\" | {foods[i].displayName}: {left}/{foods[i].bitesMax} bites left.");
+            // 一口=「美味しい」の一言 / 最後の一口=満腹で幸せな一言（オープニングで登録・未設定は既定値）
+            string line = SaveDataManager.Instance == null ? "……うまい。"
+                : (left == 0 ? SaveDataManager.Instance.FullLine : SaveDataManager.Instance.TastyLine);
+            LastBiteLine = line;
+            Debug.Log($"[Food] \"{line}\" | {foods[i].displayName}: {left}/{foods[i].bitesMax} bites left.");
             if (left == 0)
             {
                 Debug.Log($"[Food] '{foods[i].displayName}' finished and removed.");

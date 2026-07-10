@@ -44,6 +44,20 @@ public class SceneRouter : MonoBehaviour
         BuildOverlay();
     }
 
+    /// <summary>初回起動判定: Cafe開始時に未登録ならオープニングへ。
+    /// SceneRouterは遅延生成(初回EnterFocusまで不在)のため、シーン配置不要の静的フックで行う。
+    /// AfterSceneLoad=全Awake後なのでSaveDataManager.Instanceは確定済み。</summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void CheckOpeningOnBoot()
+    {
+        if (SceneManager.GetActiveScene().name == CafeScene
+            && SaveDataManager.Instance != null
+            && !SaveDataManager.Instance.IsOpeningDone)
+        {
+            SceneManager.LoadScene("Opening");
+        }
+    }
+
     public void EnterFocus() { StartTransition(FocusScene); }
     public void ExitFocus() { StartTransition(CafeScene); }
 

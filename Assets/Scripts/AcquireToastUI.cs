@@ -39,9 +39,12 @@ public class AcquireToastUI : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    public void Show(string itemName)
+    public void Show(string itemName) => ShowRaw(itemName + " を手に入れた！");
+
+    /// <summary>定型文なしの生テキスト表示（食事の一言など）</summary>
+    public void ShowRaw(string text)
     {
-        if (label != null) label.text = itemName + " を手に入れた！";
+        if (label != null) label.text = text;
         _t = 0f;
         if (group != null) group.alpha = 0f;
     }

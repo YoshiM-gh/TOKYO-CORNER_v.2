@@ -41,6 +41,7 @@ public class DialogueUI : MonoBehaviour
     private Behaviour _playerInput; // MovePlayerInput（会話中は移動をロック）
     private bool _playerInputWasEnabled = true; // ロック前の状態（解除時に復元・他システムと衝突しない）
     private bool _movementLocked; // 再入ガード（連鎖ShowLinesでロック中のfalseを元値として上書きしないため）
+    private Transform _rightTarget; // 会話中のカメラ追従用（相手）
 
     private string[] _lines;
     private int _lineIndex;
@@ -170,6 +171,7 @@ public class DialogueUI : MonoBehaviour
 
     private void SetupPortraits(Transform rightTarget)
     {
+        _rightTarget = rightTarget;
         // 左: プレイヤー（自動取得）
         if (_player == null)
         {
@@ -224,20 +226,34 @@ public class DialogueUI : MonoBehaviour
     {
         cam.targetTexture = rt;
         img.texture = rt;
-        // 本人の顔の前にカメラを置く（バストアップ・その場のアニメがそのまま映る）
-        Vector3 face = target.position + Vector3.up * 1.4f;
-        cam.transform.position = face + target.forward * 1.15f + Vector3.up * 0.05f;
-        cam.transform.LookAt(face);
+        AimCameraAt(cam, target);
         cam.fieldOfView = 32f;
         cam.enabled = true;
     }
 
+    /// <summary>本人の顔の前にカメラを置く（毎フレーム追従・本人が動いても立ち絵から外れない）</summary>
+    private static void AimCameraAt(Camera cam, Transform target)
+    {
+        Vector3 face = target.position + Vector3.up * 1.4f;
+        cam.transform.position = face + target.forward * 1.15f + Vector3.up * 0.05f;
+        cam.transform.LookAt(face);
+    }
+
     private void TeardownPortraits()
     {
+        _rightTarget = null;
         if (_leftCam != null) { _leftCam.enabled = false; _leftCam.targetTexture = null; }
         if (_rightCam != null) { _rightCam.enabled = false; _rightCam.targetTexture = null; }
         if (_leftFrame != null) _leftFrame.SetActive(false);
         if (_rightFrame != null) _rightFrame.SetActive(false);
+    }
+
+    private void LateUpdate()
+    {
+        if (!IsOpen) return;
+        // 会話中はカメラを毎フレーム顔前に置き直す（開始位置ズレ・移動キャラでも常に本人を映す）
+        if (_leftCam != null && _leftCam.enabled && _player != null) AimCameraAt(_leftCam, _player);
+        if (_rightCam != null && _rightCam.enabled && _rightTarget != null) AimCameraAt(_rightCam, _rightTarget);
     }
 
     /// <summary>会話中のプレイヤー移動ロック（MovePlayerInputを無効化）</summary>
@@ -259,6 +275,9 @@ public class DialogueUI : MonoBehaviour
                 _movementLocked = true;
             }
             _playerInput.enabled = false;
+            // 入力を止めるだけではCharacterMoverが最終入力値で歩き続けるため、ゼロ入力を明示送信
+            var mover = _player.GetComponent<Controller.CharacterMover>();
+            if (mover != null) mover.SetInput(Vector2.zero, _player.position + _player.forward, false, false);
         }
         else if (_movementLocked)
         {
