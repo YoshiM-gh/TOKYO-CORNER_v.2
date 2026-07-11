@@ -29,6 +29,7 @@ public class SaveData
     public string tastyLine = "";          // 「美味しい」の一言（空=既定値）
     public string fullLine = "";           // 満腹で幸せな一言（空=既定値）
     public int guestNumber = 0;            // 仮ID（プロト:ローカル採番・初期化で振り直し）
+    public string avatarId = "";          // 選んだ見た目（ithappyプレハブ名・空=既定の23）
 
     public float cumulativeRoamingSeconds = 0f;
     public float cumulativeFocusSeconds = 0f;
@@ -381,6 +382,15 @@ public class SaveDataManager : MonoBehaviour
     public string TastyLine => string.IsNullOrEmpty(saveData.tastyLine) ? "……うまい。" : saveData.tastyLine;
     /// <summary>満腹で幸せな一言（未設定なら既定値）</summary>
     public string FullLine => string.IsNullOrEmpty(saveData.fullLine) ? "ごちそうさま。" : saveData.fullLine;
+
+    public string AvatarId => saveData.avatarId;
+
+    /// <summary>見た目（アバター）を保存。オープニング/将来の設定画面から呼ぶ</summary>
+    public void SetAvatar(string prefabName)
+    {
+        saveData.avatarId = prefabName ?? "";
+        Save();
+    }
 
     /// <summary>オープニング完了を保存し、仮ID（会員番号）を返す</summary>
     public int CompleteOpening(string playerName, bool drinkHot, string tastyLine, string fullLine)

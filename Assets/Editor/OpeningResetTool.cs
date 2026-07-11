@@ -31,6 +31,7 @@ public static class OpeningResetTool
         data.tastyLine = "";
         data.fullLine = "";
         data.guestNumber = 0;        // 再採番させる
+        data.avatarId = "";         // 見た目も選び直し
         data.specialDrinkHot = true; // 初期値へ
         data.playerDrinkName = "";  // コーナースペシャル命名クリア
         data.playerFoodName = "";

@@ -23,7 +23,10 @@ public class DialogueUI : MonoBehaviour
 
     private GameObject _panel;
     private Image _panelImg;         // hold中はraycastを透過させる
-    private TMPro.TMP_Text _nameLabel;
+    private TMPro.TMP_Text _plateLeftLabel;  // 立ち絵下ネームプレート（左=プレイヤー）
+    private Image _plateLeftBG;
+    private TMPro.TMP_Text _plateRightLabel; // 立ち絵下ネームプレート（右=相手）
+    private Image _plateRightBG;
     private TMPro.TMP_Text _bodyLabel;
     private GameObject _advanceCursor;
     private TMPro.TMP_Text _advanceTmp;
@@ -42,6 +45,9 @@ public class DialogueUI : MonoBehaviour
     private bool _playerInputWasEnabled = true; // ロック前の状態（解除時に復元・他システムと衝突しない）
     private bool _movementLocked; // 再入ガード（連鎖ShowLinesでロック中のfalseを元値として上書きしないため）
     private Transform _rightTarget; // 会話中のカメラ追従用（相手）
+    private const int PortraitLayerLeft = 30;  // 立ち絵撮影用の一時レイヤー（プレイヤー）
+    private const int PortraitLayerRight = 31; // 同（相手）
+    private readonly System.Collections.Generic.Dictionary<GameObject, int> _layerBackup = new System.Collections.Generic.Dictionary<GameObject, int>();
 
     private string[] _lines;
     private int _lineIndex;
@@ -90,7 +96,11 @@ public class DialogueUI : MonoBehaviour
         _onComplete = onComplete;
         _hold = holdAfterComplete;
         if (_panelImg != null) _panelImg.raycastTarget = true; // hold透過からの復帰
-        if (_nameLabel != null) _nameLabel.text = speaker ?? "";
+        // ネームプレート（立ち絵下）: 左=プレイヤーの登録名 / 右=相手（話者がRightのとき更新）
+        string pn = SaveDataManager.Instance != null && !string.IsNullOrEmpty(SaveDataManager.Instance.PlayerName)
+            ? SaveDataManager.Instance.PlayerName : "わたし";
+        if (_plateLeftLabel != null) _plateLeftLabel.text = pn;
+        if (speakerSide == PortraitSide.Right && _plateRightLabel != null) _plateRightLabel.text = speaker ?? "";
         _speakerSide = speakerSide;
         SetupPortraits(portraitTarget);
         SetPlayerMovementLocked(true); // 会話中は移動禁止（立ち絵カメラから外れない・所作としても自然）
@@ -117,7 +127,7 @@ public class DialogueUI : MonoBehaviour
         if (_typing)
         {
             StopTypingCo(); // タイプ中 → 全文即表示
-            if (_bodyLabel != null) _bodyLabel.text = _lines[_lineIndex];
+            if (_bodyLabel != null) _bodyLabel.text = FormatLine(_lines[_lineIndex]);
             ApplyHighlight(false);
             if (_advanceCursor != null) { _advanceCursor.SetActive(true); _blinkT = 0f; }
             return;
@@ -143,7 +153,16 @@ public class DialogueUI : MonoBehaviour
         ApplyHighlight(true); // セリフが流れている間だけ話者を立てる
         if (_advanceCursor != null) _advanceCursor.SetActive(false);
         StopTypingCo();
-        _typeCo = StartCoroutine(TypeRoutine(_lines[_lineIndex]));
+        _typeCo = StartCoroutine(TypeRoutine(FormatLine(_lines[_lineIndex])));
+    }
+
+    /// <summary>文末（。？！）で自動改行して読みやすくする</summary>
+    private static string FormatLine(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return s;
+        s = s.Replace("。", "。\n").Replace("？", "？\n").Replace("！", "！\n");
+        while (s.Contains("\n\n")) s = s.Replace("\n\n", "\n");
+        return s.TrimEnd('\n');
     }
 
     private IEnumerator TypeRoutine(string text)
@@ -193,6 +212,8 @@ public class DialogueUI : MonoBehaviour
         if (useLeft)
         {
             if (_leftRT == null) _leftRT = new RenderTexture(512, 640, 16) { name = "DialoguePortraitRT_L" };
+            SetPortraitLayer(_player, PortraitLayerLeft);
+            ConfigurePortraitCamera(_leftCam, PortraitLayerLeft);
             AimCamera(_leftCam, _leftRT, _leftImage, _player);
         }
         else if (_leftCam != null) _leftCam.enabled = false;
@@ -201,6 +222,8 @@ public class DialogueUI : MonoBehaviour
         if (useRight)
         {
             if (_rightRT == null) _rightRT = new RenderTexture(512, 640, 16) { name = "DialoguePortraitRT_R" };
+            SetPortraitLayer(rightTarget, PortraitLayerRight);
+            ConfigurePortraitCamera(_rightCam, PortraitLayerRight);
             AimCamera(_rightCam, _rightRT, _rightImage, rightTarget);
         }
         else if (_rightCam != null) _rightCam.enabled = false;
@@ -208,18 +231,42 @@ public class DialogueUI : MonoBehaviour
 
     }
 
-    /// <summary>話者ハイライト。speaking中のみ聞き手側を暗くし、待ち（間）は両方ニュートラルに戻す。</summary>
+    /// <summary>話者のネームプレートを点灯して「誰のセリフか」を示す（立ち絵は暗くしない）。</summary>
     private void ApplyHighlight(bool speaking)
     {
-        var dim = new Color(0.45f, 0.45f, 0.45f, 1f);
-        Color l = Color.white, r = Color.white;
-        if (speaking)
+        if (_leftImage != null) _leftImage.color = Color.white;
+        if (_rightImage != null) _rightImage.color = Color.white;
+        bool leftIsSpeaker = _speakerSide == PortraitSide.Left;
+        SetPlate(_plateLeftBG, _plateLeftLabel, leftIsSpeaker);
+        SetPlate(_plateRightBG, _plateRightLabel, !leftIsSpeaker);
+    }
+
+    /// <summary>プレートの点灯/消灯（点灯=金地に濃紺文字）</summary>
+    private static void SetPlate(Image bg, TMPro.TMP_Text label, bool active)
+    {
+        if (bg != null) bg.color = active ? (Color)new Color32(232, 200, 120, 255) : (Color)new Color32(35, 43, 51, 245);
+        if (label != null) label.color = active ? (Color)new Color32(24, 29, 36, 255) : (Color)new Color32(139, 152, 165, 255);
+    }
+
+    /// <summary>立ち絵カメラを「専用レイヤーのキャラだけ映す」設定にする。
+    /// 超接近時に相手の背中がカメラを塞ぐ・カウンターが遮る等の映り込みを構造的に排除する。</summary>
+    private static void ConfigurePortraitCamera(Camera cam, int layer)
+    {
+        cam.cullingMask = 1 << layer;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color32(26, 31, 38, 255); // 会話パネルと馴染む濃紺
+    }
+
+    /// <summary>キャラのツリー全体を一時レイヤーへ（元レイヤーはbackupに記録し、Teardownで復元）</summary>
+    private void SetPortraitLayer(Transform root, int layer)
+    {
+        if (root == null) return;
+        foreach (var tr in root.GetComponentsInChildren<Transform>(true))
         {
-            if (_speakerSide == PortraitSide.Right) l = dim;
-            else if (_speakerSide == PortraitSide.Left) r = dim;
+            var go = tr.gameObject;
+            if (!_layerBackup.ContainsKey(go)) _layerBackup[go] = go.layer; // 連鎖ShowLinesでも元値を保つ
+            go.layer = layer;
         }
-        if (_leftImage != null) _leftImage.color = l;
-        if (_rightImage != null) _rightImage.color = r;
     }
 
     private static void AimCamera(Camera cam, RenderTexture rt, RawImage img, Transform target)
@@ -242,6 +289,8 @@ public class DialogueUI : MonoBehaviour
     private void TeardownPortraits()
     {
         _rightTarget = null;
+        foreach (var kv in _layerBackup) if (kv.Key != null) kv.Key.layer = kv.Value; // レイヤー復元
+        _layerBackup.Clear();
         if (_leftCam != null) { _leftCam.enabled = false; _leftCam.targetTexture = null; }
         if (_rightCam != null) { _rightCam.enabled = false; _rightCam.targetTexture = null; }
         if (_leftFrame != null) _leftFrame.SetActive(false);
@@ -304,8 +353,12 @@ public class DialogueUI : MonoBehaviour
         var p = FindDeep(transform, "Panel");
         _panel = p != null ? p.gameObject : null;
         _panelImg = _panel != null ? _panel.GetComponent<Image>() : null;
-        var nl = FindDeep(transform, "NameLabel");
-        _nameLabel = nl != null ? nl.GetComponent<TMPro.TMP_Text>() : null;
+        var plL = FindDeep(transform, "NamePlateLeft");
+        _plateLeftBG = plL != null ? plL.GetComponent<Image>() : null;
+        _plateLeftLabel = plL != null ? plL.GetComponentInChildren<TMPro.TMP_Text>(true) : null;
+        var plR = FindDeep(transform, "NamePlateRight");
+        _plateRightBG = plR != null ? plR.GetComponent<Image>() : null;
+        _plateRightLabel = plR != null ? plR.GetComponentInChildren<TMPro.TMP_Text>(true) : null;
         var bl = FindDeep(transform, "BodyLabel");
         _bodyLabel = bl != null ? bl.GetComponent<TMPro.TMP_Text>() : null;
         var ac = FindDeep(transform, "AdvanceCursor");

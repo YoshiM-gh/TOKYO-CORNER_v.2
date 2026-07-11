@@ -14,6 +14,11 @@ using UnityEngine.UI;
 public class OpeningFlow : MonoBehaviour
 {
     [SerializeField] private float charInterval = 0.04f;
+    [SerializeField] private AvatarCatalog catalog; // 見た目選択の台帳（Openingシーンで割当）
+
+    private GameObject[] _avatarPreviews;
+    private int _avatarIndex;
+    private string _avatarLabel = "";
 
     private TMPro.TMP_Text _body;
     private GameObject _advanceGO;
@@ -40,6 +45,7 @@ public class OpeningFlow : MonoBehaviour
     {
         Bind();
         HideInputs();
+        SetupAvatarPreviews();
         if (_advanceGO != null) _advanceGO.SetActive(false);
         StartCoroutine(Flow());
     }
@@ -60,6 +66,10 @@ public class OpeningFlow : MonoBehaviour
         yield return Say("TOKYO CORNERへようこそ。");
         yield return Say("わたしはナギ。この店の記録係です。");
         yield return Say("開店の前に、あなたの登録を行います。");
+
+        yield return Say("まず、あなたの見た目を教えてください。");
+        yield return AskAvatar();
+        yield return Say(_avatarLabel + "、ですね。");
 
         yield return Say("お名前を教えてください。");
         yield return AskInput(v => _name = v, 8, false, "（8文字まで）");
@@ -165,6 +175,78 @@ public class OpeningFlow : MonoBehaviour
         _choiceClicked = 0;
         _choiceAGO.SetActive(false);
         _choiceBGO.SetActive(false);
+    }
+
+    /// <summary>カルーセルのプレビュー6体を生成（ナギの隣・カメラ向き・全て非表示）</summary>
+    private void SetupAvatarPreviews()
+    {
+        if (catalog == null || catalog.entries == null) return;
+        _avatarPreviews = new GameObject[catalog.entries.Length];
+        for (int i = 0; i < catalog.entries.Length; i++)
+        {
+            var e = catalog.entries[i];
+            if (e == null || e.prefab == null) continue;
+            var go = Instantiate(e.prefab, new Vector3(-1.35f, 0f, 0f), Quaternion.Euler(0f, 180f, 0f));
+            go.name = "AvatarPreview_" + e.prefab.name;
+            go.SetActive(false);
+            _avatarPreviews[i] = go;
+        }
+    }
+
+    private void ShowAvatarPreview(int index)
+    {
+        if (_avatarPreviews == null) return;
+        for (int i = 0; i < _avatarPreviews.Length; i++)
+            if (_avatarPreviews[i] != null) _avatarPreviews[i].SetActive(i == index);
+    }
+
+    /// <summary>見た目選択（◀▶で切替・決定で確定）。Fortnite/Diablo式カルーセル。矢印キー対応。</summary>
+    private IEnumerator AskAvatar()
+    {
+        if (catalog == null || catalog.entries == null || catalog.entries.Length == 0) yield break;
+        _choiceClicked = 0;
+        _okClicked = false;
+        if (_choiceALabel != null) _choiceALabel.text = "◀";
+        if (_choiceBLabel != null) _choiceBLabel.text = "▶";
+        _choiceAGO.SetActive(true);
+        _choiceBGO.SetActive(true);
+        _okGO.SetActive(true);
+        _avatarIndex = Mathf.Clamp(_avatarIndex, 0, catalog.entries.Length - 1);
+        ShowAvatarPreview(_avatarIndex);
+        bool done = false;
+        while (!done)
+        {
+            int move = 0;
+            if (_choiceClicked == 1) move = -1;
+            else if (_choiceClicked == 2) move = +1;
+            _choiceClicked = 0;
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb != null)
+            {
+                if (kb.leftArrowKey.wasPressedThisFrame) move = -1;
+                if (kb.rightArrowKey.wasPressedThisFrame) move = +1;
+            }
+            if (move != 0)
+            {
+                int n = catalog.entries.Length;
+                _avatarIndex = (_avatarIndex + move + n) % n;
+                ShowAvatarPreview(_avatarIndex);
+            }
+            if (_okClicked)
+            {
+                _okClicked = false;
+                var e = catalog.entries[_avatarIndex];
+                _avatarLabel = e != null ? e.label : "";
+                if (SaveDataManager.Instance != null && e != null && e.prefab != null)
+                    SaveDataManager.Instance.SetAvatar(e.prefab.name);
+                done = true;
+            }
+            if (!done) yield return null;
+        }
+        _choiceAGO.SetActive(false);
+        _choiceBGO.SetActive(false);
+        _okGO.SetActive(false);
+        // 選んだ姿はナギの隣に立たせたまま面接を続ける（あなたがそこに居る）
     }
 
     private void HideInputs()
