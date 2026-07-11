@@ -12,9 +12,12 @@ public class AvatarCatalog : ScriptableObject
     {
         public GameObject prefab; // ithappyキャラプレハブ
         public string label;      // 表示名（おにいさん等・ナギの復唱にも使用）
+        public Avatar avatar;     // 体型別Avatar（Adult/Senior/Child…素プレハブはAnimator無しのため必須）
     }
 
     public Entry[] entries;
+
+    public RuntimeAnimatorController idleController; // プレビュー用（オープニングで棒立ちさせないため）
 
     public Entry FindByPrefabName(string prefabName)
     {

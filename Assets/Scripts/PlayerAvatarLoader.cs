@@ -33,15 +33,20 @@ public class PlayerAvatarLoader : MonoBehaviour
         var neo = Instantiate(entry.prefab, old.transform.position, old.transform.rotation);
         neo.tag = old.tag;
 
+        // Animator: 移動コントローラを【先に】設定する。
+        // CharacterMover.Awake(AddComponent時に即実行)が BuildAnimatorTargets で
+        // 親Animatorのcontrollerを全子パーツへ配布するため、後から設定すると全身Tポーズになる。
+        var oldAn = old.GetComponent<Animator>();
+        var neoAn = neo.GetComponent<Animator>();
+        if (neoAn == null) neoAn = neo.AddComponent<Animator>(); // 素プレハブはAnimator無し（Transformのみ）
+        if (oldAn != null) neoAn.runtimeAnimatorController = oldAn.runtimeAnimatorController;
+        if (entry.avatar != null) neoAn.avatar = entry.avatar; // 体型別Avatar（Adult/Senior/Child）
+
         // 機能コンポーネントの移植（順序: CC → Mover → Input。Input内のMover参照は新体側へ付け替わる）
         CopyComponentTo(old, neo, typeof(CharacterController));
         CopyComponentTo(old, neo, System.Type.GetType("Controller.CharacterMover, Assembly-CSharp"));
         CopyComponentTo(old, neo, System.Type.GetType("Controller.MovePlayerInput, Assembly-CSharp"));
         CopyComponentTo(old, neo, System.Type.GetType("SitPoseHotkeyDebug, Assembly-CSharp"));
-
-        var oldAn = old.GetComponent<Animator>();
-        var neoAn = neo.GetComponent<Animator>();
-        if (oldAn != null && neoAn != null) neoAn.runtimeAnimatorController = oldAn.runtimeAnimatorController;
 
         // カメラの追従先を差し替え（ithappy公式API）
         foreach (var cam in FindObjectsByType<Controller.PlayerCamera>(FindObjectsSortMode.None))
@@ -50,6 +55,10 @@ public class PlayerAvatarLoader : MonoBehaviour
         // シーン内の旧体参照（CameraFollow.target・URP VolumeTrigger等）を新体へ付け替え
         ReplaceSceneReferences(old, neo);
 
+        // Destroyは遅延実行のため、同フレーム内の他スクリプト(Interactable等)のStart時Findが
+        // 旧体を掴まないよう即座に隠す（destroyed参照は==null扱いでクリック判定が静かに死ぬ）
+        old.name = "OldPlayerBody(Destroying)";
+        old.SetActive(false);
         Destroy(old);
         neo.name = "23_Businessman";
         Debug.Log("[AvatarLoader] player avatar -> " + entry.prefab.name + " (" + entry.label + ")");

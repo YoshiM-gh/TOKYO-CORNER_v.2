@@ -13,15 +13,22 @@ MonoBehaviour:
   m_Name: AvatarCatalog
   m_EditorClassIdentifier: Assembly-CSharp::AvatarCatalog
   entries:
-  - prefab: {fileID: 5313301363095490188, guid: e65e6cfaf99d1c147adadcfda301af35, type: 3}
-    label: "\u304A\u306B\u3044\u3055\u3093"
-  - prefab: {fileID: 5728126844746850923, guid: bf3ed92612d886c4997e53b7a00858a4, type: 3}
-    label: "\u304A\u306D\u3048\u3055\u3093"
   - prefab: {fileID: 8100943956934522936, guid: 83779f852649b7945a3b0361f9be1fed, type: 3}
-    label: "\u304A\u3058\u3055\u3093"
+    label: "\u304A\u3058\u3044\u3055\u3093"
+    avatar: {fileID: 9000000, guid: 9af8f1cc5c41e084ebb1ea74e9e09272, type: 3}
   - prefab: {fileID: 5356149970950997916, guid: 1ff0a97a1eb0a2b44aff3ef1122e494f, type: 3}
+    label: "\u304A\u3070\u3042\u3055\u3093"
+    avatar: {fileID: 9000000, guid: 9af8f1cc5c41e084ebb1ea74e9e09272, type: 3}
+  - prefab: {fileID: 6209069977280005589, guid: 328cc9f60937f3044be8fe03ec0e768c, type: 3}
+    label: "\u304A\u3058\u3055\u3093"
+    avatar: {fileID: 9000000, guid: 8ef54e699c9481e4288e6dbe54c9c316, type: 3}
+  - prefab: {fileID: 344900350259553414, guid: 332b6e3e5e73aa647b75f2f0a72bbe6e, type: 3}
     label: "\u304A\u3070\u3055\u3093"
-  - prefab: {fileID: 3359365567355396324, guid: 82a7e040b3595b643ae093ce6005fa5c, type: 3}
-    label: "\u7537\u306E\u5B50"
-  - prefab: {fileID: 4798181073414428554, guid: 8dd80be17b0b15d468fe2e60844bf7c8, type: 3}
-    label: "\u5973\u306E\u5B50"
+    avatar: {fileID: 9000000, guid: 8ef54e699c9481e4288e6dbe54c9c316, type: 3}
+  - prefab: {fileID: 5313301363095490188, guid: e65e6cfaf99d1c147adadcfda301af35, type: 3}
+    label: "\u305B\u3044\u306D\u3093\u3060\u3093\u305B\u3044"
+    avatar: {fileID: 9000000, guid: 509e9ce93ce95e64a9c3c3ea2bb6dc1a, type: 3}
+  - prefab: {fileID: 5728126844746850923, guid: bf3ed92612d886c4997e53b7a00858a4, type: 3}
+    label: "\u305B\u3044\u306D\u3093\u3058\u3087\u305B\u3044"
+    avatar: {fileID: 9000000, guid: 509e9ce93ce95e64a9c3c3ea2bb6dc1a, type: 3}
+  idleController: {fileID: 9100000, guid: 7cd9cc51e2228274b992cdc426c6d87f, type: 2}

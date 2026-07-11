@@ -188,8 +188,29 @@ public class OpeningFlow : MonoBehaviour
             if (e == null || e.prefab == null) continue;
             var go = Instantiate(e.prefab, new Vector3(-1.35f, 0f, 0f), Quaternion.Euler(0f, 180f, 0f));
             go.name = "AvatarPreview_" + e.prefab.name;
+            ApplyPreviewAnimators(go, catalog.idleController, e.avatar); // 素プレハブはAnimator無し→棒立ち防止
             go.SetActive(false);
             _avatarPreviews[i] = go;
+        }
+    }
+
+    /// <summary>プレビューへAnimator配布（ithappy素プレハブは子パーツごとの独立スケルトン方式。
+    /// CharacterMover.BuildAnimatorTargetsと同じ対象=ルート+SMR持ち直下子に controller+avatar を設定）</summary>
+    private static void ApplyPreviewAnimators(GameObject go, RuntimeAnimatorController ctrl, Avatar avatar)
+    {
+        if (ctrl == null) return;
+        var targets = new System.Collections.Generic.List<Transform> { go.transform };
+        for (int i = 0; i < go.transform.childCount; i++)
+        {
+            var c = go.transform.GetChild(i);
+            if (c.GetComponentInChildren<SkinnedMeshRenderer>(true) != null) targets.Add(c);
+        }
+        foreach (var t in targets)
+        {
+            var an = t.GetComponent<Animator>();
+            if (an == null) an = t.gameObject.AddComponent<Animator>();
+            an.runtimeAnimatorController = ctrl;
+            if (avatar != null) an.avatar = avatar;
         }
     }
 
