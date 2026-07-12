@@ -28,8 +28,8 @@ public static class OpeningResetTool
         var data = JsonUtility.FromJson<SaveData>(json);
         data.openingDone = false;
         data.playerName = "";
-        data.tastyLine = "";
-        data.fullLine = "";
+        data.drinkLine = "";
+        data.foodLine = "";
         data.guestNumber = 0;        // 再採番させる
         data.avatarId = "";         // 見た目も選び直し
         data.specialDrinkHot = true; // 初期値へ

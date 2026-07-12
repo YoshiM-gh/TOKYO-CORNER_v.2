@@ -38,7 +38,7 @@ public class OpeningFlow : MonoBehaviour
     private float _blinkT;
 
     // 収集データ
-    private string _name = "", _drink = "", _food = "", _tasty = "", _full = "";
+    private string _name = "", _drink = "", _food = "", _drinkLine = "", _foodLine = "";
     private bool _hot = true;
 
     private void Start()
@@ -68,6 +68,7 @@ public class OpeningFlow : MonoBehaviour
         yield return Say("開店の前に、あなたの登録を行います。");
 
         yield return Say("まず、あなたの見た目を教えてください。");
+        yield return SlideNagiAside(); // ナギが右奥へ譲る（主役交代の演出）
         yield return AskAvatar();
         yield return Say(_avatarLabel + "、ですね。");
 
@@ -85,11 +86,11 @@ public class OpeningFlow : MonoBehaviour
         yield return AskInput(v => _food = v, 12, false, "（ここに入力）");
         yield return Say(_drink + "と" + _food + "。控えました。");
 
-        yield return Say("おいしいものを口にしたとき、あなたは何と言いますか。");
+        yield return Say("美味しいドリンクを口にしたとき、あなたは何と言いますか。");
         yield return Say("思いつかなければ、空欄で構いません。");
-        yield return AskInput(v => _tasty = v, 20, true, "（空欄でも可）");
-        yield return Say("では、満腹で幸せなときは。");
-        yield return AskInput(v => _full = v, 20, true, "（空欄でも可）");
+        yield return AskInput(v => _drinkLine = v, 20, true, "（空欄でも可）");
+        yield return Say("では、美味しいフードのときは。");
+        yield return AskInput(v => _foodLine = v, 20, true, "（空欄でも可）");
 
         int guestNo = 0;
         var sdm = SaveDataManager.Instance;
@@ -97,20 +98,69 @@ public class OpeningFlow : MonoBehaviour
         {
             sdm.SetPlayerMenuName(MenuCategory.Drink, _drink);
             sdm.SetPlayerMenuName(MenuCategory.Food, _food);
-            guestNo = sdm.CompleteOpening(_name, _hot, _tasty, _full);
+            guestNo = sdm.CompleteOpening(_name, _hot, _drinkLine, _foodLine);
         }
 
         yield return Say("登録が完了しました。");
         yield return Say("あなたはこの店の、" + guestNo + "番目のお客様です。");
+        // ナギのバイバイ（子パーツ分散Animatorにも撒く）
+        var nagiGo = GameObject.Find("Nagi");
+        if (nagiGo != null)
+            foreach (var an in nagiGo.GetComponentsInChildren<Animator>(true))
+                an.SetTrigger("Wave");
+        // 選んだ姿は嬉しくて小躍り（ナギの真顔バイバイとの対比）
+        if (_avatarPreviews != null && _avatarIndex >= 0 && _avatarIndex < _avatarPreviews.Length && _avatarPreviews[_avatarIndex] != null)
+            foreach (var an2 in _avatarPreviews[_avatarIndex].GetComponentsInChildren<Animator>(true))
+                an2.SetTrigger("Cheer");
         yield return Say("それでは——ごゆっくり。");
         UnityEngine.SceneManagement.SceneManager.LoadScene("Cafe");
     }
 
     // ── プリミティブ ──────────────────────────────────────
 
+    /// <summary>1行に収まるなら触らず、溢れる時だけ句読点（。、？！）でセグメント化して詰め直す。
+    /// 語中の不自然な折り返しを防ぎつつ、短文の無駄な改行も避ける。</summary>
+    private static string FormatOpeningLine(string s)
+    {
+        const float MaxLineUnits = 20f; // 全角換算の1行上限（Box幅720/30pxから）
+        if (string.IsNullOrEmpty(s)) return s;
+        if (UnitsOf(s) <= MaxLineUnits) return s; // 収まるなら改行しない
+
+        // 句読点でセグメント化（区切り文字は末尾に残す）
+        var segs = new System.Collections.Generic.List<string>();
+        var cur = new System.Text.StringBuilder();
+        foreach (char c in s)
+        {
+            cur.Append(c);
+            if (c == '。' || c == '、' || c == '？' || c == '！') { segs.Add(cur.ToString()); cur.Length = 0; }
+        }
+        if (cur.Length > 0) segs.Add(cur.ToString());
+
+        // 貪欲詰め: 行に収まる限り連結、溢れたら改行
+        var outLines = new System.Collections.Generic.List<string>();
+        string line = "";
+        foreach (var seg in segs)
+        {
+            if (line.Length == 0) { line = seg; continue; }
+            if (UnitsOf(line) + UnitsOf(seg) <= MaxLineUnits) line += seg;
+            else { outLines.Add(line); line = seg; }
+        }
+        if (line.Length > 0) outLines.Add(line);
+        return string.Join("\n", outLines);
+    }
+
+    /// <summary>全角=1/半角=0.5の表示幅換算</summary>
+    private static float UnitsOf(string s)
+    {
+        float u = 0f;
+        foreach (char c in s) u += c <= 0x7F ? 0.5f : 1f;
+        return u;
+    }
+
     /// <summary>セリフをタイプライター表示し、クリック送りを待つ</summary>
     private IEnumerator Say(string text)
     {
+        text = FormatOpeningLine(text); // 句読点で改行（読みやすさ優先・語中折返し防止）
         _advanceClicked = false;
         if (_advanceGO != null) _advanceGO.SetActive(false);
         _typing = true;
@@ -186,7 +236,7 @@ public class OpeningFlow : MonoBehaviour
         {
             var e = catalog.entries[i];
             if (e == null || e.prefab == null) continue;
-            var go = Instantiate(e.prefab, new Vector3(-1.35f, 0f, 0f), Quaternion.Euler(0f, 180f, 0f));
+            var go = Instantiate(e.prefab, new Vector3(0.6f, 0f, 0f), Quaternion.identity); // 中央やや左・カメラ正面
             go.name = "AvatarPreview_" + e.prefab.name;
             ApplyPreviewAnimators(go, catalog.idleController, e.avatar); // 素プレハブはAnimator無し→棒立ち防止
             go.SetActive(false);
@@ -214,6 +264,27 @@ public class OpeningFlow : MonoBehaviour
         }
     }
 
+    /// <summary>ナギを右奥へゆっくりスライド（遠近で約1/2サイズに・以後そのまま）</summary>
+    private IEnumerator SlideNagiAside()
+    {
+        var nagi = GameObject.Find("Nagi");
+        if (nagi == null) yield break;
+        Vector3 from = nagi.transform.position;
+        Vector3 to = new Vector3(-2.2f, 0f, -5.0f); // 画面右・奥
+        float dur = 1.2f;
+        float tm = 0f;
+        bool done = false;
+        while (!done)
+        {
+            tm += Time.deltaTime;
+            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(tm / dur));
+            nagi.transform.position = Vector3.Lerp(from, to, k);
+            if (tm >= dur) done = true;
+            else yield return null;
+        }
+        nagi.transform.position = to;
+    }
+
     private void ShowAvatarPreview(int index)
     {
         if (_avatarPreviews == null) return;
@@ -229,6 +300,13 @@ public class OpeningFlow : MonoBehaviour
         _okClicked = false;
         if (_choiceALabel != null) _choiceALabel.text = "◀";
         if (_choiceBLabel != null) _choiceBLabel.text = "▶";
+        var rtA = _choiceAGO.GetComponent<UnityEngine.RectTransform>();
+        var rtB = _choiceBGO.GetComponent<UnityEngine.RectTransform>();
+        var rtOK = _okGO.GetComponent<UnityEngine.RectTransform>();
+        Vector2 posA = rtA.anchoredPosition, posB = rtB.anchoredPosition, posOK = rtOK.anchoredPosition;
+        rtA.anchoredPosition = new Vector2(-190f, 22f);  // ◀ ▶ 決定 を横一列（重なり防止）
+        rtB.anchoredPosition = new Vector2(0f, 22f);
+        rtOK.anchoredPosition = new Vector2(190f, 22f);
         _choiceAGO.SetActive(true);
         _choiceBGO.SetActive(true);
         _okGO.SetActive(true);
@@ -267,6 +345,7 @@ public class OpeningFlow : MonoBehaviour
         _choiceAGO.SetActive(false);
         _choiceBGO.SetActive(false);
         _okGO.SetActive(false);
+        rtA.anchoredPosition = posA; rtB.anchoredPosition = posB; rtOK.anchoredPosition = posOK; // 位置復元（温度2択・入力用）
         // 選んだ姿はナギの隣に立たせたまま面接を続ける（あなたがそこに居る）
     }
 

@@ -103,7 +103,7 @@ public class DrinkInventory : MonoBehaviour
             int left = drinks[i].sipsRemaining;
             // 一口=「美味しい」の一言 / 飲み切り=満腹で幸せな一言（オープニングで登録・未設定は既定値）
             string line = SaveDataManager.Instance == null ? "……うまい。"
-                : (left == 0 ? SaveDataManager.Instance.FullLine : SaveDataManager.Instance.TastyLine);
+                : SaveDataManager.Instance.DrinkLine;
             LastSipLine = line;
             Debug.Log($"[Drink] \"{line}\" | {drinks[i].displayName}: {left}/{drinks[i].sipsMax} sips left.");
             if (left == 0)

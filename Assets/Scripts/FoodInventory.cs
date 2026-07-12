@@ -103,7 +103,7 @@ public class FoodInventory : MonoBehaviour
             int left = foods[i].bitesRemaining;
             // 一口=「美味しい」の一言 / 最後の一口=満腹で幸せな一言（オープニングで登録・未設定は既定値）
             string line = SaveDataManager.Instance == null ? "……うまい。"
-                : (left == 0 ? SaveDataManager.Instance.FullLine : SaveDataManager.Instance.TastyLine);
+                : SaveDataManager.Instance.FoodLine;
             LastBiteLine = line;
             Debug.Log($"[Food] \"{line}\" | {foods[i].displayName}: {left}/{foods[i].bitesMax} bites left.");
             if (left == 0)

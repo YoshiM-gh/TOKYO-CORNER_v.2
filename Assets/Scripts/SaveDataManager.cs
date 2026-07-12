@@ -26,8 +26,8 @@ public class SaveData
     public bool openingDone = false;
     public string playerName = "";        // ローカルのみ・いつでも変更可
     public bool specialDrinkHot = true;    // コーナースペシャル〈ドリンク〉の温度
-    public string tastyLine = "";          // 「美味しい」の一言（空=既定値）
-    public string fullLine = "";           // 満腹で幸せな一言（空=既定値）
+    public string drinkLine = "";          // 「美味しい」の一言（空=既定値）
+    public string foodLine = "";           // 満腹で幸せな一言（空=既定値）
     public int guestNumber = 0;            // 仮ID（プロト:ローカル採番・初期化で振り直し）
     public string avatarId = "";          // 選んだ見た目（ithappyプレハブ名・空=既定の23）
 
@@ -379,9 +379,9 @@ public class SaveDataManager : MonoBehaviour
     public bool IsOpeningDone => saveData.openingDone;
     public string PlayerName => saveData.playerName;
     /// <summary>「美味しい」の一言（未設定なら既定値）</summary>
-    public string TastyLine => string.IsNullOrEmpty(saveData.tastyLine) ? "……うまい。" : saveData.tastyLine;
+    public string DrinkLine => string.IsNullOrEmpty(saveData.drinkLine) ? "……うまい。" : saveData.drinkLine;
     /// <summary>満腹で幸せな一言（未設定なら既定値）</summary>
-    public string FullLine => string.IsNullOrEmpty(saveData.fullLine) ? "ごちそうさま。" : saveData.fullLine;
+    public string FoodLine => string.IsNullOrEmpty(saveData.foodLine) ? "……うまい。" : saveData.foodLine;
 
     public string AvatarId => saveData.avatarId;
 
@@ -393,12 +393,12 @@ public class SaveDataManager : MonoBehaviour
     }
 
     /// <summary>オープニング完了を保存し、仮ID（会員番号）を返す</summary>
-    public int CompleteOpening(string playerName, bool drinkHot, string tastyLine, string fullLine)
+    public int CompleteOpening(string playerName, bool drinkHot, string drinkLine, string foodLine)
     {
         saveData.playerName = playerName ?? "";
         saveData.specialDrinkHot = drinkHot;
-        saveData.tastyLine = tastyLine ?? "";
-        saveData.fullLine = fullLine ?? "";
+        saveData.drinkLine = drinkLine ?? "";
+        saveData.foodLine = foodLine ?? "";
         if (saveData.guestNumber <= 0) saveData.guestNumber = UnityEngine.Random.Range(1000, 10000); // 仮ID採番
         saveData.openingDone = true;
         Save();
