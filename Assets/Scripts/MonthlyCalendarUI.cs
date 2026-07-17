@@ -391,6 +391,7 @@ private void SetCellEmpty(GameObject cell)
                 var moreTxt = moreTxtGO.AddComponent<TextMeshProUGUI>();
                 moreTxt.text      = $"他 {overflow} 件";
                 moreTxt.fontSize  = UITheme_FocusMode.FontMoreLabel;
+        UIFonts.ApplySmall(moreTxt);
                 moreTxt.color     = UITheme_FocusMode.AccentSatBlue;
                 moreTxt.alignment = TextAlignmentOptions.MidlineLeft;
                 // クリックでポップアップ
@@ -471,6 +472,7 @@ private void SetCellEmpty(GameObject cell)
         txtRT.offsetMax = new Vector2(-4f, -2f);
         var txt    = txtGO.AddComponent<TextMeshProUGUI>();
         txt.fontSize  = UITheme_FocusMode.FontChipTitle;
+        UIFonts.ApplySmall(txt);
         txt.text      = UITextUtil.EllipsizeOneLine(txt, ev.title, chipWidth - 14f); // 左10+右4を除いた幅で「…」省略
         txt.color     = Color.white;
         txt.alignment = TextAlignmentOptions.MidlineLeft;  // 縦中央

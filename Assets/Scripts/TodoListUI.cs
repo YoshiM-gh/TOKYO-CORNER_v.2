@@ -488,7 +488,18 @@ public class TodoListUI : MonoBehaviour
         var more = NewUI("MoreBtn", row.transform);
         var moreImg = more.AddComponent<Image>(); moreImg.color = Color.clear;
         var moreLE = more.AddComponent<LayoutElement>(); moreLE.minWidth = 30; moreLE.preferredWidth = 30; moreLE.minHeight = 30;
-        var moreTxt = NewText("Dots", more.transform, "…", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextMuted);
+                // 「→」翌日送り（期限切れタスクのみ・Todoタブ用）
+        if (!done && HasDateBefore(item, today))
+        {
+            BuildReorderButton(row.transform, "→", true, () =>
+            {
+                NotebookManager.Instance?.MoveTodoToNextDay(item.id);
+                Rebuild();
+            });
+        }
+
+        
+var moreTxt = NewText("Dots", more.transform, "…", UITheme_FocusMode.FontChipTitle, UITheme_FocusMode.TextMuted);
         moreTxt.alignment = TextAlignmentOptions.Center;
         var moreTxtRT = moreTxt.GetComponent<RectTransform>(); moreTxtRT.anchorMin = Vector2.zero; moreTxtRT.anchorMax = Vector2.one; moreTxtRT.offsetMin = Vector2.zero; moreTxtRT.offsetMax = Vector2.zero;
         var moreBtn = more.AddComponent<Button>(); moreBtn.transition = Selectable.Transition.None; moreBtn.targetGraphic = moreImg;
@@ -597,8 +608,8 @@ public class TodoListUI : MonoBehaviour
             });
         }
 
-        // 「→」翌日送り（Daily の当日タスクのみ）。押すと即・翌日へ（確認なし）。
-        if (displayMode == TodoDisplayMode.DailyToday && !done && IsOnDate(item, today))
+        // 「→」翌日送り（Daily の当日タスク・期限切れタスクともに）。押すと即・翌日へ（確認なし）。
+        if (displayMode == TodoDisplayMode.DailyToday && !done && (IsOnDate(item, today) || HasDateBefore(item, today)))
         {
             BuildReorderButton(row.transform, "\u2192", true, () => // →
             {
@@ -966,6 +977,7 @@ public class TodoListUI : MonoBehaviour
         tmp.font = font != null ? font : TMP_Settings.defaultFontAsset;
         tmp.text = text;
         tmp.fontSize = size;
+        UIFonts.ApplySmall(tmp); // 小さい文字は可読性優先フォントに
         tmp.color = color;
         tmp.raycastTarget = false;
         tmp.overflowMode = TextOverflowModes.Overflow;

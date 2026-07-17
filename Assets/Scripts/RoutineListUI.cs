@@ -131,7 +131,7 @@ public class RoutineListUI : MonoBehaviour
 
         var row = NewUI("Row_" + item.id, listContent);
         var rowImg = row.AddComponent<Image>();
-        rowImg.color = selected ? UITheme_FocusMode.SelectedBG : done ? UITheme_FocusMode.DoneBG : UITheme_FocusMode.PanelBG;
+        rowImg.color = selected ? new Color(0.31f, 0.55f, 0.95f, 0.40f) : done ? UITheme_FocusMode.DoneBG : UITheme_FocusMode.PanelBG;
         UIStyleKit.ApplyRounded(rowImg, 10f);
         var rowLE = row.AddComponent<LayoutElement>();
         rowLE.minHeight = 56; rowLE.preferredHeight = 56;
@@ -565,6 +565,7 @@ public class RoutineListUI : MonoBehaviour
         tmp.font = font;
         tmp.text = text;
         tmp.fontSize = size;
+        UIFonts.ApplySmall(tmp); // 小さい文字は可読性優先フォントに
         tmp.color = color;
         tmp.raycastTarget = false;
         tmp.overflowMode = TextOverflowModes.Overflow;

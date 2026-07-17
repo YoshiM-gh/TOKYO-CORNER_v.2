@@ -262,6 +262,7 @@ public class WeeklyCalendarUI : MonoBehaviour
         }
         tmp.text     = text;
         tmp.fontSize = UITheme_FocusMode.FontSectionTitle;
+        UIFonts.ApplySmall(tmp);
         tmp.color    = UITheme_FocusMode.TextBody;
     }
 
@@ -385,6 +386,7 @@ public class WeeklyCalendarUI : MonoBehaviour
                 lbl.enableAutoSizing = true;
                 lbl.fontSizeMin = 12f;
                 lbl.fontSizeMax = 20f;
+                if (UIFonts.Readable != null) lbl.font = UIFonts.Readable;
                 lbl.color = UITheme_FocusMode.TextMuted;
                 lbl.alignment = TextAlignmentOptions.Center;
                 lbl.overflowMode = TextOverflowModes.Ellipsis;
@@ -526,6 +528,7 @@ public class WeeklyCalendarUI : MonoBehaviour
         var txt = txtGO.AddComponent<TextMeshProUGUI>();
         txt.text             = ev.title;
         txt.fontSize         = UITheme_FocusMode.FontChipTitle;
+        UIFonts.ApplySmall(txt);
         txt.color            = Color.white;
         txt.enableWordWrapping = false;
         txt.overflowMode     = TextOverflowModes.Overflow; // Ellipsis は日本語で誤動作するため手動省略
@@ -566,6 +569,7 @@ public class WeeklyCalendarUI : MonoBehaviour
         var txt = txtGO.AddComponent<TextMeshProUGUI>();
         txt.text      = $"他 {count} 件";
         txt.fontSize  = UITheme_FocusMode.FontMoreLabel;
+        UIFonts.ApplySmall(txt);
         txt.color     = UITheme_FocusMode.AccentSatBlue;
         txt.alignment = TextAlignmentOptions.MidlineLeft;
 
@@ -654,6 +658,7 @@ public class WeeklyCalendarUI : MonoBehaviour
             var txt = lb.AddComponent<TextMeshProUGUI>();
             txt.text      = $"{h:D2}:00";
             txt.fontSize  = UITheme_FocusMode.FontSectionTitle;
+            UIFonts.ApplySmall(txt);
             txt.color     = UITheme_FocusMode.TextBody;
             txt.alignment = TextAlignmentOptions.TopRight;
         }
@@ -789,7 +794,7 @@ public class WeeklyCalendarUI : MonoBehaviour
         return result;
     }
 
-    private void BuildEventBlock(Transform parent, ScheduleEvent ev,
+private void BuildEventBlock(Transform parent, ScheduleEvent ev,
                                   float colW, int lane, int totalLanes)
     {
         float sH = ParseAndSnap(ev.time); if (sH < 0f) return;
@@ -812,12 +817,11 @@ public class WeeklyCalendarUI : MonoBehaviour
         bkRT.anchoredPosition = new Vector2(lX, -sH * HOUR_HEIGHT - 1f);
         var bkImg = bk.AddComponent<Image>();
         var baseC = tag != null ? tag.chipBG : UITheme_FocusMode.AccentBlueFaint;
-        bkImg.color = UITheme_FocusMode.CardBG(baseC); // 淡色・不透明（パネル色とブレンド）
+        bkImg.color = UITheme_FocusMode.CardBG(baseC);
         if (cardSprite != null)
         {
             bkImg.sprite = cardSprite;
             bkImg.type   = Image.Type.Sliced;
-            // 9-slice 角丸を 4px 相当に（CanvasScaler refPPU=100 前提）
             bkImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 4f);
         }
 
@@ -827,8 +831,8 @@ public class WeeklyCalendarUI : MonoBehaviour
         var bdrRT = bdr.GetComponent<RectTransform>();
         bdrRT.anchorMin = new Vector2(0f,0f); bdrRT.anchorMax = new Vector2(0f,1f);
         bdrRT.pivot     = new Vector2(0f, 0.5f);
-        bdrRT.sizeDelta = new Vector2(3f, -8f);        // 上下4pxインセット（角丸からはみ出さない）
-        bdrRT.anchoredPosition = new Vector2(2f, 0f);  // 左から2px
+        bdrRT.sizeDelta = new Vector2(3f, -8f);
+        bdrRT.anchoredPosition = new Vector2(2f, 0f);
         var bdrImg = bdr.AddComponent<Image>();
         bdrImg.color = tag != null ? tag.chipBorder : UITheme_FocusMode.AccentBlue;
         bdrImg.raycastTarget = false;
@@ -836,11 +840,10 @@ public class WeeklyCalendarUI : MonoBehaviour
         {
             bdrImg.sprite = cardSprite;
             bdrImg.type   = Image.Type.Sliced;
-            bdrImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 1.5f); // 半径1.5px=ピル形
+            bdrImg.pixelsPerUnitMultiplier = cardSprite.border.x * 100f / (cardSprite.pixelsPerUnit * 1.5f);
         }
 
-
-        // タイトル
+        // タイトル（30分以上の予定のみ表示）
         var txGO = new GameObject("Title", typeof(RectTransform));
         txGO.transform.SetParent(bk.transform, false);
         var txRT = txGO.GetComponent<RectTransform>();
@@ -850,10 +853,13 @@ public class WeeklyCalendarUI : MonoBehaviour
         var txTxt = txGO.AddComponent<TextMeshProUGUI>();
         txTxt.text       = ev.title;
         txTxt.fontSize   = UITheme_FocusMode.FontChipTitle;
+        UIFonts.ApplySmall(txTxt);
         txTxt.color      = Color.white;
         txTxt.fontStyle  = FontStyles.Bold;
         txTxt.overflowMode = TextOverflowModes.Ellipsis;
-        txTxt.lineSpacing = -70f; // 行間（Kotonoruは内部余白が大きいためメトリクス上は重なり気味が見た目の適正値）
+        txTxt.lineSpacing = -70f;
+        // 30分未満はタイトル非表示（ブロックが小さすぎて読めないため）
+        txGO.SetActive(eH - sH >= 0.5f);
 
         var btn = bk.AddComponent<Button>(); btn.targetGraphic = bkImg;
         var cap = ev;
