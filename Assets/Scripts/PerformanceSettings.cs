@@ -10,7 +10,7 @@ public static class PerformanceSettings
     private static void Apply()
     {
         // ★ フレームレートを630に制限（無制限だとCPU/GPUが爆走してファン全開になる）
-        Application.targetFrameRate = 300;
+        Application.targetFrameRate = 30;
 
         // ★ VSync無効（vSync有効だと targetFrameRate が無視され、
         //    120Hzディスプレイでは120fpsで回ってしまうため）
