@@ -289,6 +289,7 @@ public class RoutineListUI : MonoBehaviour
         input.caretColor       = Color.clear;
         input.caretWidth       = 2;
         input.selectionColor   = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        UIFonts.FinalizeRuntimeInput(input); // 全選択・ドラッグ選択・コピペを有効化
         input.onSelect.AddListener(_ =>
         {
             if (_suppressInline) return;
@@ -390,6 +391,7 @@ public class RoutineListUI : MonoBehaviour
         input.lineType = TMP_InputField.LineType.SingleLine; input.text = current;
         input.customCaretColor = true; input.caretColor = Color.clear; input.caretWidth = 2;
         input.selectionColor = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        UIFonts.FinalizeRuntimeInput(input); // 全選択・ドラッグ選択・コピペを有効化
         input.onSelect.AddListener(_ => { if (_suppressInline) return; ActivateCaret(input, caretRT, caretImg); });
         input.onDeselect.AddListener(_ => DeactivateCaret(input));
         input.onEndEdit.AddListener(v => { if (_suppressInline) return; CommitRoutineRename(captured, v); });

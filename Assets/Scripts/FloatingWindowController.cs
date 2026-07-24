@@ -297,6 +297,7 @@ public void OpenAddForm(string defaultDate, ScheduleEvent editTarget, string def
         field.textViewport  = taRT;
         field.placeholder   = ph;
         field.textComponent = txt;
+        UIFonts.FinalizeRuntimeInput(field); // 全選択・ドラッグ選択・コピペを有効化
         return field;
     }
 

@@ -160,7 +160,7 @@ public class StickyNote : MonoBehaviour
             // タグドット色も TagConfig 連動（なければ TAG_COLORS 色）
             var dImg  = dGO.AddComponent<Image>(); dImg.color = bg;
             var dBtn  = dGO.AddComponent<Button>(); dBtn.targetGraphic = dImg;
-            dBtn.onClick.AddListener(() => { ApplyTagColor(TagConfig.Tags[cap].id); SaveNote(); });
+            dBtn.onClick.AddListener(() => { var tid2 = TagConfig.Tags[cap].id; ApplyTagColor(_tagId == tid2 ? "" : tid2); SaveNote(); }); // 再クリックで解除
             var dET = dGO.AddComponent<EventTrigger>();
             AddEt(dET, EventTriggerType.PointerDown, _ => _suppressEmptyDelete = true);
             _tagDots[i] = dImg;
@@ -355,7 +355,7 @@ public class StickyNote : MonoBehaviour
             var def = TagConfig.Tags[i];
             bool sel = def.id == _tagId;
             var bc = new Color(def.chipBG.r, def.chipBG.g, def.chipBG.b, 1f);
-            _tagDots[i].color = sel ? Color.Lerp(bc, Color.white, 0.35f) : Color.Lerp(bc, new Color(0,0,0,1), 0.2f);
+            _tagDots[i].color = sel ? bc : new Color(0.55f, 0.57f, 0.62f, 1f); // 選択ラベルのみスケジュールと同色・未選択はグレー
         }
     }
 
@@ -368,18 +368,10 @@ public class StickyNote : MonoBehaviour
             : Color.white;                        // 暗い背景 → 白テキスト
     }
 
-    private static Color GetBgColor(string tagId)
+private static Color GetBgColor(string tagId)
     {
-        // タグ色はアイテムカードと同じ CardBG（タグ色×背景ブレンドの不透明色）で統一
-        if (!string.IsNullOrEmpty(tagId))
-        {
-            var tag = TagConfig.GetById(tagId);
-            if (tag != null) return UITheme_FocusMode.CardBG(tag.chipBG); // アイテムカードと同色（落ち着いた不透明色）
-        }
-        // leisure など TagConfig 外のタグは TAG_COLORS を使用
-        foreach (var (id, bg, _) in TAG_COLORS)
-            if (id == tagId) return bg;
-        return DEFAULT_BG;
+        _ = tagId;
+        return DEFAULT_BG; // 付箋は白で統一（ラベルは上部ドットの色だけで表現）
     }
 
     // ── ドラッグ移動 ───────────────────────────────────────────

@@ -94,6 +94,23 @@ public class WeeklyMemoData
 }
 
 // ─────────────────────────────────────────────────────────
+// DailyMemoEntry / DailyMemoData
+// Dailyタブ「今日のメモ」（日付ごとの走り書き1枚。旧付箋の後継）
+// ─────────────────────────────────────────────────────────
+[Serializable]
+public class DailyMemoEntry
+{
+    public string dateKey;   // "yyyy-MM-dd"
+    public string text;
+}
+
+[Serializable]
+public class DailyMemoData
+{
+    public List<DailyMemoEntry> entries = new List<DailyMemoEntry>();
+}
+
+// ─────────────────────────────────────────────────────────
 // StickyNoteData / StickyNotesData
 // Dailyタブ付箋データ（日付ごとに管理）
 // ─────────────────────────────────────────────────────────

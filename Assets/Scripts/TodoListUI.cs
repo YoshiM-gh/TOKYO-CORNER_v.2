@@ -488,8 +488,8 @@ public class TodoListUI : MonoBehaviour
         var more = NewUI("MoreBtn", row.transform);
         var moreImg = more.AddComponent<Image>(); moreImg.color = Color.clear;
         var moreLE = more.AddComponent<LayoutElement>(); moreLE.minWidth = 30; moreLE.preferredWidth = 30; moreLE.minHeight = 30;
-                // 「→」翌日送り（期限切れタスクのみ・Todoタブ用）
-        if (!done && HasDateBefore(item, today))
+                // 「→」翌日送り（期限切れ・当日タスク・Todoタブ用）
+        if (!done && (HasDateBefore(item, today) || IsOnDate(item, today)))
         {
             BuildReorderButton(row.transform, "→", true, () =>
             {
@@ -841,6 +841,7 @@ var moreTxt = NewText("Dots", more.transform, "…", UITheme_FocusMode.FontChipT
         input.caretColor       = Color.clear;  // 標準キャレット非表示
         input.caretWidth       = 2;
         input.selectionColor   = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        UIFonts.FinalizeRuntimeInput(input); // 全選択・ドラッグ選択・コピペを有効化
 
         // onSelect: フォーカスイン → 右ペインに当該タスク表示 ＋ この行のキャレットをアクティブ化
         input.onSelect.AddListener(_ =>
@@ -953,6 +954,7 @@ var moreTxt = NewText("Dots", more.transform, "…", UITheme_FocusMode.FontChipT
         input.lineType = TMP_InputField.LineType.SingleLine; input.text = current;
         input.customCaretColor = true; input.caretColor = Color.clear; input.caretWidth = 2;
         input.selectionColor = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        UIFonts.FinalizeRuntimeInput(input); // 全選択・ドラッグ選択・コピペを有効化
         input.onSelect.AddListener(_ => { if (_suppressInline) return; ActivateCaret(input, caretRT, caretImg); });
         input.onDeselect.AddListener(_ => DeactivateCaret(input));
         input.onEndEdit.AddListener(v => { if (_suppressInline) return; CommitTodoRename(captured, v); });

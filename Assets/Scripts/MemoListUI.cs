@@ -964,6 +964,7 @@ public class MemoListUI : MonoBehaviour
         input.caretColor       = Color.clear;
         input.caretWidth       = 2;
         input.selectionColor   = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        UIFonts.FinalizeRuntimeInput(input); // 全選択・ドラッグ選択・コピペを有効化
         input.onSelect.AddListener(_ =>
         {
             if (_suppressInline) return;
@@ -1131,6 +1132,7 @@ public class MemoListUI : MonoBehaviour
         input.caretColor       = Color.clear;
         input.caretWidth       = 2;
         input.selectionColor   = UITheme_FocusMode.WithAlpha(UITheme_FocusMode.AccentSatBlue, 0.4f);
+        UIFonts.FinalizeRuntimeInput(input); // 全選択・ドラッグ選択・コピペを有効化
         return input;
     }
 

@@ -65,7 +65,11 @@ public class WeeklyCalendarUI : MonoBehaviour
     // ── ライフサイクル ────────────────────────────────────────
     private void OnEnable()
     {
-        if (timelineScroll != null) timelineScroll.scrollSensitivity = 60f;
+        if (timelineScroll != null)
+        {
+            timelineScroll.scrollSensitivity = 60f;
+            timelineScroll.movementType = ScrollRect.MovementType.Clamped; // 端での弾性バウンス禁止（0時が上端のとき固定）
+        }
         NavHeaderStyler.LayoutAndGear(transform.Find("Content/Header"), CategorySettingsController.Toggle);  // Phase1: ヘッダー部品規格
         UITheme_FocusMode.OnThemeChanged += Refresh;
         weekStart = GetWeekStart(DateTime.Now, weekStartDow);
@@ -365,7 +369,7 @@ public class WeeklyCalendarUI : MonoBehaviour
                 var bRT = bdr.GetComponent<RectTransform>();
                 bRT.anchorMin = new Vector2(0f,0f); bRT.anchorMax = new Vector2(0f,1f);
                 bRT.sizeDelta = new Vector2(_hairline, 0f); bRT.anchoredPosition = Vector2.zero;
-                bdr.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
+                bdr.AddComponent<Image>().color = Color.clear; // 方針行はグリッド線なし（チップ型・脱Excel）
                 bdr.AddComponent<LayoutElement>().ignoreLayout = true;
 
                 // 方針サイクルボタン
@@ -373,15 +377,16 @@ public class WeeklyCalendarUI : MonoBehaviour
                 cellGO.transform.SetParent(colGO.transform, false);
                 var cellRT = cellGO.GetComponent<RectTransform>();
                 cellRT.anchorMin = Vector2.zero; cellRT.anchorMax = Vector2.one;
-                cellRT.offsetMin = new Vector2(6f, 4f); cellRT.offsetMax = new Vector2(-4f, -4f);
+                cellRT.offsetMin = new Vector2(8f, 6f); cellRT.offsetMax = new Vector2(-8f, -6f);
                 var cellImg = cellGO.AddComponent<Image>();
                 cellImg.color = Color.white;
+                UIStyleKit.ApplyRounded(cellImg, 9f); // 方針チップは角丸（脱Excel）
                 var btn = cellGO.AddComponent<Button>();
                 var lblGO = new GameObject("Label", typeof(RectTransform));
                 lblGO.transform.SetParent(cellGO.transform, false);
                 var lblRT = lblGO.GetComponent<RectTransform>();
                 lblRT.anchorMin = Vector2.zero; lblRT.anchorMax = Vector2.one;
-                lblRT.offsetMin = new Vector2(8f, 0f); lblRT.offsetMax = new Vector2(-4f, 0f);
+                lblRT.offsetMin = new Vector2(10f, 0f); lblRT.offsetMax = new Vector2(-10f, 0f);
                 var lbl = lblGO.AddComponent<TextMeshProUGUI>();
                 lbl.enableAutoSizing = true;
                 lbl.fontSizeMin = 12f;
@@ -857,7 +862,7 @@ private void BuildEventBlock(Transform parent, ScheduleEvent ev,
         txTxt.color      = Color.white;
         txTxt.fontStyle  = FontStyles.Bold;
         txTxt.overflowMode = TextOverflowModes.Ellipsis;
-        txTxt.lineSpacing = -70f;
+        txTxt.lineSpacing = 0f; // Notoは標準メトリクスでOK（旧Kotonoru用の-70は重なりの原因）
         // 30分未満はタイトル非表示（ブロックが小さすぎて読めないため）
         txGO.SetActive(eH - sH >= 0.5f);
 

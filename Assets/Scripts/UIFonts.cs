@@ -38,4 +38,19 @@ public static class UIFonts
         if (tmp == null || Readable == null) return;
         if (tmp.fontSize <= SMALL_MAX) tmp.font = Readable;
     }
+
+
+/// <summary>ランタイム生成した TMP_InputField の仕上げ。
+    /// AddComponent 時（OnEnable）に textComponent が未設定だとキャレット・選択ハイライトの
+    /// レンダラーが生成されず、全選択（Cmd/Ctrl+A）・ドラッグ選択・コピペが視覚的に機能しない。
+    /// 参照を全て設定した後にこれを呼び、OnEnable を再実行して初期化させる。</summary>
+    public static void FinalizeRuntimeInput(TMPro.TMP_InputField input)
+    {
+        if (input == null) return;
+        if (input.gameObject.activeInHierarchy)
+        {
+            input.enabled = false;
+            input.enabled = true;
+        }
+    }
 }

@@ -62,7 +62,10 @@ public class DailyCalendarUI : MonoBehaviour
     private Transform        _noTimeRow;
     private ScrollRect       _timelineScroll;
     private Transform        _timelineParent;
-    private RectTransform    _stickyCanvas;
+    private TMP_InputField   _dailyMemoInput;  // 「今日のメモ」（旧付箋の後継）
+    private string           _memoDateKey;     // 現在ロード中メモの日付
+    private bool             _memoDirty;
+    private float            _memoSaveAt = -1f;
     private RectTransform _todoPanel;   // 中央Todo列のルート
 
     // DowRow 内の直接 TMP 参照
@@ -94,9 +97,10 @@ public class DailyCalendarUI : MonoBehaviour
         Refresh();
     }
 
-    private void OnDisable()
+private void OnDisable()
     {
         UITheme_FocusMode.OnThemeChanged -= Refresh;
+        SaveDailyMemoNow(); // 編集途中のメモを確実に保存
     }
 
     // =========================================================
@@ -225,7 +229,7 @@ private void BuildScaffold()
         return t;
     }
 
-    private GameObject BuildBodyArea(Transform parent)
+private GameObject BuildBodyArea(Transform parent)
     {
         var go  = MakeGO("BodyArea", parent);
         go.AddComponent<Image>().color = Color.clear;
@@ -243,15 +247,8 @@ private void BuildScaffold()
         div.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
         var divLE = div.AddComponent<LayoutElement>(); divLE.preferredWidth = 2f; divLE.minWidth = 2f;
 
-        // 中央 Todo 列（時間の有無を問わずTodoを集約。日付なし=上/当日=下）
+        // 右ペイン（上=Todo／下=付箋ボードを1本の縦スクロールに）
         BuildTodoPanel(go.transform);
-
-        // 縦境界線（Todo列 ↔ 付箋）
-        var div2  = MakeGO("BodyDivider2", go.transform);
-        div2.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
-        var div2LE = div2.AddComponent<LayoutElement>(); div2LE.preferredWidth = 2f; div2LE.minWidth = 2f;
-
-        BuildStickyPanel(go.transform);
         return go;
 }
 
@@ -259,7 +256,7 @@ private void BuildScaffold()
     {
         var go  = MakeGO("LeftPanel", parent);
         go.AddComponent<Image>().color = Color.clear;
-        go.AddComponent<LayoutElement>().flexibleWidth = 2f; // 2:2:3 のうち Left=2
+        go.AddComponent<LayoutElement>().flexibleWidth = 1f; // スケジュール:右ペイン = 50:50
         // VLG を使わずアンカー直指定で各行を配置
         const float hDow    = 56f;
         const float hPolicy = 80f;
@@ -501,51 +498,28 @@ private void BuildScaffold()
     }
 
     // ── 付箋パネル ─────────────────────────────────────────────
-    private void BuildTodoPanel(Transform parent)
+private void BuildTodoPanel(Transform parent)
     {
-        // 中央Todo列。flexW=2 の枠の中に、縦並びで TopBar＋スクロールリストを生成し、
-        // TodoListUI(displayMode=DailyToday) をアタッチして構築する（慎重案：UIはこちらで作って渡す）。
+        // 右ペイン：上=Todo、下=付箋ボードを1本の縦スクロールに載せる。
+        // TodoListUI(displayMode=DailyToday) には ListContent を渡して構築させる。
         var go = MakeGO("TodoPanel", parent);
         go.AddComponent<Image>().color = Color.clear;
-        go.AddComponent<LayoutElement>().flexibleWidth = 2f; // 2:2:3 のうち Todo=2（Leftと同幅）
+        go.AddComponent<LayoutElement>().flexibleWidth = 1f; // スケジュール:右ペイン = 50:50
         _todoPanel = go.GetComponent<RectTransform>();
-        var col = go.AddComponent<VerticalLayoutGroup>();
-        col.childControlWidth = true; col.childControlHeight = true;
-        col.childForceExpandWidth = true; col.childForceExpandHeight = false;
-        col.spacing = 8f; col.padding = new RectOffset(12, 12, 10, 10);
 
-        // --- TopBar（完了済み表示トグル ＋ 「+追加」）。Todoタブと同一スタイル・寸法に揃える。 ---
-        var topBar = MakeGO("TopBar", go.transform);
-        topBar.AddComponent<Image>().color = Color.clear;
-        var tbHlg = topBar.AddComponent<HorizontalLayoutGroup>();
-        tbHlg.childControlWidth = true; tbHlg.childControlHeight = true;
-        tbHlg.childForceExpandWidth = false; tbHlg.childForceExpandHeight = false;
-        tbHlg.childAlignment = TextAnchor.MiddleLeft; tbHlg.spacing = 16f; // Todoタブと同じ
-        var tbLE = topBar.AddComponent<LayoutElement>();
-        tbLE.minHeight = 40f; tbLE.preferredHeight = 40f; tbLE.flexibleHeight = 0f;
-
-        // 左端に「今日に戻る」ボタン → Spacer → 右側にトグル＋追加。
-        BuildDailyTodayButton(topBar.transform);
-        var spacer = MakeGO("Spacer", topBar.transform);
-        spacer.AddComponent<LayoutElement>().flexibleWidth = 1f;
-        var showDoneToggle = BuildDailyDoneToggle(topBar.transform);
-        var addBtn = BuildDailyAddButton(topBar.transform);
-
-        // --- ListScroll（ScrollRect → Viewport → ListContent） ---
-        var listScroll = MakeGO("ListScroll", go.transform);
-        var lsLE = listScroll.AddComponent<LayoutElement>();
-        lsLE.flexibleHeight = 1f; // 残り全体を占有
-        var sr = listScroll.AddComponent<ScrollRect>();
+        var sr = go.AddComponent<ScrollRect>();
         sr.horizontal = false; sr.vertical = true; sr.movementType = ScrollRect.MovementType.Clamped;
         sr.scrollSensitivity = 20f;
 
-        var viewport = MakeGO("Viewport", listScroll.transform);
+        var viewport = MakeGO("Viewport", go.transform);
         StretchRT(viewport);
+        var vpRT = viewport.GetComponent<RectTransform>();
+        vpRT.offsetMax = new Vector2(-SCROLLBAR_W, 0f); // 右にスクロールバー分の余白
         var vpImg = viewport.AddComponent<Image>(); vpImg.color = Color.clear;
         viewport.AddComponent<RectMask2D>();
-        sr.viewport = viewport.GetComponent<RectTransform>();
+        sr.viewport = vpRT;
 
-        var content = MakeGO("ListContent", viewport.transform);
+        var content = MakeGO("RightContent", viewport.transform);
         var cRT = content.GetComponent<RectTransform>();
         cRT.anchorMin = new Vector2(0f, 1f); cRT.anchorMax = new Vector2(1f, 1f);
         cRT.pivot = new Vector2(0.5f, 1f); cRT.sizeDelta = Vector2.zero;
@@ -553,16 +527,63 @@ private void BuildScaffold()
         cVlg.childControlWidth = true; cVlg.childControlHeight = true;
         cVlg.childForceExpandWidth = true; cVlg.childForceExpandHeight = false;
         cVlg.childAlignment = TextAnchor.UpperCenter; cVlg.spacing = 8f;
+        cVlg.padding = new RectOffset(12, 12, 10, 10);
         var cCsf = content.AddComponent<ContentSizeFitter>();
         cCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         cCsf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
         sr.content = cRT;
 
+        // 縦スクロールバー（右端・ペイン全高）
+        var vSb = BuildVScrollbar(go.transform, 0f);
+        if (vSb != null)
+        {
+            sr.verticalScrollbar = vSb;
+            sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+        }
+
+        // --- TopBar（完了済み表示トグル ＋ 「+追加」） ---
+        var topBar = MakeGO("TopBar", content.transform);
+        topBar.AddComponent<Image>().color = Color.clear;
+        var tbHlg = topBar.AddComponent<HorizontalLayoutGroup>();
+        tbHlg.childControlWidth = true; tbHlg.childControlHeight = true;
+        tbHlg.childForceExpandWidth = false; tbHlg.childForceExpandHeight = false;
+        tbHlg.childAlignment = TextAnchor.MiddleLeft; tbHlg.spacing = 16f;
+        var tbLE = topBar.AddComponent<LayoutElement>();
+        tbLE.minHeight = 40f; tbLE.preferredHeight = 40f; tbLE.flexibleHeight = 0f;
+
+        BuildDailyTodayButton(topBar.transform);
+        var spacer = MakeGO("Spacer", topBar.transform);
+        spacer.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        var showDoneToggle = BuildDailyDoneToggle(topBar.transform);
+        var addBtn = BuildDailyAddButton(topBar.transform);
+
+        // --- Todoリスト本体（外側スクロールに直載せ。内側スクロールは廃止） ---
+        var listHost = MakeGO("ListContent", content.transform);
+        var lVlg = listHost.AddComponent<VerticalLayoutGroup>();
+        lVlg.childControlWidth = true; lVlg.childControlHeight = true;
+        lVlg.childForceExpandWidth = true; lVlg.childForceExpandHeight = false;
+        lVlg.childAlignment = TextAnchor.UpperCenter; lVlg.spacing = 8f;
+
+        // --- 付箋セクション（区切り＋見出し＋ボード） ---
+        var hdiv = MakeGO("FusenDivider", content.transform);
+        hdiv.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
+        var hdivLE = hdiv.AddComponent<LayoutElement>(); hdivLE.preferredHeight = 2f; hdivLE.minHeight = 2f;
+
+        var sec = MakeGO("FusenHeader", content.transform);
+        var secLE = sec.AddComponent<LayoutElement>(); secLE.preferredHeight = 28f; secLE.minHeight = 28f;
+        var secTxt = sec.AddComponent<TextMeshProUGUI>();
+        secTxt.text = "今日のメモ";
+        secTxt.fontSize = 14f;
+        secTxt.color = new Color(1f, 1f, 1f, 0.40f);
+        secTxt.alignment = TextAlignmentOptions.MidlineLeft;
+        secTxt.raycastTarget = false;
+
+        BuildStickyPanel(content.transform);
+
         // --- TodoListUI をアタッチして Daily 用に初期化 ---
         _todoList = go.AddComponent<TodoListUI>();
-        _todoList.InitForDaily(content.transform, showDoneToggle, addBtn, null); // font=null→TMP既定にフォールバック
-        _todoList.SetViewDate(_currentDate); // 初期表示日を反映
-        // Daily編集モーダル（Canvas直下にシーン配置・1個）を探して紐づける。
+        _todoList.InitForDaily(listHost.transform, showDoneToggle, addBtn, null);
+        _todoList.SetViewDate(_currentDate);
         var todoModal = UnityEngine.Object.FindObjectOfType<TodoModal>(true);
         if (todoModal != null) _todoList.SetTodoModal(todoModal);
     }
@@ -622,37 +643,61 @@ private void BuildScaffold()
         return btn;
     }
 
-    private void BuildStickyPanel(Transform parent)
+private void BuildStickyPanel(Transform parent)
     {
-        var sp  = MakeGO("StickyPanel", parent);
-        sp.AddComponent<Image>().color = new Color(1f,1f,1f,0.015f);
-        sp.AddComponent<LayoutElement>().flexibleWidth = 3f; // 2:2:3 のうち Sticky=3
+        // 「今日のメモ」：日付ごとのプレーンテキスト1枚（旧付箋の後継。クリックで即入力・自動保存）
+        var sp  = MakeGO("DailyMemo", parent);
+        var spImg = sp.AddComponent<Image>();
+        spImg.color = new Color(1f, 1f, 1f, 0.04f);
+        ApplyRoundedSprite(spImg, 8f);
+        var spLE = sp.AddComponent<LayoutElement>();
+        spLE.minHeight = 420f; spLE.preferredHeight = 420f; spLE.flexibleHeight = 0f;
 
-        var sc  = MakeGO("StickyCanvas", sp.transform);
-        _stickyCanvas = sc.GetComponent<RectTransform>();
-        _stickyCanvas.anchorMin = Vector2.zero; _stickyCanvas.anchorMax = Vector2.one;
-        _stickyCanvas.offsetMin = _stickyCanvas.offsetMax = Vector2.zero;
-        _stickyCanvas.pivot = new Vector2(0f, 1f); // 左上原点
+        var input = sp.AddComponent<TMP_InputField>();
+        input.targetGraphic = spImg;
 
-        var bgImg = sc.AddComponent<Image>(); bgImg.color = new Color(0f,0f,0f,0f); bgImg.raycastTarget = true;
+        var textArea = MakeGO("TextArea", sp.transform);
+        StretchRT(textArea, 14f, 12f);
+        textArea.AddComponent<RectMask2D>();
 
-        // クリック → 付箋生成（PointerClick EventTrigger）
-        var et    = sc.AddComponent<EventTrigger>();
-        var entry = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
-        entry.callback.AddListener((evData) =>
-        {
-            var ped = (PointerEventData)evData;
-            if (ped.dragging) return;
-            // 空白部分のクリックのみ（付箋 GO をクリックした場合は付箋側 Button が先に消費する）
-            if (ped.rawPointerPress != sc && ped.rawPointerPress != null &&
-                ped.rawPointerPress.transform.IsChildOf(sc.transform) &&
-                ped.rawPointerPress != sc) return;
-            Vector2 localPos;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                _stickyCanvas, ped.position, ped.pressEventCamera, out localPos);
-            SpawnNewNote(localPos);
-        });
-        et.triggers.Add(entry);
+        var textGO = MakeGO("Text", textArea.transform);
+        StretchRT(textGO);
+        var txt = textGO.AddComponent<TextMeshProUGUI>();
+        if (UIFonts.Readable != null) txt.font = UIFonts.Readable;
+        txt.fontSize = 16f;
+        txt.color = new Color(0.92f, 0.94f, 0.97f, 1f);
+        txt.alignment = TextAlignmentOptions.TopLeft;
+        txt.richText = false;
+        txt.raycastTarget = false;
+
+        var phGO = MakeGO("Placeholder", textArea.transform);
+        StretchRT(phGO);
+        var ph = phGO.AddComponent<TextMeshProUGUI>();
+        if (UIFonts.Readable != null) ph.font = UIFonts.Readable;
+        ph.fontSize = 16f;
+        ph.color = new Color(1f, 1f, 1f, 0.25f);
+        ph.alignment = TextAlignmentOptions.TopLeft;
+        ph.text = "今日の走り書き…（クリックして入力）";
+        ph.raycastTarget = false;
+
+        // 参照を全て繋いでから設定（lineTypeはtextComponent代入後でないと効かない）
+        input.textViewport = textArea.GetComponent<RectTransform>();
+        input.textComponent = txt;
+        input.placeholder = ph;
+        input.lineType = TMP_InputField.LineType.MultiLineNewline;
+        input.richText = false;                  // プレーンテキスト運用（IME変換中の<u>タグが生表示されるのを防ぐ）
+        input.isRichTextEditingAllowed = false;
+        input.customCaretColor = true;
+        input.caretColor = new Color(0.92f, 0.94f, 0.97f, 1f);
+        input.selectionColor = new Color(0.31f, 0.55f, 0.95f, 0.35f);
+        input.onValueChanged.AddListener(_ => { _memoDirty = true; _memoSaveAt = Time.unscaledTime + 1.5f; });
+        input.onEndEdit.AddListener(_ => SaveDailyMemoNow());
+
+        // ランタイム生成の定石：参照確定後に OnEnable を再実行させ、
+        // キャレット・入力レンダラーを初期化させる（これがないと表示はできても編集不能になる）
+        input.enabled = false;
+        input.enabled = true;
+        _dailyMemoInput = input;
     }
 
     // =========================================================
@@ -697,11 +742,15 @@ private void BuildScaffold()
 
     private int _lastDataVersion = -1;
 
-    private void Update()
+private void Update()
     {
-        // データ変更検知 → 自動Refresh
+        // 「今日のメモ」のデバウンス保存（自分の保存でRefreshは誘発しない）
+        if (_memoSaveAt > 0f && Time.unscaledTime >= _memoSaveAt) SaveDailyMemoNow();
+
+        // データ変更検知 → 自動Refresh（メモ編集中はフォーカスを奪わないよう保留）
+        bool memoEditing = _dailyMemoInput != null && _dailyMemoInput.isFocused;
         var __nm = NotebookManager.Instance;
-        if (__nm != null && __nm.DataVersion != _lastDataVersion) { Refresh(); return; }
+        if (__nm != null && __nm.DataVersion != _lastDataVersion && !memoEditing) { Refresh(); return; }
         // リサイズを検知し、0.25秒静止後にグリッドを再構築（ヘアラインを再スナップ）
         if (Screen.width != _lastScreenSize.x || Screen.height != _lastScreenSize.y)
         {
@@ -1164,7 +1213,7 @@ private void BuildScaffold()
         tTxt.text = ev.title; tTxt.fontSize = UITheme_FocusMode.FontChipTitle;
         tTxt.color = Color.white; tTxt.fontStyle = FontStyles.Bold;
         tTxt.overflowMode = TextOverflowModes.Ellipsis; tTxt.raycastTarget = false;
-        tTxt.lineSpacing = -70f; // 行間（Kotonoruは内部余白が大きいためメトリクス上は重なり気味が見た目の適正値）
+        tTxt.lineSpacing = 0f; // Notoは標準メトリクスでOK（旧Kotonoru用の-70は重なりの原因）
 
         var btn = bk.AddComponent<Button>(); btn.targetGraphic = bkImg;
         var cap = ev;
@@ -1177,45 +1226,51 @@ private void BuildScaffold()
     }
 
     // ── 付箋 ─────────────────────────────────────────────────
-    private void RefreshStickyNotes()
+private void RefreshStickyNotes()
     {
-        if (!_stickyCanvas) return;
-        Canvas.ForceUpdateCanvases();
-        // 既存付箋を削除（StickyNote コンポーネントを持つ子のみ）
-        var kill = new List<GameObject>();
-        foreach (Transform c in _stickyCanvas)
-            if (c.GetComponent<StickyNote>() != null) kill.Add(c.gameObject);
-        foreach (var g in kill) Destroy(g);
+        // 「今日のメモ」ロード（日付切替時は編集中テキストを先に保存）
+        if (_dailyMemoInput == null) return;
+        var dk = NotebookManager.DateKey(_currentDate);
+        if (_memoDirty && !string.IsNullOrEmpty(_memoDateKey) && _memoDateKey != dk) SaveDailyMemoNow();
 
-        string dk   = NotebookManager.DateKey(_currentDate);
-        var notes   = NotebookManager.Instance?.GetStickyNotes(dk) ?? new List<StickyNoteData>();
-        var canvas  = GetComponentInParent<Canvas>();
-        foreach (var n in notes) SpawnStickyNote(n, canvas);
+        var memo = NotebookManager.Instance?.GetDailyMemo(dk) ?? string.Empty;
+
+        // 旧付箋データの片道移行：メモが空で旧付箋があれば行として取り込む（データは消さない）
+        if (string.IsNullOrEmpty(memo))
+        {
+            var notes = NotebookManager.Instance?.GetStickyNotes(dk);
+            if (notes != null && notes.Count > 0)
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var n in notes)
+                    if (!string.IsNullOrWhiteSpace(n.content)) sb.AppendLine("・" + n.content.Trim());
+                memo = sb.ToString().TrimEnd();
+                if (memo.Length > 0) NotebookManager.Instance?.SetDailyMemo(dk, memo);
+            }
+        }
+
+        _memoDateKey = dk;
+        if (!_dailyMemoInput.isFocused) // 編集中は上書きしない
+        {
+            _dailyMemoInput.SetTextWithoutNotify(memo);
+            _memoDirty = false; _memoSaveAt = -1f;
+        }
     }
 
-    private void SpawnNewNote(Vector2 localPos)
+/// <summary>「今日のメモ」を即時保存（デバウンス・日付切替・onEndEdit・非表示化から呼ぶ）。
+    /// 保存によるDataVersion増分は自分で取り込み、不要な全再構築を避ける。</summary>
+    private void SaveDailyMemoNow()
     {
-        if (_blockNextNoteSpawn) { _blockNextNoteSpawn = false; return; }
-        Canvas.ForceUpdateCanvases();
-        string dk     = NotebookManager.DateKey(_currentDate);
-        var    canvas = GetComponentInParent<Canvas>();
-
-        var go   = new GameObject("StickyNote_new", typeof(RectTransform));
-        go.transform.SetParent(_stickyCanvas, false);
-        var note = go.AddComponent<StickyNote>();
-        note.InitNew(dk, canvas, _stickyCanvas, localPos, null);
-        note.FocusInput();
+        if (!_memoDirty || _dailyMemoInput == null || string.IsNullOrEmpty(_memoDateKey)) return;
+        _memoDirty = false; _memoSaveAt = -1f;
+        NotebookManager.Instance?.SetDailyMemo(_memoDateKey, _dailyMemoInput.text);
+        if (NotebookManager.Instance != null) _lastDataVersion = NotebookManager.Instance.DataVersion;
     }
 
-    private StickyNote SpawnStickyNote(StickyNoteData data, Canvas canvas)
-    {
-        if (data == null || !_stickyCanvas) return null;
-        var go   = new GameObject($"StickyNote_{data.id}", typeof(RectTransform));
-        go.transform.SetParent(_stickyCanvas, false);
-        var note = go.AddComponent<StickyNote>();
-        note.Init(data, canvas, _stickyCanvas, null);
-        return note;
-    }
+
+
+
+
 
     // ── モーダル ──────────────────────────────────────────────
     // EventModal は Awake 時点ではまだ FindObjectOfType で拾えないことがある

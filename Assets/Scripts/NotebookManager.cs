@@ -21,6 +21,7 @@ public class NotebookManager : MonoBehaviour
     private LifetimeStats lifetimeStats = new LifetimeStats();
     private WeeklyMemoData weeklyMemoData = new WeeklyMemoData();
     private StickyNotesData stickyNotesData = new StickyNotesData();
+    private DailyMemoData   dailyMemoData   = new DailyMemoData();
     private TodoListData    todoData    = new TodoListData();
     private RoutineListData routineData = new RoutineListData();
     private MemoNotesData   memoNotes   = new MemoNotesData();
@@ -34,6 +35,7 @@ public class NotebookManager : MonoBehaviour
     private string PathLifetime     => Path.Combine(Application.persistentDataPath, "notebook_lifetime.json");
     private string PathWeeklyMemo  => Path.Combine(Application.persistentDataPath, "notebook_weekly_memo.json");
     private string PathStickyNotes => Path.Combine(Application.persistentDataPath, "notebook_sticky.json");
+    private string PathDailyMemo   => Path.Combine(Application.persistentDataPath, "notebook_daily_memo.json");
     private string PathTodo      => Path.Combine(Application.persistentDataPath, "notebook_todo.json");
     private string PathTodoArchive => Path.Combine(Application.persistentDataPath, "notebook_todo_archive.json");
     private string PathRoutine   => Path.Combine(Application.persistentDataPath, "notebook_routine.json");
@@ -60,6 +62,7 @@ public class NotebookManager : MonoBehaviour
         WriteJson(PathLifetime, lifetimeStats);
         WriteJson(PathWeeklyMemo, weeklyMemoData);
         WriteJson(PathStickyNotes, stickyNotesData);
+        WriteJson(PathDailyMemo,   dailyMemoData);
         WriteJson(PathTodo,      todoData);
         WriteJson(PathRoutine,   routineData);
         WriteJson(PathMemoNotes, memoNotes);
@@ -73,6 +76,7 @@ public class NotebookManager : MonoBehaviour
         lifetimeStats   = ReadJson<LifetimeStats>(PathLifetime)   ?? new LifetimeStats();
         weeklyMemoData  = ReadJson<WeeklyMemoData>(PathWeeklyMemo) ?? new WeeklyMemoData();
         stickyNotesData = ReadJson<StickyNotesData>(PathStickyNotes) ?? new StickyNotesData();
+        dailyMemoData   = ReadJson<DailyMemoData>(PathDailyMemo)     ?? new DailyMemoData();
         todoData    = ReadJson<TodoListData>(PathTodo)         ?? new TodoListData();
         routineData = ReadJson<RoutineListData>(PathRoutine)   ?? new RoutineListData();
         memoNotes   = ReadJson<MemoNotesData>(PathMemoNotes)   ?? new MemoNotesData();
@@ -256,6 +260,24 @@ public class NotebookManager : MonoBehaviour
         {
             entry.text = text;
         }
+        SaveAll();
+    }
+
+    // ─── DailyMemo（今日のメモ：日付ごとの走り書き1枚） ──────
+
+    /// <summary>日付メモを取得（dateKey = "yyyy-MM-dd"）</summary>
+    public string GetDailyMemo(string dateKey)
+    {
+        var entry = dailyMemoData.entries.Find(e => e.dateKey == dateKey);
+        return entry?.text ?? string.Empty;
+    }
+
+    /// <summary>日付メモを保存・更新</summary>
+    public void SetDailyMemo(string dateKey, string text)
+    {
+        var entry = dailyMemoData.entries.Find(e => e.dateKey == dateKey);
+        if (entry == null) dailyMemoData.entries.Add(new DailyMemoEntry { dateKey = dateKey, text = text });
+        else entry.text = text;
         SaveAll();
     }
 
