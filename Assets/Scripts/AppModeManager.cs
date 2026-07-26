@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -62,6 +63,8 @@ public class AppModeManager : MonoBehaviour
     private GameObject _navGroup;             // バーのナビ群（Bar時のみ表示）
     private RectTransform _barRootRT;         // バー本体（Bar時は角丸フローティング形状）
     private GameObject _barHairline;          // 通常モード時の下端ヘアライン
+    private Image      _barBaseImg;           // バーの地（Bar時のみ角丸ピル、通常時は直角）
+    private GameObject _winMinGO, _winCloseGO, _winCtlSpacer; // タイトルバーが無い場面用の −/×
     private GameObject _barBackdrop;          // 背面ベース
     private Image[] _navChipImgs;             // ナビ2チップの背景（Bar時のみ薄く表示）
     private Camera _bgCam;                    // 透過用：背景クリアを差し替えるカメラ
@@ -277,22 +280,77 @@ private void Update()
         SweepToolFonts();
 
         // Barモード: タイトルバー非表示＋バーのドラッグでウィンドウ移動
-        MacWindowUtil.TrySetBorderless(_mode == Mode.Bar && InFocusScene);
-        MacWindowUtil.TrySetFloating(_mode == Mode.Bar && InFocusScene); // 常に最前面（タスクバーヒーロー）
+        // 枠なしの適用範囲はOSで異なる（WindowUtil.BorderlessAllModes）:
+        //   Windows = フォーカス画面の全モード（通常モードはリサイズ枠だけ残す）
+        //   macOS   = Barモードのみ（信号機ボタンを使うため）
+        bool wantBorderless = InFocusScene && (_mode == Mode.Bar || WindowUtil.BorderlessAllModes);
+        WindowUtil.TrySetBorderless(wantBorderless, _mode != Mode.Bar);
+        // ウィンドウの可視領域をクライアント＋角丸に切り抜く。
+        // Barは仕様書の角丸12に合わせ、通常モードは控えめに10px。
+        if (wantBorderless)
+            WindowUtil.TryClipToClient(_mode == Mode.Bar ? Mathf.RoundToInt(12f * BarScale()) : 10);
+        else
+            WindowUtil.TryClearClip();
+        WindowUtil.TrySetFloating(_mode == Mode.Bar && InFocusScene); // 常に最前面（タスクバーヒーロー）
         // ※ウィンドウ透過はUnityのMetal層が非対応だったため断念→フルブリード角丸で対応
-        if (_mode == Mode.Bar && InFocusScene) HandleBarDrag();
+        if (wantBorderless)
+        {
+            // 縁を掴んだらOSのリサイズへ、そうでなければバーのドラッグ移動へ
+            if (Input.GetMouseButtonDown(0) && TryBeginEdgeResize()) _barDragging = false;
+            else HandleBarDrag(); // 枠なし中はバーがタイトルバーの代わり
+        }
         else _barDragging = false;
     }
 
     /// <summary>Barモード（枠なし）中はバーのどこを掴んでもウィンドウを移動できる。</summary>
+    private const float RESIZE_MARGIN = 6f; // クライアント内側の掴み代（OSの枠は切り抜きで消えている）
+
+    /// <summary>
+    /// ウィンドウの縁（内側6px）を掴んだらOS標準のリサイズを開始する。
+    /// Barモードは固定サイズなので対象外。Macでは TryBeginResize が false を返すので何も起きない。
+    /// </summary>
+    private bool TryBeginEdgeResize()
+    {
+        if (_mode == Mode.Bar) return false;
+        var mp = Input.mousePosition;
+        int dx = mp.x <= RESIZE_MARGIN ? -1 : mp.x >= Screen.width  - RESIZE_MARGIN ? 1 : 0;
+        int dy = mp.y <= RESIZE_MARGIN ? -1 : mp.y >= Screen.height - RESIZE_MARGIN ? 1 : 0;
+        if (dx == 0 && dy == 0) return false;
+        return WindowUtil.TryBeginResize(dx, dy);
+    }
+
+    private readonly List<RaycastResult> _dragHitBuf = new List<RaycastResult>();
+
+    /// <summary>
+    /// バーを掴んでのウィンドウ移動を開始してよいか。枠なし運用ではバーがタイトルバーの代役なので
+    /// ①ポインタがバーの帯の中 ②ボタン等の操作要素の上ではない、の2条件で判定する。
+    /// （Barモードはウィンドウ全体がバーなので①は常に成立する）
+    /// </summary>
+    private bool CanStartBarDrag()
+    {
+        if (Input.mousePosition.y < Screen.height - BarPixelHeight()) return false;
+        var es = EventSystem.current;
+        if (es == null) return true;
+        var ped = new PointerEventData(es) { position = Input.mousePosition };
+        _dragHitBuf.Clear();
+        es.RaycastAll(ped, _dragHitBuf);
+        foreach (var hit in _dragHitBuf)
+        {
+            if (hit.gameObject == null) continue;
+            if (hit.gameObject.GetComponentInParent<Selectable>() != null) return false;
+        }
+        return true;
+    }
+
     private void HandleBarDrag()
     {
         if (Application.isEditor) return;
         if (Input.GetMouseButtonDown(0))
         {
+            if (!CanStartBarDrag()) return; // バーの帯の外／ボタンの上では掴まない
             _barDragging = true;
-            _dragMouse0  = MacWindowUtil.GlobalMouse();
-            _dragOrigin0 = MacWindowUtil.GetWindowOrigin();
+            _dragMouse0  = WindowUtil.GlobalMouse();
+            _dragOrigin0 = WindowUtil.GetWindowOrigin();
         }
         else if (!Input.GetMouseButton(0))
         {
@@ -300,9 +358,9 @@ private void Update()
         }
         else if (_barDragging)
         {
-            var d = MacWindowUtil.GlobalMouse() - _dragMouse0;
+            var d = WindowUtil.GlobalMouse() - _dragMouse0;
             if (d.sqrMagnitude > 9f)
-                MacWindowUtil.SetWindowOrigin(_dragOrigin0 + d);
+                WindowUtil.SetWindowOrigin(_dragOrigin0 + d);
         }
     }
 
@@ -537,9 +595,12 @@ private float BarScale()
     // 最小サイズの思想：可読性の保証ではなく「レイアウトが破綻しない下限」だけを守る。
     // 小さくして文字が潰れるのはプレイヤーの選択（アスペクト固定・等倍ズームは維持）。
     // 1xモニタ: 90%下限の半分まで縮小許可（Full 864 / Nb 693 / TimerH 363）。Retinaは従来どおり。
-    private int FullMinW()  => ClampToDisplayW(Screen.dpi >= 200f ? 2048 : 864);
-    private int NbMinW()    => ClampToDisplayW(Screen.dpi >= 200f ? 2048 : 693);
-    private int TimerMinH() => ClampToDisplayH(Screen.dpi >= 200f ? 1040 : 363);
+    // DPIティア: Retina/200%(>=200) / Windowsの125%・150%(>=110) / 等倍96dpi
+    // 実測: MacBook 303 / Mac外部 109 / Windows 100%=96・125%=120・150%=144
+    // ※Mac外部109は従来どおり等倍ティアのまま（閾値110はその上）＝Mac側の挙動は不変
+    private int FullMinW()  => ClampToDisplayW(Screen.dpi >= 200f ? 2048 : Screen.dpi >= 110f ? 1296 : 864);
+    private int NbMinW()    => ClampToDisplayW(Screen.dpi >= 200f ? 2048 : Screen.dpi >= 110f ? 1040 : 693);
+    private int TimerMinH() => ClampToDisplayH(Screen.dpi >= 200f ? 1040 : Screen.dpi >= 110f ? 545 : 363);
 
     /// <summary>最小サイズがディスプレイより大きくならないようクランプ（1080p等の小さな画面対策）。</summary>
     private static int ClampToDisplayW(int px)
@@ -574,7 +635,12 @@ private float BarScale()
         if (_mode == Mode.Bar)
         {
             int bw = BarPixelMinWidth(), bh = BarPixelHeight();
-            if (w != bw || h != bh) Screen.SetResolution(bw, bh, FullScreenMode.Windowed);
+            // Windows: 枠なし中に Screen.SetResolution を呼ぶとUnityがウィンドウを作り直し、
+            // タイトルバーが復活する（剥がす→復活の無限ループ＝点滅）。ネイティブで直接サイズを決める。
+            if (!WindowUtil.TrySetClientSize(bw, bh))
+            {
+                if (w != bw || h != bh) Screen.SetResolution(bw, bh, FullScreenMode.Windowed);
+            }
             return;
         }
 
@@ -595,6 +661,8 @@ private float BarScale()
         }
         // 2px以内の誤差はリサイズループ防止のため許容
         if (Mathf.Abs(tw - w) > 2 || Mathf.Abs(th - h) > 2)
+            // 通常モードはUnityに任せる。ネイティブ指定だとバックバッファが追従せず
+            // 描画がレターボックスされる（右と下に黒帯）。枠なしのBarモードのみネイティブ。
             Screen.SetResolution(tw, th, FullScreenMode.Windowed);
     }
 
@@ -613,11 +681,19 @@ private void SaveWindowSize(Mode m)
         if (Screen.fullScreen || !InFocusScene) return;
         var disp = Screen.currentResolution;
         bool hasDisp = disp.width > 100;
+        // 枠なしのまま Screen.SetResolution するとUnityがウィンドウを作り直し、
+        // 一瞬消えてからタイトルバー付きで再出現する。先に枠を戻しておく。
+        // Windowsは枠なしのまま（リサイズ枠だけ戻す）、Macはタイトルバーを復元する
+        if (m != Mode.Bar) WindowUtil.TrySetBorderless(WindowUtil.BorderlessAllModes, true);
         int w, h;
         switch (m)
         {
             case Mode.Bar:
-                Screen.SetResolution(BarPixelMinWidth(), BarPixelHeight(), FullScreenMode.Windowed);
+                // 先に枠を外してからサイズを確定する。逆順だと「枠ありサイズ→枠を外して
+                // 縦に伸びる→再サイズ」の3手になり、切替時に消える/点滅する。
+                WindowUtil.TrySetBorderless(true);
+                if (!WindowUtil.TrySetClientSize(BarPixelMinWidth(), BarPixelHeight()))
+                    Screen.SetResolution(BarPixelMinWidth(), BarPixelHeight(), FullScreenMode.Windowed);
                 return;
             case Mode.Timer:
             {
@@ -669,7 +745,7 @@ private void SaveWindowSize(Mode m)
     /// 比率の維持は EnforceMinSize の「確定後スナップ」に一本化（Windowsでも同一動作）。</summary>
     private void ApplyWindowAspect()
     {
-        MacWindowUtil.TrySetContentAspect(0f, 0f); // 拘束解除（全画面互換）
+        WindowUtil.TrySetContentAspect(0f, 0f); // 拘束解除（全画面互換）
     }
 
 
@@ -708,6 +784,7 @@ private void BuildBar()
         // 角丸ベース＋マスク（Bar時は角丸カード化。中身は縦グラデ）
         var baseImg = root.AddComponent<Image>();
         UIStyleKit.ApplyRounded(baseImg, 12f);
+        _barBaseImg = baseImg;
         baseImg.color = new Color(0.055f, 0.066f, 0.088f, 1f);
         root.AddComponent<Mask>().showMaskGraphic = true;
 
@@ -896,6 +973,14 @@ private void BuildBar()
             simg.raycastTarget = false;
         }
 
+        // ウィンドウ操作（枠なし運用のWindowsのみ。Macはタイトルバーの信号機を使う）
+        if (WindowUtil.IsWindows)
+        {
+            _winCtlSpacer = MakeSpacer(root.transform, 4f);
+            _winMinGO   = MakeBarButton(root.transform, "WinMin",   "−", 26f, () => WindowUtil.TryMinimize());
+            _winCloseGO = MakeBarButton(root.transform, "WinClose", "×", 26f, RequestAppQuit);
+        }
+
         // 下端の進捗ライン（ポモドーロ残量。リングと同じ色）
         var pgGO = new GameObject("Progress", typeof(RectTransform));
         pgGO.transform.SetParent(root.transform, false);
@@ -911,12 +996,21 @@ private void BuildBar()
         pgGO.AddComponent<LayoutElement>().ignoreLayout = true;
     }
 
-    private void MakeSpacer(Transform parent, float width)
+    /// <summary>枠なし運用ではタイトルバーの「×」が無いため、バーのボタンから終了する。</summary>
+    private void RequestAppQuit()
+    {
+        SaveWindowSize(_mode);
+        PlayerPrefs.Save();
+        Application.Quit();
+    }
+
+    private GameObject MakeSpacer(Transform parent, float width)
     {
         var sp = new GameObject("Spacer", typeof(RectTransform));
         sp.transform.SetParent(parent, false);
         var le = sp.AddComponent<LayoutElement>();
         le.minWidth = width; le.preferredWidth = width;
+        return sp;
     }
 
 private GameObject MakeBarButton(Transform parent, string key, string label, float width, UnityEngine.Events.UnityAction onClick)
@@ -987,6 +1081,27 @@ private void UpdateBarHighlight()
                     if (ci.color != cc) ci.color = cc;
                 }
 
+        // バーの形はモードで変える：
+        //   Bar    = 独立した浮遊ピル（角丸12・ウィンドウ切り抜きと合わせて四隅が背景に抜ける）
+        //   通常   = 直角。下側が角丸だとコンテンツとの間に切れ込みができ、
+        //            ヘッダーが浮いたカードに見えてフォーカス画面と分断されるため。
+        //            区切りは下端ヘアラインが担う（＝地続きのまま境界だけ示す）
+        if (_barBaseImg != null)
+        {
+            bool rounded = _barBaseImg.sprite != null;
+            if (mini && !rounded) UIStyleKit.ApplyRounded(_barBaseImg, 12f);
+            else if (!mini && rounded)
+            {
+                _barBaseImg.sprite = null;
+                _barBaseImg.type   = Image.Type.Simple;
+            }
+        }
+        // −/× はタイトルバーが無い場面だけ出す（Barモード、または全モード枠なしを有効化したとき）。
+        // 通常モードではOSのタイトルバーのボタンを使うため二重に出さない。
+        bool showWinCtl = mini || WindowUtil.BorderlessAllModes;
+        if (_winMinGO   != null && _winMinGO.activeSelf   != showWinCtl) _winMinGO.SetActive(showWinCtl);
+        if (_winCloseGO != null && _winCloseGO.activeSelf != showWinCtl) _winCloseGO.SetActive(showWinCtl);
+        if (_winCtlSpacer != null && _winCtlSpacer.activeSelf != showWinCtl) _winCtlSpacer.SetActive(showWinCtl);
         if (_barHairline != null && _barHairline.activeSelf != !mini) _barHairline.SetActive(!mini);
         if (_barBackdrop != null && !_barBackdrop.activeSelf) _barBackdrop.SetActive(true);
 
