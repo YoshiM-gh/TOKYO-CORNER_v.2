@@ -493,8 +493,15 @@ namespace Controller
                     m_Animators[i].SetBool(m_JumpID, isJump);
                 }
 
-                m_FlowAxis = Vector2.ClampMagnitude(m_FlowAxis + k_InputFlow * deltaTime * (axis - m_FlowAxis).normalized, 1f);
-                m_FlowState = Mathf.Clamp01(m_FlowState + k_InputFlow * deltaTime * Mathf.Sign(state - m_FlowState));
+                // 2026-07-27 修正（キャラが小刻みに震える問題）:
+                // 旧: (axis - m_FlowAxis).normalized に一定量を掛けて加算していたため、
+                //     目標へどれだけ近づいても必ず一定量動いてしまい、行き過ぎ→逆に行き過ぎ、を
+                //     毎フレーム繰り返してブレンド値が振動していた。静止中(axis=0)でも Walk/Run が
+                //     混ざり続け、キャラが震えて見える。振動の速さがfpsに連動するのもこのため。
+                // 新: MoveTowards は目標で止まるので行き過ぎない（到達後は完全に静止する）。
+                float maxStep = k_InputFlow * deltaTime;
+                m_FlowAxis  = Vector2.ClampMagnitude(Vector2.MoveTowards(m_FlowAxis, axis, maxStep), 1f);
+                m_FlowState = Mathf.MoveTowards(m_FlowState, Mathf.Clamp01(state), maxStep);
             }
 
             public void AnimateIK(in Vector3 target, in LookWeight lookWeight)
