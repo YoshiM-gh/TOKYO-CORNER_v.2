@@ -35,9 +35,9 @@ public class PomodoroTimerUI : MonoBehaviour
     [SerializeField] private Button confirmButton;
     [SerializeField] private TextMeshProUGUI playPauseIcon;
 
-    private float workMinutes  = 25f;
-    private float breakMinutes = 5f;
-    private int   cycleCount   = 4;
+    // 設定値は PomodoroManager が持つ（timer はプロキシなので同じ値を指す）。
+    // 移行前はここにローカル変数があり、Rボタン（TimerControllerのSerializeField）と
+    // ▶ボタン（このローカル値）で別々の設定が使われていた。
 
     void Start()
     {
@@ -54,6 +54,7 @@ public class PomodoroTimerUI : MonoBehaviour
         cycleMinus.onClick.AddListener(() => AdjustCycle(-1));
         cyclePlus.onClick.AddListener(()  => AdjustCycle(+1));
 
+        RefreshSettingTexts();
         UpdateDisplay();
     }
 
@@ -67,7 +68,7 @@ public class PomodoroTimerUI : MonoBehaviour
         bool isStopped = timer.Phase == TimerController.TimerPhase.Stopped;
 
         timeText.text = isStopped
-            ? TimerController.FormatTime(workMinutes * 60f)
+            ? TimerController.FormatTime(timer.WorkMinutes * 60f)
             : TimerController.FormatTime(timer.RemainingSeconds);
 
         ringProgress.fillAmount = isStopped ? 0f : 1f - timer.Progress01;
@@ -85,6 +86,9 @@ public class PomodoroTimerUI : MonoBehaviour
         if (settingsPanel != null)
             settingsPanel.SetActive(isStopped);
 
+        // バー側から設定が変わることもあるので、表示のたびに追従させる
+        RefreshSettingTexts();
+
         confirmButton.interactable = true;
     }
 
@@ -92,14 +96,14 @@ public class PomodoroTimerUI : MonoBehaviour
     void OnPlayPause()
     {
         if (timer.Phase == TimerController.TimerPhase.Stopped)
-            timer.StartPomodoro(workMinutes, breakMinutes, breakMinutes * 3f, cycleCount);
+            timer.StartWithSettings(); // 長休憩は break*3 の決め打ちをやめ、設定値を使う
         else
             timer.TogglePause();
     }
     void OnConfirm()
     {
         if (timer.Phase == TimerController.TimerPhase.Stopped)
-            timer.StartPomodoro(workMinutes, breakMinutes, breakMinutes * 3f, cycleCount);
+            timer.StartWithSettings();
         else if (timer.IsAwaitingNextPhase)
             timer.AdvanceToNextPhase();
         else
@@ -108,18 +112,27 @@ public class PomodoroTimerUI : MonoBehaviour
 
     public void AdjustWork(int delta)
     {
-        workMinutes = Mathf.Clamp(workMinutes + delta, 1f, 99f);
-        workMinutesText.text = workMinutes.ToString("0");
+        timer.WorkMinutes += delta; // Manager側でクランプ＆PlayerPrefs保存
+        RefreshSettingTexts();
+        UpdateDisplay(); // 停止中の表示（mm:ss）にも即反映する
     }
     public void AdjustBreak(int delta)
     {
-        breakMinutes = Mathf.Clamp(breakMinutes + delta, 1f, 99f);
-        breakMinutesText.text = breakMinutes.ToString("0");
+        timer.BreakMinutes += delta;
+        RefreshSettingTexts();
     }
     public void AdjustCycle(int delta)
     {
-        cycleCount = Mathf.Clamp(cycleCount + delta, 1, 99);
-        cycleCountText.text = cycleCount.ToString();
+        timer.CycleCount += delta;
+        RefreshSettingTexts();
+    }
+
+    /// <summary>設定欄の数字をManagerの保持値に合わせる。</summary>
+    void RefreshSettingTexts()
+    {
+        if (workMinutesText  != null) workMinutesText.text  = timer.WorkMinutes.ToString("0");
+        if (breakMinutesText != null) breakMinutesText.text = timer.BreakMinutes.ToString("0");
+        if (cycleCountText   != null) cycleCountText.text   = timer.CycleCount.ToString();
     }
 
     static string GetJapaneseLabel(TimerController.TimerPhase phase) => phase switch

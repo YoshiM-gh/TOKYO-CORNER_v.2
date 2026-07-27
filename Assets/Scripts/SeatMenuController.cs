@@ -168,15 +168,11 @@ public class SeatMenuController : MonoBehaviour
     private void OnFocus()
     {
         Close();
-        var seat = _seat;
-        if (PolicyPromptUI.Instance != null && SceneRouter.Instance != null)
-        {
-            // 儀式ループ: 方針が未設定の日のみ問いかけを挟む。「やめる」で着席メニューに戻す
-            PolicyPromptUI.Instance.OpenOrPass(
-                () => SceneRouter.Instance.EnterFocus(),
-                () => OpenFor(seat));
-        }
-        else if (SceneRouter.Instance != null) SceneRouter.Instance.EnterFocus();
+        // 2026-07-27: 「今日はどんな一日にしたいですか？」の問いかけは廃止。
+        // 方針の設定はWeeklyタブに一本化し、儀式ループ（注文→着席→フォーカス突入）に
+        // 余計な問いを挟まない。PolicyPromptUI は呼び出しを外しただけで残してあるので、
+        // 復活させたい場合はここで OpenOrPass を呼び戻せばよい。
+        if (SceneRouter.Instance != null) SceneRouter.Instance.EnterFocus();
     }
 
     private void OnStand()

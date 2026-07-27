@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// ポモドーロ計測のUI非依存な本体（仕様書v4 §11 / Phase 3）。
@@ -35,6 +36,10 @@ public class PomodoroManager : MonoBehaviour
         }
     }
 
+    /// <summary>生成せずに現在のインスタンスだけ返す。OnDisable/OnDestroyの購読解除で使う
+    /// （Instanceだと終了時に作り直してしまうため）。</summary>
+    public static PomodoroManager InstanceOrNull => _instance;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {
@@ -48,15 +53,19 @@ public class PomodoroManager : MonoBehaviour
         if (found != null) { _instance = found; return; }
 
         var go = new GameObject("[PomodoroManager]");
+        // エディットモードでは DontDestroyOnLoad が使えない（例外になる）。
+        // エディタスクリプトがプロキシ経由でプロパティを触るだけでも生成され得るので、
+        // 再生中以外はシーンに残さない一時オブジェクトとして扱う。
+        if (!Application.isPlaying) go.hideFlags = HideFlags.HideAndDontSave;
         _instance = go.AddComponent<PomodoroManager>();
-        DontDestroyOnLoad(go);
+        if (Application.isPlaying) DontDestroyOnLoad(go);
     }
 
     private void Awake()
     {
         if (_instance != null && _instance != this) { Destroy(gameObject); return; }
         _instance = this;
-        DontDestroyOnLoad(gameObject);
+        if (Application.isPlaying) DontDestroyOnLoad(gameObject);
         LoadSettings();
         SetupAudio();
         // 起動直後は「設定表示」状態にしておく（移行前の PreparePomodoro と同じ入り口）
@@ -117,6 +126,30 @@ public class PomodoroManager : MonoBehaviour
         set { _soundEnabled = value; PlayerPrefs.SetInt(K_SOUND, value ? 1 : 0); }
     }
 
+    /// <summary>
+    /// 保存値がまだ無いときだけ、旧TimerControllerのインスペクタ値を初期値として取り込む。
+    /// 移行時に「シーンで設定していた値が25/5/15/4に戻る」事故を防ぐための一方通行の種まき。
+    /// </summary>
+    public void SeedDefaultsIfUnset(float work, float brk, float longBreak, int cycles, int everyRounds)
+    {
+        bool seeded = false;
+        if (!PlayerPrefs.HasKey(K_WORK))   { _workMinutes      = Mathf.Clamp(work, 1f, 99f);      PlayerPrefs.SetFloat(K_WORK, _workMinutes);        seeded = true; }
+        if (!PlayerPrefs.HasKey(K_BREAK))  { _breakMinutes     = Mathf.Clamp(brk, 1f, 99f);       PlayerPrefs.SetFloat(K_BREAK, _breakMinutes);      seeded = true; }
+        if (!PlayerPrefs.HasKey(K_LONG))   { _longBreakMinutes = Mathf.Clamp(longBreak, 1f, 99f); PlayerPrefs.SetFloat(K_LONG, _longBreakMinutes);   seeded = true; }
+        if (!PlayerPrefs.HasKey(K_CYCLES)) { _cycleCount       = Mathf.Clamp(cycles, 1, 99);      PlayerPrefs.SetInt(K_CYCLES, _cycleCount);         seeded = true; }
+        if (!PlayerPrefs.HasKey(K_EVERY))  { _longBreakEvery   = Mathf.Max(1, everyRounds);       PlayerPrefs.SetInt(K_EVERY, _longBreakEvery);      seeded = true; }
+        if (!seeded) return;
+        // 停止中なら、種まきした値を表示にも反映する
+        if (_phase == TimerController.TimerPhase.Stopped) PreparePomodoro();
+    }
+
+    /// <summary>通知メッセージの表示時間（旧TimerControllerのインスペクタ値を引き継ぐ）。</summary>
+    public float NotificationDuration
+    {
+        get => _notificationDuration;
+        set => _notificationDuration = Mathf.Max(0f, value);
+    }
+
     private void LoadSettings()
     {
         _workMinutes      = PlayerPrefs.GetFloat(K_WORK,   25f);
@@ -174,6 +207,24 @@ public class PomodoroManager : MonoBehaviour
     public IReadOnlyList<string> Laps => _laps;
     public bool IsAwaitingNextPhase => _mode == TimerController.TimerMode.Pomodoro && _awaitingNextPhase;
 
+    private void OnEnable()  { SceneManager.activeSceneChanged += HandleSceneChanged; }
+    private void OnDisable() { SceneManager.activeSceneChanged -= HandleSceneChanged; }
+
+    /// <summary>
+    /// 離席（フォーカス画面を出る）＝一時停止。2026-07-27の決定（B案）。
+    /// リセットしないのが要点で、経過時間を偽らずに中断を残す。再入場したときは
+    /// 『進行中だが止まっている』状態がカードとバーに出るので、▶で続ける／Rで捨てるを
+    /// プレイヤーが選べる（＝モーダルで問わずに既存のボタンで選ばせる）。
+    /// お店に寄っただけで作業が消えないので「やめても捨てたくならない」方針とも噛み合う。
+    /// </summary>
+    private void HandleSceneChanged(Scene from, Scene to)
+    {
+        if (to.name == SceneRouter.FocusScene) return; // 再入場時は何もしない（状態を保つ）
+        if (!_isRunning) return;
+        Pause();
+        Debug.Log($"[Pomodoro] 離席のため一時停止（残り {FormatTime(RemainingSeconds)} / {_currentRound}/{_totalRounds}）");
+    }
+
     private void Update()
     {
         UpdateNotificationVisibility();
@@ -225,6 +276,7 @@ public class PomodoroManager : MonoBehaviour
         _laps.Clear();
         StartPhase(TimerController.TimerPhase.Work, _workDurationSeconds);
         ShowNotification("Pomodoro started");
+        PlayCue(CueFocusStart, 0);
     }
 
     /// <summary>停止状態に戻す（Rボタン）。移行前と違い、設定は保持中の値を使う。</summary>
@@ -354,6 +406,9 @@ public class PomodoroManager : MonoBehaviour
         var nextNotification = _queuedPhaseNotification;
         ClearQueuedPhase();
         StartPhase(nextPhase, nextDuration);
+        bool toBreak = nextPhase == TimerController.TimerPhase.ShortBreak
+                    || nextPhase == TimerController.TimerPhase.LongBreak;
+        PlayCue(toBreak ? CueFocusBreakStart : CueFocusStart, 0);
         if (!string.IsNullOrEmpty(nextNotification)) ShowNotification(nextNotification);
     }
 
@@ -428,7 +483,7 @@ public class PomodoroManager : MonoBehaviour
         _isPaused  = false;
         _elapsedBeforePauseSeconds = _phaseDurationSeconds;
         ShowNotification(message);
-        PlayBeep(2); // 全サイクル完了は2音
+        PlayCue(CueFocusComplete, 2);
         RaiseChanged();
     }
 
@@ -442,7 +497,7 @@ public class PomodoroManager : MonoBehaviour
         _isRunning = false;
         _isPaused  = false;
         ShowNotification("Phase complete");
-        PlayBeep(1); // フェーズ終了は1音（カード非表示・お店滞在中でも鳴る）
+        PlayCue(CueFocusEnd, 1); // カード非表示・お店滞在中でも鳴る
         RaiseChanged();
     }
 
@@ -526,6 +581,49 @@ public class PomodoroManager : MonoBehaviour
         _audio.spatialBlend = 0f; // 2D
         _audio.volume       = 0.35f;
         _beepClip = BuildBeepClip();
+        LogCueAvailability();
+    }
+
+    // ---- 音素材（docs/SoundList.md の命名に対応）--------------------------
+    // 素材を Assets/Resources/Audio/<id>.wav に置けば自動でそちらが使われる。
+    // 無い場合は生成波形のビープで代替する（素材待ちでも動作確認ができる）。
+    public const string CueFocusStart      = "se_focus_start";        // FOC-01 タイマー開始
+    public const string CueFocusEnd        = "se_focus_end";          // FOC-02 作業フェーズ終了
+    public const string CueFocusBreakStart = "se_focus_break_start";  // FOC-03 休憩フェーズ開始
+    public const string CueFocusComplete   = "jingle_focus_complete"; // FOC-04 全ラウンド完了
+
+    private readonly Dictionary<string, AudioClip> _cues = new Dictionary<string, AudioClip>();
+
+    private AudioClip ResolveCue(string id)
+    {
+        AudioClip clip;
+        if (_cues.TryGetValue(id, out clip)) return clip;
+        clip = Resources.Load<AudioClip>("Audio/" + id);
+        if (clip == null) clip = Resources.Load<AudioClip>(id);
+        _cues[id] = clip; // 見つからない結果もキャッシュする（毎回探しに行かない）
+        return clip;
+    }
+
+    private void LogCueAvailability()
+    {
+        var missing = new List<string>();
+        foreach (var id in new[] { CueFocusStart, CueFocusEnd, CueFocusBreakStart, CueFocusComplete })
+            if (ResolveCue(id) == null) missing.Add(id);
+        if (missing.Count > 0)
+            Debug.Log("[Pomodoro] 音素材が未配置なので生成ビープで代替: " + string.Join(", ", missing)
+                    + " ／ 置き場所: Assets/Resources/Audio/<名前>.wav");
+    }
+
+    /// <summary>
+    /// 素材があればそれを、無ければ生成ビープを鳴らす。
+    /// fallbackBeeps=0 のキューは素材が無いときは無音にする（開始音などで鳴らしすぎないため）。
+    /// </summary>
+    private void PlayCue(string id, int fallbackBeeps)
+    {
+        if (!_soundEnabled || _audio == null) return;
+        var clip = ResolveCue(id);
+        if (clip != null) { _audio.PlayOneShot(clip); return; }
+        if (fallbackBeeps > 0) PlayBeep(fallbackBeeps);
     }
 
     /// <summary>

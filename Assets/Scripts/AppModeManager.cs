@@ -57,7 +57,7 @@ public class AppModeManager : MonoBehaviour
     // ── バーUI ──
     private Canvas _barCanvas;
     private TextMeshProUGUI _barTimerLabel;
-    private TMP_Text _cardTimeSrc;
+
     private readonly Dictionary<string, Button> _barButtons = new();
     private readonly Dictionary<string, TextMeshProUGUI> _barLabels = new();
     private GameObject _navGroup;             // バーのナビ群（Bar時のみ表示）
@@ -73,11 +73,11 @@ public class AppModeManager : MonoBehaviour
     private bool _bgCamSaved;
     private Image _barProgress;               // 下端のポモドーロ進捗ライン
     private GameObject _logoBlock;
-    private Button[] _ctrlButtons;            // TimerCardのR/再生/スキップ（バーから呼ぶ）
-    private TMP_Text _cycleSrc;               // 「サイクル n / m」の元テキスト
+
+
     private TextMeshProUGUI _barCycleLabel;   // バーの 1/4 表示
     private TextMeshProUGUI _barPlayLabel;    // バーの再生/一時停止グリフ
-    private TimerController _timerCtl;        // 作業中/休憩中の色同期用
+    private static PomodoroManager PM => PomodoroManager.Instance; // 計測の実体（シーン非依存）
     private float _nextSync;
 
     private Vector2Int _lastSize;
@@ -164,8 +164,8 @@ public class AppModeManager : MonoBehaviour
         _mainScaler = null; _mainCanvas = null; _wmArea = null; _wmAreaGroup = null;
         _wm = null; _wmButtons = null; _wmWindows = null; _backToCafe = null;
         _leftCol = null; _leftColGroup = null; _timerCard = null;
-        _charGroup = null; _charCam = null; _cardTimeSrc = null;
-        _ctrlButtons = null; _cycleSrc = null; _timerCtl = null;
+        _charGroup = null; _charCam = null;
+
         _bgCam = null; _bgCamSaved = false;
         _origSaved = false; _appliedTab = null;
         ApplyAll();
@@ -220,12 +220,31 @@ public void RequestMode(Mode target, string tab = null)
         if (SceneRouter.Instance != null) SceneRouter.Instance.ExitFocus();
     }
 
-/// <summary>TimerCardの操作ボタン（0=R, 1=再生/一時停止, 2=スキップ）をバーから呼ぶ。</summary>
+/// <summary>
+    /// バーのタイマー操作（0=R, 1=再生/一時停止, 2=✓）。
+    /// Phase 3以降は PomodoroManager を直接叩く（移行前はTimerCardの実ボタンのonClickを
+    /// Invokeしていたため、カードが無い場面では機能しなかった）。分岐はカードと同一。
+    /// </summary>
     private void InvokeTimerControl(int idx)
     {
-        CacheObjects();
-        if (_ctrlButtons != null && idx < _ctrlButtons.Length && _ctrlButtons[idx] != null)
-            _ctrlButtons[idx].onClick.Invoke();
+        var m = PM;
+        if (m == null) return;
+        bool stopped = m.Phase == TimerController.TimerPhase.Stopped;
+        switch (idx)
+        {
+            case 0:
+                m.PreparePomodoro();
+                break;
+            case 1:
+                if (stopped) m.StartWithSettings();
+                else         m.TogglePause();
+                break;
+            case 2:
+                if (stopped)                    m.StartWithSettings();
+                else if (m.IsAwaitingNextPhase) m.AdvanceToNextPhase();
+                else                            m.ForceAdvancePhase();
+                break;
+        }
     }
 
 /// <summary>Barモードの透過：背景カメラのクリアをα=0にして角丸カードの外を突き抜く。
@@ -418,12 +437,7 @@ private void Update()
                         foreach (var cam in FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                             if (cam.targetTexture == rtex) { _charCam = cam; break; }
                 }
-                // タイマー操作ボタン（R/再生/スキップ）をバーから叩けるように取得
-                if (_ctrlButtons == null && _timerCard != null)
-                {
-                    var ctl = _timerCard.Find("ControlButtons");
-                    if (ctl != null) _ctrlButtons = ctl.GetComponentsInChildren<Button>(true);
-                }
+
             }
         }
         // 元レイアウトの保存（1回だけ）
@@ -1158,9 +1172,9 @@ private void SyncBar()
             if (_logoBlock.activeSelf != show) _logoBlock.SetActive(show);
         }
 
-        // ポモドーロ状態（色・進捗の共有ソース。Phase 3 で PomodoroManager に置換予定）
-        if (_timerCtl == null) _timerCtl = FindAnyObjectByType<TimerController>(FindObjectsInactive.Include);
-        var phase = _timerCtl != null ? _timerCtl.Phase : TimerController.TimerPhase.Stopped;
+        // ポモドーロ状態（Phase 3以降は PomodoroManager が唯一のソース）
+        var m = PM;
+        var phase = m != null ? m.Phase : TimerController.TimerPhase.Stopped;
         bool onBreak = phase == TimerController.TimerPhase.ShortBreak || phase == TimerController.TimerPhase.LongBreak;
         bool ticking = onBreak || phase == TimerController.TimerPhase.Work || phase == TimerController.TimerPhase.Stopwatch;
         var stateCol = !ticking ? LabelIdle : (onBreak ? TimerBreak : TimerWork);
@@ -1168,20 +1182,11 @@ private void SyncBar()
         // TimerCard 内の mm:ss をミラー＋状態色（作業=青／休憩=緑／停止=グレー）
         if (_barTimerLabel != null)
         {
-            if (_cardTimeSrc == null && _timerCard != null)
-            {
-                float best = 0f;
-                foreach (var t in _timerCard.GetComponentsInChildren<TMP_Text>(true))
-                {
-                    if (t == null || string.IsNullOrEmpty(t.text)) continue;
-                    if (System.Text.RegularExpressions.Regex.IsMatch(t.text.Trim(), @"^\d{1,3}:\d{2}$") && t.fontSize > best)
-                    {
-                        best = t.fontSize;
-                        _cardTimeSrc = t;
-                    }
-                }
-            }
-            _barTimerLabel.text = _cardTimeSrc != null ? _cardTimeSrc.text.Trim() : "--:--";
+            // 停止中は設定値、稼働中は残り時間（カードと同じ規則）
+            _barTimerLabel.text = m == null ? "--:--"
+                : phase == TimerController.TimerPhase.Stopped
+                    ? PomodoroManager.FormatTime(m.WorkMinutes * 60f)
+                    : PomodoroManager.FormatTime(m.RemainingSeconds);
             if (_barTimerLabel.color != stateCol) _barTimerLabel.color = stateCol;
         }
 
@@ -1192,7 +1197,7 @@ private void SyncBar()
             if (_barProgress.enabled != show) _barProgress.enabled = show;
             if (show)
             {
-                float frac = Mathf.Clamp01(1f - _timerCtl.Progress01);
+                float frac = Mathf.Clamp01(1f - m.Progress01);
                 var prt = (RectTransform)_barProgress.transform;
                 float pw = _barRootRT != null ? _barRootRT.rect.width : Screen.width / BarScale();
                 var wantSz = new Vector2(pw * frac, 2f);
@@ -1204,24 +1209,15 @@ private void SyncBar()
         // サイクル（n/m）ミラー：稼働中はゴールド（カフェの差し色）
         if (_barCycleLabel != null)
         {
-            if (_cycleSrc == null && _timerCard != null)
-            {
-                foreach (var t in _timerCard.GetComponentsInChildren<TMP_Text>(true))
-                    if (t != null && t.text != null && t.text.Contains("サイクル")) { _cycleSrc = t; break; }
-            }
-            if (_cycleSrc != null)
-            {
-                var mm = System.Text.RegularExpressions.Regex.Match(_cycleSrc.text, @"(\d+)\s*/\s*(\d+)");
-                if (mm.Success) _barCycleLabel.text = mm.Groups[1].Value + "/" + mm.Groups[2].Value;
-            }
+            if (m != null)
+                _barCycleLabel.text = phase == TimerController.TimerPhase.Stopped
+                    ? "1/" + m.CycleCount
+                    : m.CurrentRound + "/" + m.TotalRounds;
             var cg = ticking ? new Color(1f, 0.776f, 0.302f, 0.95f) : LabelIdle;
             if (_barCycleLabel.color != cg) _barCycleLabel.color = cg;
         }
-        if (_barPlayLabel != null && _ctrlButtons != null && _ctrlButtons.Length > 1 && _ctrlButtons[1] != null)
-        {
-            var pt = _ctrlButtons[1].GetComponentInChildren<TMP_Text>(true);
-            if (pt != null && !string.IsNullOrEmpty(pt.text)) _barPlayLabel.text = pt.text.Trim();
-        }
+        if (_barPlayLabel != null && m != null)
+            _barPlayLabel.text = m.IsRunning ? "II" : "\u25B6";
 
         if (_mode == Mode.Notebook || _mode == Mode.Full) SwitchWindow(_tab);
     }
