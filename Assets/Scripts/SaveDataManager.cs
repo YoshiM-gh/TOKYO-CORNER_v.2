@@ -198,11 +198,17 @@ public class SaveDataManager : MonoBehaviour
         modeAtLastSample = currentMode;
     }
 
+    /// <summary>
+    /// 現在のモード。**シーンで判定する**（2026-07-27修正）。
+    /// 旧実装は GameModeManager.Instance を見ていたが、フォーカスは別シーンになり
+    /// そこには GameModeManager が居ないため Instance が null → 直前の値(Roaming)を返し続け、
+    /// **集中時間がすべて散策時間に計上されていた**。
+    /// </summary>
     private GameModeManager.GameMode GetCurrentMode()
     {
-        return GameModeManager.Instance != null
-            ? GameModeManager.Instance.CurrentMode
-            : modeAtLastSample;
+        return SceneRouter.IsFocusScene
+            ? GameModeManager.GameMode.Focus
+            : GameModeManager.GameMode.Roaming;
     }
 
     public bool TryPurchaseMvpDrink()

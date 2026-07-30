@@ -8,7 +8,7 @@ using UnityEngine;
 /// 実体は <see cref="PomodoroManager"/>（DontDestroyOnLoadシングルトン）に移動した。
 ///
 /// このクラスを残す理由: シーン内のシリアライズ参照
-/// （GameModeManager / PomodoroTimerUI / FocusPanelController / FocusPanelSetup）を
+/// （PomodoroTimerUI など。旧FocusUI系はPhase 5で削除済み）を
 /// 一切張り替えずに移行を終わらせるため。**公開API・enum・FormatTime は移行前と同一**。
 ///
 /// - 状態は持たない（すべて Manager に委譲）

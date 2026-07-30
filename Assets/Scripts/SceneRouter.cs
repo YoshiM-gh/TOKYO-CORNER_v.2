@@ -58,6 +58,13 @@ public class SceneRouter : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 現在フォーカス画面に居るか。フォーカスは別シーン(UI_Prototype)になったため、
+    /// モード判定は GameModeManager ではなく**シーン**で行うのが正しい。
+    /// GameModeManager は Cafe の住人なので、フォーカス中は Instance が null になる。
+    /// </summary>
+    public static bool IsFocusScene => SceneManager.GetActiveScene().name == FocusScene;
+
     public void EnterFocus() { StartTransition(FocusScene); }
     public void ExitFocus() { StartTransition(CafeScene); }
 
