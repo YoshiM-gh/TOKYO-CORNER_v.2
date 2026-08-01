@@ -1,21 +1,24 @@
 using UnityEngine;
 
 /// <summary>
-/// 無操作時にフレームレートを自動で落とし、入力があれば即復帰する省電力機構。
-/// GameObject不要（起動時に自動生成）。
+/// フレームレートの動的制御（省電力）。GameObject不要（起動時に自動生成）。
 ///
-/// 2026-07-27: 下限をシーンで分けた。
-/// 元は全シーン一律5fpsだったが、カフェのように**キャラが動いている3D画面**では
-/// 1秒5コマの描画が「小刻みに震える」「その場で足踏みする」ように見えてしまう
-/// （実測では位置・接地は正常で、カクつきによる見え方だけの問題）。
-/// 道具画面（カレンダー/Todo/メモ）は静止画に近いので5fpsで問題ない。
+/// 決め方は「今どれだけの絵が動いているか」で、2つの軸を掛け合わせる:
+///   1. 表示モード … Bar/Timer は数字と小さなUIしか動かないので操作中でも低くてよい
+///   2. 無操作かどうか … 3秒以上さわっていなければさらに落とす
+///
+/// 2026-07-27: 全シーン一律5fpsだったのをシーン別にした（3D世界で5fpsは動きが破綻して見える）。
+/// 2026-07-31: 表示モードの軸を追加（Phase 4）。
 /// </summary>
 public class IdleFrameThrottle : MonoBehaviour
 {
-    private const int   ACTIVE_FPS     = 30; // 操作中
-    private const int   IDLE_FPS_TOOL  = 5;  // 無操作時・道具画面（ほぼ静止画）
-    private const int   IDLE_FPS_WORLD = 20; // 無操作時・3D世界（キャラが動くので下げすぎない）
-    private const float IDLE_AFTER     = 3f; // この秒数無操作でアイドル扱い
+    private const int ACTIVE_WORLD  = 30; // 操作中・3Dのカフェ
+    private const int ACTIVE_TOOL   = 30; // 操作中・道具画面（スクロールの追従があるので落とさない）
+    private const int ACTIVE_COMPACT= 15; // 操作中・Bar/Timer（数字と小さなUIだけ）
+    private const int IDLE_WORLD    = 20; // 無操作・3Dのカフェ（キャラが動くので落としすぎない）
+    private const int IDLE_TOOL     = 5;  // 無操作・道具画面（ほぼ静止画）
+    private const int IDLE_COMPACT  = 5;  // 無操作・Bar/Timer
+    private const float IDLE_AFTER  = 3f;
 
     private float   _lastActiveTime;
     private Vector3 _lastMousePos;
@@ -36,19 +39,27 @@ public class IdleFrameThrottle : MonoBehaviour
 
     private void Update()
     {
-        // キー・クリック・スクロール・マウス移動のいずれかで「操作中」とみなす
         bool active =
             Input.anyKey ||
             Input.mouseScrollDelta.sqrMagnitude > 0.0001f ||
             (Input.mousePosition - _lastMousePos).sqrMagnitude > 4f;
         _lastMousePos = Input.mousePosition;
-
         if (active) _lastActiveTime = Time.unscaledTime;
 
         bool idle = Time.unscaledTime - _lastActiveTime > IDLE_AFTER;
-        int target = !idle ? ACTIVE_FPS
-                   : SceneRouter.IsFocusScene ? IDLE_FPS_TOOL   // 道具画面
-                                              : IDLE_FPS_WORLD; // カフェ・オープニング
+        int target;
+
+        if (!SceneRouter.IsFocusScene)
+        {
+            target = idle ? IDLE_WORLD : ACTIVE_WORLD; // カフェ・オープニング
+        }
+        else
+        {
+            var am = AppModeManager.Instance;
+            bool compact = am != null && am.IsCompactMode; // Bar / Timer
+            if (compact) target = idle ? IDLE_COMPACT : ACTIVE_COMPACT;
+            else         target = idle ? IDLE_TOOL    : ACTIVE_TOOL;
+        }
 
         if (Application.targetFrameRate != target)
             Application.targetFrameRate = target;

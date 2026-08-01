@@ -18,6 +18,12 @@ public class AppModeManager : MonoBehaviour
 {
     public enum Mode { Bar = 0, Timer = 1, Notebook = 2, Full = 3 }
 
+    /// <summary>他所からタブ切替を頼むための入口（カレンダーの日付セルなど）。</summary>
+    public static AppModeManager Instance { get; private set; }
+
+    /// <summary>Bar / Timer か（数字と小さなUIしか動かない省エネ向きの状態）。fps制御が参照する。</summary>
+    public bool IsCompactMode => _mode == Mode.Bar || _mode == Mode.Timer;
+
     // ── 定数（実測ベース） ──
     private const float MIN_SCALE  = 0.8f;
     private const int   FULL_MIN_W = 1536, FULL_MIN_H = 864;
@@ -38,7 +44,6 @@ public class AppModeManager : MonoBehaviour
     private Canvas        _mainCanvas;
     private RectTransform _wmArea;
     private CanvasGroup   _wmAreaGroup;
-    private Michsky.MUIP.WindowManager _wm;
     private GameObject    _wmButtons;      // 旧ナビ（トルツメ対象）
     private RectTransform _wmWindows;
     private GameObject    _backToCafe;     // 旧「お店に戻る」（トルツメ対象）
@@ -151,6 +156,7 @@ public class AppModeManager : MonoBehaviour
 
     private void Start()
     {
+        Instance = this;
         _mode = (Mode)PlayerPrefs.GetInt("tc_mode", (int)Mode.Full);
         _tab  = PlayerPrefs.GetString("tc_tab", "Monthly");
         BuildBar();
@@ -162,7 +168,7 @@ public class AppModeManager : MonoBehaviour
     {
         _orig.Clear();
         _mainScaler = null; _mainCanvas = null; _wmArea = null; _wmAreaGroup = null;
-        _wm = null; _wmButtons = null; _wmWindows = null; _backToCafe = null;
+        _wmButtons = null; _wmWindows = null; _backToCafe = null;
         _leftCol = null; _leftColGroup = null; _timerCard = null;
         _charGroup = null; _charCam = null;
 
@@ -208,9 +214,8 @@ public void RequestMode(Mode target, string tab = null)
         _mode = next;
         PlayerPrefs.SetInt("tc_mode", (int)_mode);
         ApplyScalers();
-        RestoreWindowSize(_mode);
+        BeginWindowResize(_mode); // 引き伸ばし対策：画面を伏せてから次フレームでリサイズ
         ApplyAll();
-        ApplyWindowAspect();
         _reapplyAt = Time.unscaledTime + 0.7f;
         Debug.Log($"[AppModeManager] mode → {_mode} (tab={_tab})");
     }
@@ -278,6 +283,8 @@ public void RequestMode(Mode target, string tab = null)
     // ── 毎フレーム ─────────────────────────────────────────
 private void Update()
     {
+        TickWindowResize(); // 伏せる→リサイズ→戻す の進行（引き伸ばし対策）
+
         if (Screen.width != _lastSize.x || Screen.height != _lastSize.y)
         {
             _lastSize = new Vector2Int(Screen.width, Screen.height);
@@ -403,8 +410,7 @@ private void Update()
                 _wmArea      = areaGO.transform as RectTransform;
                 _wmAreaGroup = areaGO.GetComponent<CanvasGroup>();
                 if (_wmAreaGroup == null) _wmAreaGroup = areaGO.AddComponent<CanvasGroup>(); // Unityのfake null対策で??は使わない
-                _wm          = areaGO.GetComponentInChildren<Michsky.MUIP.WindowManager>(true);
-                var wmT      = _wm != null ? _wm.transform : areaGO.transform.Find("Window Manager");
+                var wmT      = areaGO.transform.Find("Window Manager");
                 if (wmT != null)
                 {
                     var b = wmT.Find("Buttons");   _wmButtons = b != null ? b.gameObject : null;
@@ -498,6 +504,43 @@ private void Update()
                 cs.matchWidthOrHeight  = o.match;
             }
         }
+    }
+
+    // ── ウィンドウリサイズ時の『引き伸ばし』対策 ──────────────
+    // OSはウィンドウのリサイズ中、アプリが新しいフレームを描き終えるまで
+    // 直前のフレームを新しいサイズへ引き伸ばして表示する。
+    // Barモード（高さ48px）の絵が縦に伸びると、バーの文字ごと間延びして見えていた。
+    // → リサイズの直前に画面を伏せて『無地のフレーム』を1枚描いてからサイズを変える。
+    //   無地なら引き伸ばされても分からないので、切替が瞬時に見える。
+    private Mode _resizeMode;
+    private int  _resizeStep = -1; // -1=何もしない / 0=伏せた / 1=リサイズ済み
+
+    private void BeginWindowResize(Mode m)
+    {
+        _resizeMode = m;
+        _resizeStep = 0;
+        if (_barCanvas != null)  _barCanvas.enabled = false;
+        if (_mainCanvas != null) _mainCanvas.enabled = false;
+    }
+
+    private void TickWindowResize()
+    {
+        if (_resizeStep < 0) return;
+
+        if (_resizeStep == 0)
+        {
+            // 無地のフレームが1枚描かれた後にサイズを変える
+            RestoreWindowSize(_resizeMode);
+            ApplyWindowAspect();
+            _resizeStep = 1;
+            return;
+        }
+
+        // 新しいサイズで描き直せる状態になったので戻す
+        if (_barCanvas != null)  _barCanvas.enabled = true;
+        if (_mainCanvas != null) _mainCanvas.enabled = true;
+        _resizeStep = -1;
+        ApplyAll();
     }
 
     // ── レイアウト強制（毎フレーム・変更時のみ書き込み）──────
@@ -1142,23 +1185,8 @@ private void SyncBar()
         if (Time.unscaledTime < _nextSync) return;
         _nextSync = Time.unscaledTime + 0.5f;
 
-        // 旧ナビ直クリックとの同期：保留中の切替が無ければ WindowManager 側を正とする
-        if ((_mode == Mode.Notebook || _mode == Mode.Full) && _wm != null && _appliedTab == _tab)
-        {
-            try
-            {
-                if (_wm.windows != null && _wm.currentWindowIndex >= 0 && _wm.currentWindowIndex < _wm.windows.Count)
-                {
-                    string cur = _wm.windows[_wm.currentWindowIndex].windowName;
-                    if (!string.IsNullOrEmpty(cur) && cur != _tab)
-                    {
-                        _tab = cur; _appliedTab = cur;
-                        PlayerPrefs.SetString("tc_tab", cur);
-                    }
-                }
-            }
-            catch { }
-        }
+        // 旧ナビ（Buttons行）は全モードで非表示のため、WindowManager側からタブを読み戻す
+        // 処理はPhase 5で撤去した。タブの唯一のソースは _tab（＝ヘッダーバーのナビ）。
         UpdateBarHighlight();
 
         // ディスプレイ間移動でDPIが変わったらバースケールを追従
@@ -1223,11 +1251,42 @@ private void SyncBar()
     }
 
     private string _appliedTab;
+
+    /// <summary>
+    /// タブ切替。Michsky WindowManager.OpenWindow() の置き換え（Phase 5）。
+    /// 名前が一致した画面だけを有効にし、他は無効にする。フェードは入れない:
+    ///  - MUIPのフェードは Animator + CanvasGroup で行われ、連打すると複数画面が一瞬重なった
+    ///  - SetActive で切り替えると各画面の OnEnable が正しく発火し、再描画が自然に走る
+    ///    （フェード方式では OnEnable が来ないためポーリングで代用していた）
+    /// </summary>
     private void SwitchWindow(string key)
     {
-        if (_appliedTab == key || _wm == null) return;
-        try { _wm.OpenWindow(key); _appliedTab = key; }
-        catch (System.Exception e) { Debug.LogWarning("[AppModeManager] OpenWindow失敗: " + e.Message); _appliedTab = key; }
+        if (_appliedTab == key || _wmWindows == null) return;
+
+        for (int i = 0; i < _wmWindows.childCount; i++)
+        {
+            var child = _wmWindows.GetChild(i);
+            bool show = child.name == key;
+            if (child.gameObject.activeSelf != show) child.gameObject.SetActive(show);
+            if (!show) continue;
+
+            // MUIPがフェード途中の値を残していることがあるため、表示側は毎回正規化する
+            var cg = child.GetComponent<CanvasGroup>();
+            if (cg != null)
+            {
+                cg.alpha = 1f;
+                cg.interactable = true;
+                cg.blocksRaycasts = true;
+            }
+        }
+        _appliedTab = key;
+    }
+
+    /// <summary>外部（カレンダーの日付セル等）からのタブ切替要求。現在のモードは保つ。</summary>
+    public void RequestTab(string tab)
+    {
+        if (string.IsNullOrEmpty(tab)) return;
+        RequestMode(_mode == Mode.Full ? Mode.Full : Mode.Notebook, tab);
     }
 
 /// <summary>トンマナ方針（仕様書§11）：ツール画面（UI_Prototype）のKotonoruをNotoに統一。

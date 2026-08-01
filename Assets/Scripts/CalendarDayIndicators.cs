@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,7 +16,6 @@ public static class CalendarDayIndicators
     private const float ICON_H    = 26f;
     private const float ICON_GAP  = 4f;
 
-    private static Michsky.MUIP.WindowManager _wm;
 
     /// <summary>既存インジケータの除去（セル再利用時のクリア用）</summary>
     public static void Clear(Transform cell)
@@ -101,10 +100,14 @@ public static class CalendarDayIndicators
         btn.onClick.AddListener(() => OpenTab(cap));
     }
 
+    /// <summary>
+    /// 日付セルのインジケータから対象タブへ飛ぶ。
+    /// Phase 5で MUIP WindowManager を廃止したため、AppModeManager に依頼する。
+    /// 直接ウィンドウを切り替えるとヘッダーバーのアクティブ表示や保存済みタブとズレるため、
+    /// 必ずこの経路を通す。
+    /// </summary>
     private static void OpenTab(string windowName)
     {
-        if (_wm == null)
-            _wm = UnityEngine.Object.FindFirstObjectByType<Michsky.MUIP.WindowManager>(FindObjectsInactive.Include);
-        if (_wm != null) _wm.OpenWindow(windowName);
+        if (AppModeManager.Instance != null) AppModeManager.Instance.RequestTab(windowName);
     }
 }
