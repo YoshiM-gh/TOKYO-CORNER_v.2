@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Controller
 {
@@ -58,31 +57,9 @@ namespace Controller
         {
             m_Axis = new Vector2(Input.GetAxis(m_HorizontalAxis), Input.GetAxis(m_VerticalAxis));
             m_IsRun = Input.GetKey(m_RunKey);
-            m_IsJump = Input.GetButton(m_JumpButton) ||
-                       (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame);
+            m_IsJump = Input.GetButton(m_JumpButton);
 
-            if (m_Camera != null)
-            {
-                m_Target = m_Camera.Target;
-            }
-            else if (UnityEngine.Camera.main != null)
-            {
-                var cameraForward = UnityEngine.Camera.main.transform.forward;
-                cameraForward.y = 0f;
-                if (cameraForward.sqrMagnitude < 0.0001f)
-                {
-                    cameraForward = transform.forward;
-                }
-                else
-                {
-                    cameraForward.Normalize();
-                }
-                m_Target = transform.position + cameraForward * 10f;
-            }
-            else
-            {
-                m_Target = transform.position + transform.forward;
-            }
+            m_Target = (m_Camera == null) ? Vector3.zero : m_Camera.Target;
             m_MouseDelta = new Vector2(Input.GetAxis(m_MouseX), Input.GetAxis(m_MouseY));
             m_Scroll = Input.GetAxis(m_MouseScroll);
         }

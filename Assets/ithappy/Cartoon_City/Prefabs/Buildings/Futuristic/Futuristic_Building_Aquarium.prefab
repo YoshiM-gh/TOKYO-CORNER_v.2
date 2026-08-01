@@ -1,0 +1,216 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &7029968208249720772
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 8068822800856804916}
+    m_Modifications:
+    - target: {fileID: 3463449020248253663, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_Name
+      value: Futuristic_Building_Aquarium_Fish
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_RootOrder
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 1.27
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 14.47
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 4.67
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4277139970145271397, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+--- !u!1 &5881650941392972571 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3463449020248253663, guid: 6b7b59fdee9c4fb408ee74939a112b48, type: 3}
+  m_PrefabInstance: {fileID: 7029968208249720772}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1618586937095617467
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5881650941392972571}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 1
+  rotationSpeed: -30
+--- !u!1001 &7525672118346385887
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+      propertyPath: m_Name
+      value: Futuristic_Building_Aquarium
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+--- !u!1 &7255834714623456398 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+  m_PrefabInstance: {fileID: 7525672118346385887}
+  m_PrefabAsset: {fileID: 0}
+--- !u!64 &-8400587997826921449
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7255834714623456398}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 4
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -576233559679946060, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+--- !u!4 &8068822800856804916 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 67a62d295dc7f524b98c528c7cf48dc5, type: 3}
+  m_PrefabInstance: {fileID: 7525672118346385887}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &8887132750604305295
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 8068822800856804916}
+    m_Modifications:
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5961481492312692351, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6480890387629952197, guid: 0482473e97db4de41879efe46153925e, type: 3}
+      propertyPath: m_Name
+      value: Futuristic_Building_Aquarium_NightLight
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0482473e97db4de41879efe46153925e, type: 3}

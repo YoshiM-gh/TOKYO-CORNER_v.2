@@ -1,0 +1,1532 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &321669179590643640
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 14
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -30.66
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 5.48
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (14)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &603756749262421869 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 321669179590643640}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &8257367057463144348
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 603756749262421869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &708038551739717360
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 6878817280590980269}
+    m_Modifications:
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 38.48
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7683939796716173990, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Wheel_01
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+--- !u!1 &7165688557510290518 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7683939796716173990, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+  m_PrefabInstance: {fileID: 708038551739717360}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2853766815093783942
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7165688557510290518}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: 7
+--- !u!4 &7510442234337769196 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7055177043753918492, guid: 9f672075fd8a74a4392c31dea1fd4a04, type: 3}
+  m_PrefabInstance: {fileID: 708038551739717360}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &929849172964523983
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 26.97
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 15.65
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (3)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &67915870555033370 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 929849172964523983}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &4448698383568473604
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 67915870555033370}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &1220311761051585906
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 26.972
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -15.583
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (6)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &2087804280210783655 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 1220311761051585906}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &4943668136030855606
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2087804280210783655}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &1800845864263499512
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 9
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.009
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -31.133
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (9)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &1507534066769907245 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 1800845864263499512}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1878727213132826712
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1507534066769907245}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &1827952824806837821
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 20.021
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -23.786
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (7)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &1533480700093562600 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 1827952824806837821}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &5738490548595635139
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1533480700093562600}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &2447176133014083685
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 20
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 23.89
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (2)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &3305686384066996400 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 2447176133014083685}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &8772670359963326492
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3305686384066996400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &2472584690011500921
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -10.628
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -29.263
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (10)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &3334448602989887916 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 2472584690011500921}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &6913345478743639995
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3334448602989887916}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &2808260470162690131
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 30.66
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 5.48
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (4)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &3093629889847713926 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 2808260470162690131}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2165248892591005440
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3093629889847713926}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &3712350202857017853
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 30.713
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -5.36
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (5)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &4580969157923873064 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 3712350202857017853}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1138256395657731578
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4580969157923873064}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &3795413073304009242
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 10.61
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 29.28
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (1)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &4087634511676721871 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 3795413073304009242}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &331026446054430257
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4087634511676721871}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &4043854173418375533
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 15
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -26.97
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 15.65
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (15)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &3749407255530027448 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 4043854173418375533}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2086047319611000744
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3749407255530027448}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &4392041215285114268
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 31.15
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &3523397989287019849 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 4392041215285114268}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &4609677557551877643
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3523397989287019849}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &4634445046636370087
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 16
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -20
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 23.89
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (16)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &5496342961734199410 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 4634445046636370087}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3226722768675566536
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5496342961734199410}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &6144334207036875195
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 8
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 10.628
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -29.263
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (8)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &6436552693690405230 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 6144334207036875195}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1729919339564482078
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6436552693690405230}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &6301446425504944709
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 17
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -10.61
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 29.28
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (17)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &6585680860284347024 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 6301446425504944709}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1937467057434000501
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6585680860284347024}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &6412227166709007174
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_RootOrder
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_01
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+--- !u!1 &6070191987791887895 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+  m_PrefabInstance: {fileID: 6412227166709007174}
+  m_PrefabAsset: {fileID: 0}
+--- !u!64 &1183561215788013061
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6070191987791887895}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 4
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -1533902708968729358, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+--- !u!4 &6878817280590980269 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: b87bf6db5d04bfd48a544a96018c641e, type: 3}
+  m_PrefabInstance: {fileID: 6412227166709007174}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &6873010940324146784
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 12
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -26.972
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -15.583
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (12)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &6014525363790683829 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 6873010940324146784}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3178943272259507895
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6014525363790683829}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &7634267766909243278
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -30.713
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -5.36
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (13)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &7342111968186203995 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 7634267766909243278}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &6873740037293765838
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7342111968186203995}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
+--- !u!1001 &8313955466693919920
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 7510442234337769196}
+    m_Modifications:
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_RootOrder
+      value: 11
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -20.021
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -23.786
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 530832489443666543, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+      propertyPath: m_Name
+      value: FerrisWheel_Cabin_01 (11)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+--- !u!1 &9184862227088520293 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 870942928656593109, guid: a6c671c0e7b472e4b8e018f7292cab40, type: 3}
+  m_PrefabInstance: {fileID: 8313955466693919920}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1202145609291832778
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9184862227088520293}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a58089981c5c84da7dc4517976d59b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationAxis: 2
+  rotationSpeed: -7
