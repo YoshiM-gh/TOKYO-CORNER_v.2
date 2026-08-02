@@ -542,7 +542,6 @@ MonoBehaviour:
   m_RotateSpeed: 250
   m_Space: 1
   m_JumpHeight: 2
-  m_AutoFitController: 1
   m_HorizontalID: Hor
   m_VerticalID: Vert
   m_StateID: State
@@ -552,11 +551,6 @@ MonoBehaviour:
     body: 0.3
     head: 0.7
     eyes: 1
-  m_WalkAnimPlaySpeed: 1.8
-  m_RunAnimPlaySpeed: 2
-  m_IdleAnimPlaySpeed: 1
-  m_AirAnimPlaySpeed: 1
-  m_AnimPlaySpeedLerp: 10
 --- !u!143 &25556750
 CharacterController:
   m_ObjectHideFlags: 0
@@ -7273,6 +7267,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6782842514618377942, guid: fab32f6eda659fb4cbda3f884ae54f68, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1926188888}
+    - targetCorrespondingSourceObject: {fileID: 6782842514618377942, guid: fab32f6eda659fb4cbda3f884ae54f68, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1926188889}
   m_SourcePrefab: {fileID: 100100000, guid: fab32f6eda659fb4cbda3f884ae54f68, type: 3}
 --- !u!1 &416863707 stripped
 GameObject:
@@ -7374,7 +7371,6 @@ MonoBehaviour:
   m_RotateSpeed: 250
   m_Space: 1
   m_JumpHeight: 2
-  m_AutoFitController: 1
   m_HorizontalID: Hor
   m_VerticalID: Vert
   m_StateID: State
@@ -7384,11 +7380,6 @@ MonoBehaviour:
     body: 0.3
     head: 0.7
     eyes: 1
-  m_WalkAnimPlaySpeed: 1.8
-  m_RunAnimPlaySpeed: 2
-  m_IdleAnimPlaySpeed: 1
-  m_AirAnimPlaySpeed: 1
-  m_AnimPlaySpeedLerp: 10
 --- !u!143 &416863716
 CharacterController:
   m_ObjectHideFlags: 0
@@ -27636,7 +27627,6 @@ MonoBehaviour:
   m_RotateSpeed: 250
   m_Space: 1
   m_JumpHeight: 2
-  m_AutoFitController: 1
   m_HorizontalID: Hor
   m_VerticalID: Vert
   m_StateID: State
@@ -27646,11 +27636,6 @@ MonoBehaviour:
     body: 0.3
     head: 0.7
     eyes: 1
-  m_WalkAnimPlaySpeed: 1.8
-  m_RunAnimPlaySpeed: 2
-  m_IdleAnimPlaySpeed: 1
-  m_AirAnimPlaySpeed: 1
-  m_AnimPlaySpeedLerp: 10
 --- !u!143 &1926188887
 CharacterController:
   m_ObjectHideFlags: 0
@@ -27695,6 +27680,23 @@ MonoBehaviour:
   toggleKey: 289
   disableMoverWhileSitting: 1
   forcePlayState: 1
+--- !u!114 &1926188889
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926188882}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 623d927faf489440182a9bc9bc83f7b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FixedCameraPlayerInput
+  horizontalAxis: Horizontal
+  verticalAxis: Vertical
+  jumpButton: Jump
+  runKey: 304
+  lookAhead: 3
 --- !u!1 &1926265794
 GameObject:
   m_ObjectHideFlags: 0

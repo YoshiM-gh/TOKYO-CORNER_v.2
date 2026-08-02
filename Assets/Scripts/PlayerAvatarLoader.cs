@@ -46,6 +46,9 @@ public class PlayerAvatarLoader : MonoBehaviour
         CopyComponentTo(old, neo, typeof(CharacterController));
         CopyComponentTo(old, neo, System.Type.GetType("Controller.CharacterMover, Assembly-CSharp"));
         CopyComponentTo(old, neo, System.Type.GetType("Controller.MovePlayerInput, Assembly-CSharp"));
+        // 固定カメラ用の入力（向き先targetを自前で渡す）。これが無いとアバター差し替え後に
+        // 標準のMovePlayerInputが動き、targetが(0,0,0)＝ワールド原点向きに戻ってしまう。
+        CopyComponentTo(old, neo, System.Type.GetType("FixedCameraPlayerInput, Assembly-CSharp"));
         CopyComponentTo(old, neo, System.Type.GetType("SitPoseHotkeyDebug, Assembly-CSharp"));
 
         // カメラの追従先を差し替え（ithappy公式API）

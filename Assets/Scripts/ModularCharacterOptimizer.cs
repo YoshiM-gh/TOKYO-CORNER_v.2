@@ -38,8 +38,16 @@ public static class ModularCharacterOptimizer
             var parent = animator.transform.parent;
             if (parent != null && parent.GetComponentInParent<Animator>() != null) continue;
 
+            // 【重要】Animatorの数で足切りしてはいけない。
+            // ヒューマノイドのアバターは Animator が1個だけで、Avatarが対応づけているのは
+            // **体の骨格のみ**。他パーツは自前の骨格を持つのに誰も動かさないので、
+            // 体だけが動いて髪や服が初期姿勢で固まる（実際に発生した）。
+            // → 骨格が複数あるなら、Animatorが1個でも張り替えの対象にする。
             var children = animator.GetComponentsInChildren<Animator>(true);
-            if (children.Length <= 1) continue;
+            var skeletons = new HashSet<int>();
+            foreach (var smr in animator.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                if (smr.rootBone != null) skeletons.Add(smr.rootBone.GetInstanceID());
+            if (children.Length <= 1 && skeletons.Count <= 1) continue;
 
             int a, s;
             Optimize(animator, out a, out s);
@@ -60,10 +68,21 @@ public static class ModularCharacterOptimizer
         var renderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         if (renderers.Length == 0) return;
 
-        // マスター骨格 = 最もボーン数の多いパーツ（＝体）が参照している骨格
-        var master = renderers[0];
+        // マスター骨格の選定。
+        // 【重要】ボーン数だけで選んではいけない。モジュラーキャラは全パーツが同じ本数（44）を
+        // 持つことがあり、その場合「階層で最初のパーツ」が選ばれてしまう。
+        // ルートAnimatorが実際に動かすのは**体**の骨格なので、体以外を基準にすると
+        // 髪や服がアニメーションしない骨格に繋がり、体だけが動く状態になる（実際に発生）。
+        // → 名前に Body を含むパーツを最優先し、無い場合のみボーン数で決める。
+        SkinnedMeshRenderer master = null;
         foreach (var r in renderers)
-            if (r.bones != null && r.bones.Length > master.bones.Length) master = r;
+            if (r.gameObject.name.IndexOf("Body", System.StringComparison.OrdinalIgnoreCase) >= 0) { master = r; break; }
+        if (master == null)
+        {
+            master = renderers[0];
+            foreach (var r in renderers)
+                if (r.bones != null && r.bones.Length > master.bones.Length) master = r;
+        }
         if (master.rootBone == null) return;
 
         // 骨格ツリーの入れ物（例: .../Body_02/Skeleton_Adult）。この配下の名前で引けるようにする
@@ -107,11 +126,19 @@ public static class ModularCharacterOptimizer
             }
         }
 
-        // --- 余分な Animator を止める（A・B 共通）---
-        // ルート以外の Animator は、骨格を共有した時点で同じ結果を二重に書くだけになる。
+        // --- 余分な Animator を止める ---
+        // 骨格を共有できたパーツの Animator は、同じ骨に同じ結果を二重に書くだけなので止めてよい。
+        // 【重要】張り替えに失敗して自前の骨格が残っているパーツの Animator は止めてはいけない。
+        // 止めるとそのパーツだけアニメーションが凍りつく（体だけ動く状態になる）。
         foreach (var a in root.GetComponentsInChildren<Animator>(true))
         {
             if (a == root || !a.enabled) continue;
+
+            bool stillIndependent = false;
+            foreach (var smr in a.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                if (smr.rootBone != null && !smr.rootBone.IsChildOf(masterSkeleton)) stillIndependent = true;
+            if (stillIndependent) continue; // 自前の骨格で動いている＝止めない
+
             a.enabled = false;
             animatorsOff++;
         }
