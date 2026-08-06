@@ -123,6 +123,24 @@ public class PlayerAvatarLoader : MonoBehaviour
         foreach (var f in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
         {
             if (f.IsNotSerialized) continue;
+
+            // 【重要】インスペクタで設定する値だけを移植し、ランタイム状態には触れない。
+            //
+            // コンポーネントの多くは Awake で「自分自身を前提にした状態」を組み立てる。
+            // 例: CharacterMover は Awake で
+            //     m_Movement = new MovementHandler(自分のCharacterController, 自分のTransform, ...)
+            // を作る。AddComponent した時点で新体用に正しく組み上がっているのに、
+            // その後このループが旧体のインスタンスで上書きすると、
+            // 中身が「破棄される旧体」を掴んだままになり、Destroy(old) 後に
+            // Update() が毎フレーム NullReferenceException を投げて操作不能になる
+            // （Windowsビルドで実際に発生。2246回/起動）。
+            //
+            // 判定は「シリアライズされる値か」で行う。private でも [SerializeField] が
+            // 付いていればインスペクタ設定なので移植する。付いていない private は
+            // ランタイム状態とみなして新体の Awake の結果を残す。
+            bool isInspectorValue = f.IsPublic || System.Attribute.IsDefined(f, typeof(SerializeField));
+            if (!isInspectorValue) continue;
+
             object v = f.GetValue(s);
             // 未割当のObject参照はコピーしない（AddComponent時のAwakeによる自己解決を尊重）
             // ※旧体のm_Mover等はシーン上null→実行時自己解決の設計。nullで上書きすると新体のAwake解決を壊す

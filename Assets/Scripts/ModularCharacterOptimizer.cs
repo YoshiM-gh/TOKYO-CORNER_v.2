@@ -38,6 +38,13 @@ public static class ModularCharacterOptimizer
             var parent = animator.transform.parent;
             if (parent != null && parent.GetComponentInParent<Animator>() != null) continue;
 
+            // 【注意】プレイヤーも対象に含める。
+            // ヒューマノイドのAvatarが動かすのは体の骨格だけで、他パーツは自前の骨格を
+            // 持つのに誰も動かさない。張り替えないと服・髪・顔が初期姿勢のまま固まり、
+            // 全身がTポーズに見える（実機で確認）。
+            // 以前ここでプレイヤーを除外したが、当時の例外の真因は PlayerAvatarLoader の
+            // CopyComponentTo がランタイム状態まで上書きしていたことで、本クラスとは無関係だった。
+
             // 【重要】Animatorの数で足切りしてはいけない。
             // ヒューマノイドのアバターは Animator が1個だけで、Avatarが対応づけているのは
             // **体の骨格のみ**。他パーツは自前の骨格を持つのに誰も動かさないので、
@@ -57,7 +64,7 @@ public static class ModularCharacterOptimizer
         }
 
         if (chars > 0)
-            Debug.Log($"[CharacterOptimizer] {chars}体を最適化: Animator {animatorsOff}個を停止 / 重複骨格 {skeletonsRemoved}個を破棄");
+            Debug.Log($"[CharacterOptimizer] {chars}体を最適化: Animator {animatorsOff}個を停止 / 重複骨格 {skeletonsRemoved}個を停止");
     }
 
     private static void Optimize(Animator root, out int animatorsOff, out int skeletonsRemoved)
@@ -119,9 +126,14 @@ public static class ModularCharacterOptimizer
 
             smr.bones = rebound;
 
+            // 【重要】旧骨格を破棄してはいけない。
+            // CharacterMover は内部（MovementHandler）で骨格配下のTransformを掴んでおり、
+            // 破棄すると Update() が毎フレーム NullReferenceException を投げて移動処理が止まる
+            // （アニメだけ動いて操作不能になる。Windowsビルドで実際に発生）。
+            // メッシュの張り替えだけで描画コストは下がるので、骨格は非アクティブ化に留める。
             if (oldSkeleton != null && !oldSkeleton.IsChildOf(masterSkeleton))
             {
-                Object.Destroy(oldSkeleton.gameObject);
+                oldSkeleton.gameObject.SetActive(false);
                 skeletonsRemoved++;
             }
         }

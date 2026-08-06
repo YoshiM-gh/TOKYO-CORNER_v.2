@@ -34,18 +34,28 @@ public class FixedCameraPlayerInput : MonoBehaviour
     private Controller.MovePlayerInput _stock;
     private Vector3 _lastDir = Vector3.forward;
 
-    private void Awake()
+    /// <summary>
+    /// 参照は毎フレーム検証して取り直す。
+    /// 【重要】PlayerAvatarLoader はアバター差し替え時に、AddComponent した直後の
+    /// コンポーネントへ旧プレイヤーのフィールド値を機械的にコピーする。
+    /// そのため Awake で解決した参照は「破棄される旧オブジェクト」で上書きされ、
+    /// Destroy(old) 後に実質nullとなって入力が完全に死ぬ（実際に発生）。
+    /// Awakeで解決して持ち回る書き方をしてはいけない。
+    /// </summary>
+    private bool Resolve()
     {
-        _mover = GetComponent<Controller.CharacterMover>();
-        _stock = GetComponent<Controller.MovePlayerInput>();
+        if (_mover == null) _mover = GetComponent<Controller.CharacterMover>();
+        if (_stock == null) _stock = GetComponent<Controller.MovePlayerInput>();
 
         // 標準版と二重に入力を渡さないよう、こちらが動く間は止めておく
-        if (_stock != null) _stock.enabled = false;
+        if (_stock != null && _stock.enabled) _stock.enabled = false;
+
+        return _mover != null;
     }
 
     private void Update()
     {
-        if (_mover == null) return;
+        if (!Resolve()) return;
 
         var raw = new Vector2(Input.GetAxis(horizontalAxis), Input.GetAxis(verticalAxis));
         bool isRun = Input.GetKey(runKey);
