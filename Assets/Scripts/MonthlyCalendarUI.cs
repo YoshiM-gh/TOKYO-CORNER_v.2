@@ -153,20 +153,41 @@ public class MonthlyCalendarUI : MonoBehaviour
 
     // ─── 日付グリッド ─────────────────────────────────────
 
+    /// <summary>
+    /// 表示中の月が何行（週）必要かを返す。4〜6行になる。
+    /// 1日の曜日と週の開始曜日で先頭の空白数が決まり、それに日数を足して7で切り上げる。
+    /// </summary>
+    private int GetWeekRowCount()
+    {
+        int firstDow    = (int)new DateTime(currentYear, currentMonth, 1).DayOfWeek;
+        int daysInMonth = DateTime.DaysInMonth(currentYear, currentMonth);
+        int offset      = ((firstDow - weekStartDow) + 7) % 7;
+        return Mathf.CeilToInt((offset + daysInMonth) / 7f);
+    }
+
     private void UpdateGridCellSize()
     {
         if (calGridParent == null) return;
         var grid = calGridParent.GetComponent<UnityEngine.UI.GridLayoutGroup>();
         var rt   = calGridParent.GetComponent<RectTransform>();
         if (grid == null || rt.rect.width <= 0) return;
+
+        // 【重要】行数は月によって4〜6行に変わる。5行固定で高さを割ると、
+        // 6行必要な月（2026年は3月・5月・8月・11月）で最終週がはみ出して見切れる。
+        int rows = Mathf.Clamp(GetWeekRowCount(), 4, 6);
         float w = (rt.rect.width  - grid.spacing.x * 6f) / 7f;
-        float h = (rt.rect.height - grid.spacing.y * 4f) / 5f; // 最大5週表示
+        float h = (rt.rect.height - grid.spacing.y * (rows - 1)) / rows;
         grid.cellSize = new Vector2(Mathf.Max(1f, w), Mathf.Max(1f, h));
     }
 
     private void RefreshGrid()
     {
         if (calGridParent == null || dayCellPrefab == null) return;
+
+        // セル高さは行数に依存し、行数は月と週開始曜日で変わる。
+        // 初期化時に一度だけ計算する作りだと、月送り（ChangeMonth）や
+        // 週開始の切替（SetWeekStart）で6行になった月がはみ出すため、ここで毎回更新する。
+        UpdateGridCellSize();
 
         // 子を全削除
         foreach (Transform child in calGridParent)
