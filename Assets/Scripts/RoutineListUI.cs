@@ -13,6 +13,12 @@ using TMPro;
 /// </summary>
 public class RoutineListUI : MonoBehaviour
 {
+    /// <summary>FullList=Routineタブ（今日/今日以外の全件） / DailyToday=Daily右ペイン（その日の分だけ）</summary>
+    public enum RoutineDisplayMode { FullList, DailyToday }
+
+    [SerializeField] private RoutineDisplayMode displayMode = RoutineDisplayMode.FullList;
+    private DateTime _viewDate = DateTime.Now.Date; // DailyToday時の表示日（Dailyの<>で動く）
+
     [SerializeField] private Button addButton;
     [SerializeField] private Transform listContent;
     [SerializeField] private TMP_FontAsset font;
@@ -82,6 +88,25 @@ public class RoutineListUI : MonoBehaviour
 
     // ── リスト構築 ────────────────────────────
 
+    /// <summary>
+    /// Daily右ペインから使うための初期化。TodoListUI.InitForDaily と同じ役割。
+    /// Dailyでは「その日に出現するルーチン」だけを並べ、セクション見出しは出さない。
+    /// </summary>
+    public void InitForDaily(Transform content, TMP_FontAsset fontAsset, RoutineDetailUI detailUI)
+    {
+        listContent = content;
+        font        = fontAsset;
+        detail      = detailUI;
+        displayMode = RoutineDisplayMode.DailyToday;
+    }
+
+    /// <summary>Daily の日付送りに追従する（FullListでは未使用）。</summary>
+    public void SetViewDate(DateTime date)
+    {
+        _viewDate = date.Date;
+        Rebuild();
+    }
+
     public void Rebuild()
     {
         if (listContent == null) return;
@@ -92,7 +117,8 @@ public class RoutineListUI : MonoBehaviour
         if (nm == null) return;
 
         var all = nm.GetRoutines();
-        var today = DateTime.Now.Date;
+        // 表示日: Daily は _viewDate（<>で動く）、Routineタブは常に今日
+        var today = (displayMode == RoutineDisplayMode.DailyToday) ? _viewDate : DateTime.Now.Date;
         var todayKey = today.ToString("yyyy-MM-dd");
 
         var todays = all.Where(r => r.OccursOn(today))
@@ -104,6 +130,14 @@ public class RoutineListUI : MonoBehaviour
                         .OrderByDescending(r => r.priorityHigh)
                         .ThenBy(r => r.createdAt)
                         .ToList();
+
+        // Daily は「その日のための画面」なので、当日分だけを並べる（見出し・今日以外は出さない）
+        if (displayMode == RoutineDisplayMode.DailyToday)
+        {
+            foreach (var item in todays) BuildRow(item, todayKey, true);
+            if (todays.Count == 0) BuildEmptyLabel();
+            return;
+        }
 
         if (todays.Count > 0)
         {
@@ -496,6 +530,12 @@ public class RoutineListUI : MonoBehaviour
                 return string.Join("・", sorted.Select(d => DayNames[d]));
             case "interval":
                 return item.intervalDays <= 1 ? "毎日" : item.intervalDays + "日ごと";
+            case "monthly":
+                // 29〜31日は存在しない月があり月末に丸まるため、その旨を添える
+                if (item.monthlyLastDay) return "毎月末";
+                return item.monthlyDay >= 29
+                    ? $"毎月{item.monthlyDay}日(なければ月末)"
+                    : $"毎月{item.monthlyDay}日";
             default:
                 return "毎日";
         }

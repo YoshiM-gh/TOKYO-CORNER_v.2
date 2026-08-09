@@ -173,15 +173,31 @@ public class RoutineItem
     public string time;          // "HH:mm"（null可）
     public bool   priorityHigh;
 
-    // ── 繰り返しルール（MVP: daily / weekly / interval）──
-    public string repeatType = "daily";   // "daily" | "weekly" | "interval"
+    // ── 繰り返しルール（daily / weekly / interval / monthly）──
+    public string repeatType = "daily";   // "daily" | "weekly" | "interval" | "monthly"
     public List<int> weekdays = new List<int>(); // weekly: 0=日 〜 6=土
     public int    intervalDays = 1;          // interval: N日ごと
+    public int    monthlyDay = 1;            // monthly: 毎月何日（1〜31）
+    public bool   monthlyLastDay = false;    // monthly: trueなら日付を無視して「月末」
     public string startDate;     // "yyyy-MM-dd" 繰り返し起点（interval計算・表示開始）
     public string endDate;       // "yyyy-MM-dd"（null可＝終了なし）
 
     public List<string> completedDates = new List<string>(); // 完了した dateKey の集合
     public string createdAt;
+
+    /// <summary>
+    /// 毎月の出現判定。月によって日数が違うため、指定日が存在しない月は月末に丸める。
+    /// 例) 31日指定 → 2月は28日(閏年は29日) / 4月は30日。
+    /// これにより「毎月必ず1回」出現する（スキップしない）。
+    /// monthlyLastDay が true のときは日付を無視して常に月末。
+    /// </summary>
+    private bool OccursOnMonthly(DateTime day)
+    {
+        int lastDay = DateTime.DaysInMonth(day.Year, day.Month);
+        if (monthlyLastDay) return day.Day == lastDay;
+        int target = monthlyDay < 1 ? 1 : (monthlyDay > lastDay ? lastDay : monthlyDay);
+        return day.Day == target;
+    }
 
     /// <summary>この Routine が指定日に出現するか（カレンダー表示・一覧展開用）</summary>
     public bool OccursOn(DateTime day)
@@ -196,6 +212,7 @@ public class RoutineItem
             case "daily":    return true;
             case "weekly":   return weekdays != null && weekdays.Contains((int)day.DayOfWeek);
             case "interval": return intervalDays > 0 && ((day - start).Days % intervalDays) == 0;
+            case "monthly":  return OccursOnMonthly(day);
             default:           return false;
         }
     }

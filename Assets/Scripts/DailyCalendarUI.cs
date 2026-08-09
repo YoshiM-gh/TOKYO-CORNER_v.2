@@ -46,6 +46,7 @@ public class DailyCalendarUI : MonoBehaviour
     // ── 状態 ──────────────────────────────────────────────────
     private DateTime _currentDate;
     private TodoListUI _todoList; // 中央Todo列（Daily表示日と連動させる）
+    private RoutineListUI _routineList; // 右ペイン最上段のルーチン（Daily表示日と連動）
     private Button _todayBtn; private Image _todayBtnImg; private TextMeshProUGUI _todayBtnTxt; // 「今日に戻る」ボタン（今日以外でアクティブ）
     private int      _weekStartDow = 0; // 0=日、1=月
     private bool     _blockNextNoteSpawn;  // 空ノート削除直後のスポーン抑制
@@ -541,7 +542,9 @@ private void BuildTodoPanel(Transform parent)
             sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
         }
 
-        // --- TopBar（完了済み表示トグル ＋ 「+追加」） ---
+        // --- TopBar（画面全体に効く操作のみ）---
+        // Todo固有の「完了済みを表示」「+追加」はTodoセクションの見出し行へ移した。
+        // 右ペイン全体の上に置くと、最上段のルーチンに対する操作に見えてしまうため。
         var topBar = MakeGO("TopBar", content.transform);
         topBar.AddComponent<Image>().color = Color.clear;
         var tbHlg = topBar.AddComponent<HorizontalLayoutGroup>();
@@ -552,10 +555,22 @@ private void BuildTodoPanel(Transform parent)
         tbLE.minHeight = 40f; tbLE.preferredHeight = 40f; tbLE.flexibleHeight = 0f;
 
         BuildDailyTodayButton(topBar.transform);
-        var spacer = MakeGO("Spacer", topBar.transform);
-        spacer.AddComponent<LayoutElement>().flexibleWidth = 1f;
-        var showDoneToggle = BuildDailyDoneToggle(topBar.transform);
-        var addBtn = BuildDailyAddButton(topBar.transform);
+
+        // --- ルーチンセクション（右ペイン三層構造の最上段） ---
+        // 固定的なもの→変動するもの→自由記述、の順に並べる:
+        //   ルーチン（毎日ほぼ同数・場所を食わない）
+        //   → Todo（日によって増減）
+        //   → メモ（書くほど伸びる。伸びるものを下に置くと上が安定する）
+        BuildSectionLabel(content.transform, "今日のルーチン", false);
+        var routineHost = MakeGO("RoutineContent", content.transform);
+        var rVlg = routineHost.AddComponent<VerticalLayoutGroup>();
+        rVlg.childControlWidth = true; rVlg.childControlHeight = true;
+        rVlg.childForceExpandWidth = true; rVlg.childForceExpandHeight = false;
+        rVlg.childAlignment = TextAnchor.UpperCenter; rVlg.spacing = 8f;
+
+        var todoHeader = BuildSectionLabel(content.transform, "Todo", true);
+        var showDoneToggle = BuildDailyDoneToggle(todoHeader);
+        var addBtn = BuildDailyAddButton(todoHeader);
 
         // --- Todoリスト本体（外側スクロールに直載せ。内側スクロールは廃止） ---
         var listHost = MakeGO("ListContent", content.transform);
@@ -564,28 +579,59 @@ private void BuildTodoPanel(Transform parent)
         lVlg.childForceExpandWidth = true; lVlg.childForceExpandHeight = false;
         lVlg.childAlignment = TextAnchor.UpperCenter; lVlg.spacing = 8f;
 
-        // --- 付箋セクション（区切り＋見出し＋ボード） ---
-        var hdiv = MakeGO("FusenDivider", content.transform);
-        hdiv.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
-        var hdivLE = hdiv.AddComponent<LayoutElement>(); hdivLE.preferredHeight = 2f; hdivLE.minHeight = 2f;
-
-        var sec = MakeGO("FusenHeader", content.transform);
-        var secLE = sec.AddComponent<LayoutElement>(); secLE.preferredHeight = 28f; secLE.minHeight = 28f;
-        var secTxt = sec.AddComponent<TextMeshProUGUI>();
-        secTxt.text = "今日のメモ";
-        secTxt.fontSize = 14f;
-        secTxt.color = new Color(1f, 1f, 1f, 0.40f);
-        secTxt.alignment = TextAlignmentOptions.MidlineLeft;
-        secTxt.raycastTarget = false;
-
+        // --- メモセクション（三層構造の最下段） ---
+        BuildSectionLabel(content.transform, "今日のメモ", true);
         BuildStickyPanel(content.transform);
 
         // --- TodoListUI をアタッチして Daily 用に初期化 ---
         _todoList = go.AddComponent<TodoListUI>();
         _todoList.InitForDaily(listHost.transform, showDoneToggle, addBtn, null);
         _todoList.SetViewDate(_currentDate);
+
+        // --- RoutineListUI をアタッチして Daily 用に初期化 ---
+        // 詳細編集はRoutineタブ側に任せるため detail は渡さない（Dailyはチェックを付ける場所）
+        _routineList = go.AddComponent<RoutineListUI>();
+        _routineList.InitForDaily(routineHost.transform, null, null);
+        _routineList.SetViewDate(_currentDate);
         var todoModal = UnityEngine.Object.FindObjectOfType<TodoModal>(true);
         if (todoModal != null) _todoList.SetTodoModal(todoModal);
+    }
+
+    /// <summary>
+    /// セクション見出し（区切り線＋小さなラベル）。付箋セクションと同じ体裁に揃える。
+    /// 戻り値は見出し行のTransform。そのセクション固有の操作（Todoの「完了済みを表示」など）を
+    /// 右寄せで足せるようにしてある。操作を見出しと同じ行に置くことで、
+    /// 「どのセクションに効く操作か」が位置で分かる。
+    /// </summary>
+    private Transform BuildSectionLabel(Transform parent, string title, bool withDivider)
+    {
+        if (withDivider)
+        {
+            var div = MakeGO("Divider", parent);
+            div.AddComponent<Image>().color = UITheme_FocusMode.BorderDivider;
+            var divLE = div.AddComponent<LayoutElement>(); divLE.preferredHeight = 2f; divLE.minHeight = 2f;
+        }
+        var sec = MakeGO("SectionHeader", parent);
+        var hlg = sec.AddComponent<HorizontalLayoutGroup>();
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        hlg.childAlignment = TextAnchor.MiddleLeft; hlg.spacing = 16f;
+        var secLE = sec.AddComponent<LayoutElement>(); secLE.preferredHeight = 40f; secLE.minHeight = 40f;
+
+        var lblGO = MakeGO("Label", sec.transform);
+        var txt = lblGO.AddComponent<TextMeshProUGUI>();
+        txt.text = title;
+        txt.fontSize = 14f;
+        txt.color = new Color(1f, 1f, 1f, 0.40f);
+        txt.alignment = TextAlignmentOptions.MidlineLeft;
+        txt.raycastTarget = false;
+        var lblLE = lblGO.AddComponent<LayoutElement>();
+        lblLE.preferredWidth = txt.preferredWidth + 4f; lblLE.flexibleWidth = 0f;
+
+        // 以降に足す操作を右端へ寄せるためのスペーサー
+        var sp = MakeGO("Spacer", sec.transform);
+        sp.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        return sec.transform;
     }
 
     // Daily の TopBar 用「完了済みを表示」トグル。Todoタブと同一寸法（全体150x24/Box24x24/Check14x14/fontSize18）。
@@ -774,6 +820,7 @@ private void Update()
         Canvas.ForceUpdateCanvases();
         UpdateDayLabel();
         if (_todoList != null) _todoList.SetViewDate(_currentDate); // Daily表示日とTodoリストを連動
+        if (_routineList != null) _routineList.SetViewDate(_currentDate); // ルーチンも同じ日を見る
         UpdateTodayButton(); // 「今日」ボタンの有効/グレーアウトを更新
         RefreshDowRow();
         RefreshPolicyRow();

@@ -25,6 +25,12 @@ public class RoutineDetailUI : MonoBehaviour
     [SerializeField] private Button intervalBtn;
     [SerializeField] private Transform weekdayRow;     // 子: W0〜W6
     [SerializeField] private GameObject intervalRow;
+    [SerializeField] private Button monthlyBtn;          // 「毎月」セグメント
+    [SerializeField] private GameObject monthlyRow;      // 毎月の設定行
+    [SerializeField] private TMP_InputField monthlyDayInput;
+    [SerializeField] private Button monthlyDayDecBtn;
+    [SerializeField] private Button monthlyDayIncBtn;
+    [SerializeField] private Toggle monthlyLastDayToggle; // 「月末」
     [SerializeField] private TMP_InputField intervalInput;
     [SerializeField] private Button intervalDecBtn;
     [SerializeField] private Button intervalIncBtn;
@@ -55,6 +61,8 @@ public class RoutineDetailUI : MonoBehaviour
     private string _repeatType = "daily";
     private readonly HashSet<int> _weekdays = new HashSet<int>();
     private int _intervalDays = 2;
+    private int _monthlyDay = 1;
+    private bool _monthlyLastDay = false;
     private string _endDate;
     private int _hour = -1, _minute = 0;
     private bool _loading;
@@ -73,6 +81,7 @@ public class RoutineDetailUI : MonoBehaviour
         dailyBtn?.onClick.AddListener(() => SetRepeatType("daily"));
         weeklyBtn?.onClick.AddListener(() => SetRepeatType("weekly"));
         intervalBtn?.onClick.AddListener(() => SetRepeatType("interval"));
+        monthlyBtn?.onClick.AddListener(() => SetRepeatType("monthly"));
 
         if (weekdayRow != null)
         {
@@ -90,6 +99,18 @@ public class RoutineDetailUI : MonoBehaviour
 
         intervalDecBtn?.onClick.AddListener(() => ShiftInterval(-1));
         intervalIncBtn?.onClick.AddListener(() => ShiftInterval(+1));
+        monthlyDayDecBtn?.onClick.AddListener(() => ShiftMonthlyDay(-1));
+        monthlyDayIncBtn?.onClick.AddListener(() => ShiftMonthlyDay(+1));
+        monthlyDayInput?.onEndEdit.AddListener(v =>
+        {
+            if (int.TryParse(v, out int n)) _monthlyDay = Mathf.Clamp(n, 1, 31);
+            RefreshRepeatUI(); SaveNow();
+        });
+        monthlyLastDayToggle?.onValueChanged.AddListener(v =>
+        {
+            _monthlyLastDay = v;
+            RefreshRepeatUI(); SaveNow();
+        });
         intervalInput?.onEndEdit.AddListener(v =>
         {
             if (int.TryParse(v, out int n)) _intervalDays = Mathf.Clamp(n, 1, 365);
@@ -141,6 +162,8 @@ public class RoutineDetailUI : MonoBehaviour
         _weekdays.Clear();
         if (item.weekdays != null) foreach (var d in item.weekdays) _weekdays.Add(d);
         _intervalDays = Mathf.Clamp(item.intervalDays, 1, 365);
+        _monthlyDay = Mathf.Clamp(item.monthlyDay <= 0 ? 1 : item.monthlyDay, 1, 31);
+        _monthlyLastDay = item.monthlyLastDay;
         SetEndDate(string.IsNullOrEmpty(item.endDate) ? null : item.endDate);
         ParseTime(item.time);
         RefreshTimeDisplay();
@@ -192,6 +215,8 @@ public class RoutineDetailUI : MonoBehaviour
         _target.weekdays = new List<int>(_weekdays);
         _target.weekdays.Sort();
         _target.intervalDays = _intervalDays;
+        _target.monthlyDay = _monthlyDay;
+        _target.monthlyLastDay = _monthlyLastDay;
         _target.endDate = _endDate;
         _target.time = _hour >= 0 ? $"{_hour:D2}:{_minute:D2}" : null;
 
@@ -226,6 +251,8 @@ public class RoutineDetailUI : MonoBehaviour
         // 毎週に切替時、未選択なら今日の曜日をプリセット(「選ばせる」の初期値)
         if (type == "weekly" && _weekdays.Count == 0)
             _weekdays.Add((int)DateTime.Now.DayOfWeek);
+        if (type == "monthly" && _monthlyDay <= 0)
+            _monthlyDay = DateTime.Now.Day;
         RefreshRepeatUI();
         SaveNow();
     }
@@ -243,6 +270,14 @@ public class RoutineDetailUI : MonoBehaviour
         SaveNow();
     }
 
+    /// <summary>毎月の日付を1〜31で送る。存在しない日は判定側で月末に丸まる。</summary>
+    private void ShiftMonthlyDay(int d)
+    {
+        _monthlyDay = Mathf.Clamp(_monthlyDay + d, 1, 31);
+        RefreshRepeatUI();
+        SaveNow();
+    }
+
     private void ShiftInterval(int d)
     {
         _intervalDays = Mathf.Clamp(_intervalDays + d, 1, 365);
@@ -255,9 +290,11 @@ public class RoutineDetailUI : MonoBehaviour
         PaintSegment(dailyBtn, _repeatType == "daily");
         PaintSegment(weeklyBtn, _repeatType == "weekly");
         PaintSegment(intervalBtn, _repeatType == "interval");
+        PaintSegment(monthlyBtn, _repeatType == "monthly");
 
         if (weekdayRow != null) weekdayRow.gameObject.SetActive(_repeatType == "weekly");
         if (intervalRow != null) intervalRow.SetActive(_repeatType == "interval");
+        if (monthlyRow != null) monthlyRow.SetActive(_repeatType == "monthly");
 
         for (int i = 0; i < 7; i++)
         {
@@ -269,6 +306,19 @@ public class RoutineDetailUI : MonoBehaviour
         }
 
         if (intervalInput != null) intervalInput.text = _intervalDays.ToString();
+
+        // 「月末」選択中は日付欄を空にして無効化する。
+        // 数字が残っていると「15日と月末のどちらが効くのか」が読み取れないため。
+        // 値自体は _monthlyDay に保持しており、月末を外すと元の日付に戻る。
+        if (monthlyDayInput != null)
+        {
+            monthlyDayInput.text = _monthlyLastDay ? string.Empty : _monthlyDay.ToString();
+            monthlyDayInput.interactable = !_monthlyLastDay;
+        }
+        if (monthlyDayDecBtn != null) monthlyDayDecBtn.interactable = !_monthlyLastDay;
+        if (monthlyDayIncBtn != null) monthlyDayIncBtn.interactable = !_monthlyLastDay;
+        if (monthlyLastDayToggle != null && monthlyLastDayToggle.isOn != _monthlyLastDay)
+            monthlyLastDayToggle.SetIsOnWithoutNotify(_monthlyLastDay);
     }
 
     private void PaintSegment(Button btn, bool selected)
