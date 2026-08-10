@@ -592,6 +592,9 @@ private void BuildTodoPanel(Transform parent)
         // 詳細編集はRoutineタブ側に任せるため detail は渡さない（Dailyはチェックを付ける場所）
         _routineList = go.AddComponent<RoutineListUI>();
         _routineList.InitForDaily(routineHost.transform, null, null);
+        // Todoと同じく「⋯」でモーダルを開く（挙動を揃えるため）
+        var routineModal = UnityEngine.Object.FindObjectOfType<RoutineModal>(true);
+        if (routineModal != null) _routineList.SetRoutineModal(routineModal);
         _routineList.SetViewDate(_currentDate);
         var todoModal = UnityEngine.Object.FindObjectOfType<TodoModal>(true);
         if (todoModal != null) _todoList.SetTodoModal(todoModal);

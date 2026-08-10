@@ -18,6 +18,26 @@ public class RoutineListUI : MonoBehaviour
 
     [SerializeField] private RoutineDisplayMode displayMode = RoutineDisplayMode.FullList;
     private DateTime _viewDate = DateTime.Now.Date; // DailyToday時の表示日（Dailyの<>で動く）
+    private RoutineModal _routineModal; // Daily編集モーダル（DailyTodayのとき「⋯」で開く）
+
+    /// <summary>Daily右ペインから編集モーダルを渡す。TodoListUI.SetTodoModal と同じ役割。</summary>
+    public void SetRoutineModal(RoutineModal m)
+    {
+        if (_routineModal == m) return;
+        if (_routineModal != null)
+        {
+            _routineModal.OnChanged -= Rebuild;
+            _routineModal.OnDeleted -= OnModalDeleted;
+        }
+        _routineModal = m;
+        if (_routineModal != null)
+        {
+            _routineModal.OnChanged += Rebuild;
+            _routineModal.OnDeleted += OnModalDeleted;
+        }
+    }
+
+    private void OnModalDeleted(string id) => Rebuild();
 
     [SerializeField] private Button addButton;
     [SerializeField] private Transform listContent;
@@ -269,7 +289,20 @@ public class RoutineListUI : MonoBehaviour
         var moreRt = moreTmp.GetComponent<RectTransform>(); moreRt.anchorMin = Vector2.zero; moreRt.anchorMax = Vector2.one; moreRt.offsetMin = Vector2.zero; moreRt.offsetMax = Vector2.zero;
         var moreBtn = more.AddComponent<Button>(); moreBtn.transition = Selectable.Transition.None; moreBtn.targetGraphic = moreTmp;
         string capMore = item.id;
-        moreBtn.onClick.AddListener(() => StartRoutineRename(capMore));
+        // Dailyではモーダル、Routineタブでは従来どおりインライン編集。
+        // 同じ位置の同じ記号（⋯）が場所によって違う挙動をすると混乱するため、
+        // Daily側はTodoと揃えてモーダルを開く。
+        moreBtn.onClick.AddListener(() =>
+        {
+            if (displayMode == RoutineDisplayMode.DailyToday && _routineModal != null)
+            {
+                var nmm = NotebookManager.Instance;
+                var target = nmm != null ? nmm.GetRoutines().Find(x => x.id == capMore) : null;
+                if (target != null) _routineModal.OpenEdit(target);
+            }
+            else
+                StartRoutineRename(capMore);
+        });
 
         var rowBtn = row.AddComponent<Button>();
         rowBtn.transition = Selectable.Transition.None;
