@@ -42,6 +42,16 @@ public class AssetPatchGuard : IPreprocessBuildWithReport
             Why = "同上（Creative_Characters側にも同じバグ）"
         },
         new Patch {
+            File = "Assets/ithappy/City_Characters/Scripts/Character_Controller/CharacterMover.cs",
+            Marker = "m_Movement?.SetStats(m_WalkSpeed, m_RunSpeed,",
+            Why = "OnValidateだけが/3.6の換算をしておりエディタだけ移動が遅くなる問題の修正"
+        },
+        new Patch {
+            File = "Assets/ithappy/Creative_Characters/Scripts/Character_Controller/CharacterMover.cs",
+            Marker = "m_Movement?.SetStats(m_WalkSpeed, m_RunSpeed,",
+            Why = "同上（Creative_Characters側にも同じ不整合）"
+        },
+        new Patch {
             File = "Assets/ithappy/Cartoon_City/Traffic/Scripts/PrefabSwitch.cs",
             Marker = "#if UNITY_EDITOR",
             Why = "エディタ拡張がランタイムに混ざりビルドが通らないためのガード"

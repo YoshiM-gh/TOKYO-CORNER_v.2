@@ -33,6 +33,18 @@ public class PlayerAvatarLoader : MonoBehaviour
         var neo = Instantiate(entry.prefab, old.transform.position, old.transform.rotation);
         neo.tag = old.tag;
 
+        // 【重要】移植が終わるまで Awake を走らせない。
+        // 非アクティブなGameObjectへ AddComponent しても Awake は実行されず、
+        // アクティブに戻した瞬間にまとめて走る。これで「値を入れてから Awake」の順になる。
+        //
+        // アクティブのまま移植すると、AddComponent の時点で Awake が走り、
+        // 【プレハブの既定値】でランタイム状態が組み上がってしまう。
+        // 例: CharacterMover.Awake は m_WalkSpeed から MovementHandler を作るが、
+        //     このときはまだ既定値(1.5)で、後からコピーされるインスペクタ値(3)は反映されない。
+        //     結果、設定の半分の速度でしか歩けなくなる（実測で確認）。
+        //     エディタでは OnValidate がたまたま SetStats を呼び直して辻褄を合わせていた。
+        neo.SetActive(false);
+
         // Animator: 移動コントローラを【先に】設定する。
         // CharacterMover.Awake(AddComponent時に即実行)が BuildAnimatorTargets で
         // 親Animatorのcontrollerを全子パーツへ配布するため、後から設定すると全身Tポーズになる。
@@ -50,6 +62,10 @@ public class PlayerAvatarLoader : MonoBehaviour
         // 標準のMovePlayerInputが動き、targetが(0,0,0)＝ワールド原点向きに戻ってしまう。
         CopyComponentTo(old, neo, System.Type.GetType("FixedCameraPlayerInput, Assembly-CSharp"));
         CopyComponentTo(old, neo, System.Type.GetType("SitPoseHotkeyDebug, Assembly-CSharp"));
+
+        // 移植が済んだのでアクティブに戻す。ここで各コンポーネントの Awake が
+        // 「正しい値が入った状態」で一斉に走る。
+        neo.SetActive(true);
 
         // カメラの追従先を差し替え（ithappy公式API）
         foreach (var cam in FindObjectsByType<Controller.PlayerCamera>(FindObjectsSortMode.None))

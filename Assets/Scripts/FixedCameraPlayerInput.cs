@@ -59,7 +59,14 @@ public class FixedCameraPlayerInput : MonoBehaviour
 
         var raw = new Vector2(Input.GetAxis(horizontalAxis), Input.GetAxis(verticalAxis));
         bool isRun = Input.GetKey(runKey);
-        bool isJump = Input.GetButton(jumpButton);
+        // 【重要】GetButton（押しっぱなしでtrue）ではなく GetButtonDown（押した瞬間だけ）を使う。
+        // CharacterMover.CaculateGravity は接地中に isJump が立っていないと
+        //   m_GravityAcelleration = Physics.gravity
+        // で毎フレーム上書きする。GetButton だとジャンプ直後（まだ接地判定が残っている間）に
+        // 上向きの初速が消え、8cmほど浮いて終わる。さらに m_jumpTimer=1秒 が入るため
+        // 押しっぱなしでは二度と飛べない。標準の MovePlayerInput も同じ実装だが、
+        // アセット側は触らずこちらで正す。
+        bool isJump = Input.GetButtonDown(jumpButton);
 
         // 画面基準の進行方向（W=画面奥/+Z、D=画面右/+X）。止まっている間は直前の向きを保つ
         var dir = new Vector3(raw.x, 0f, raw.y);

@@ -55,7 +55,11 @@ namespace ithappy.Creative_Characters.Controller
             m_WalkSpeed = Mathf.Max(m_WalkSpeed, 0f);
             m_RunSpeed = Mathf.Max(m_RunSpeed, m_WalkSpeed);
 
-            m_Movement?.SetStats(m_WalkSpeed / 3.6f, m_RunSpeed / 3.6f, m_RotateSpeed, m_JumpHeight, m_Space);
+            // 2026-08-10 修正: OnValidate だけが km/h→m/s の換算(/3.6)をしており、
+            // コンストラクタ側は換算していなかった。同じ設定値なのに経路で3.6倍ずれる。
+            // OnValidate はエディタでしか呼ばれないため、エディタだけ移動が遅くなっていた
+            // （実測: 設定3に対して0.42m/s）。ビルド側の挙動（m/sとして扱う）に統一する。
+            m_Movement?.SetStats(m_WalkSpeed, m_RunSpeed, m_RotateSpeed, m_JumpHeight, m_Space);
         }
 
         private void Awake()
